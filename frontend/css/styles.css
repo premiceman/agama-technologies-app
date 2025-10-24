@@ -1,0 +1,26 @@
+:root{
+  --bg: #0b0f17;
+  --bg-body: #0f1522;
+  --glass: rgba(255,255,255,.06);
+  --fg: #eef2ff;
+  --fg-2: #c6d0f7;
+  --fg-3: #93a0c7;
+  --brand: #7c9cff;
+  --brand-2: #00e5c1;
+}
+*{ box-sizing: border-box }
+body{ background: var(--bg-body); color: var(--fg); }
+a{ color: var(--brand) }
+.bg-glass{ background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02)) }
+.grad{ background: linear-gradient(90deg, var(--brand), var(--brand-2)); -webkit-background-clip: text; background-clip: text; color: transparent }
+.brand-dot{ width:12px; height:12px; border-radius:50%; display:inline-block; background:radial-gradient(circle at 30% 30%, var(--brand-2), var(--brand)); box-shadow:0 0 10px var(--brand-2) }
+.card.glass{ background: var(--glass); border: 1px solid rgba(255,255,255,.08); backdrop-filter: blur(6px) }
+.navbar-brand{ color:var(--fg); text-decoration:none }
+.hero{ padding-top: 6rem; padding-bottom: 3rem }
+.text-fg-2{ color: var(--fg-2) }
+.text-fg-3{ color: var(--fg-3) }
+.btn-primary{ background: linear-gradient(90deg, var(--brand), var(--brand-2)); border: none }
+.btn-outline-light{ border-color: rgba(255,255,255,.3); color: var(--fg) }
+input, select, textarea{ background:#0b1220 !important; border-color:rgba(255,255,255,.15) !important; color:var(--fg) !important }
+.locked{ filter: blur(3px); pointer-events: none; user-select: none; }
+.badge-pill{ border-radius: 999px; padding: .35rem .6rem; background: rgba(255,255,255,.08); color: var(--fg-2); border: 1px solid rgba(255,255,255,.1) }

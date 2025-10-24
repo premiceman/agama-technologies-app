@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Free Assessment — Agama Technologies</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body class="bg-body">
+  <div class="container py-4" style="max-width:900px">
+    <h1 class="mb-3">Free Maturity Assessment</h1>
+    <p class="text-fg-3">Answer a few questions across Observability, Security, AIOps, and Business Analytics. Scores are 0–5 for each line item.</p>
+    <form id="assessForm" class="card glass p-4">
+      <div class="row g-3">
+        <div class="col-md-4"><label class="form-label">Industry</label>
+          <select class="form-select" name="vertical" id="vertical">
+            <option value="generic" selected>Generic</option>
+            <option value="saas">SaaS</option>
+          </select>
+        </div>
+        <div class="col-md-4"><label class="form-label">Company size</label>
+          <select class="form-select" name="companySize">
+            <option>SMB</option><option>Mid-market</option><option>Enterprise</option>
+          </select>
+        </div>
+        <div class="col-md-4"><label class="form-label">Region</label>
+          <select class="form-select" name="region">
+            <option>EMEA</option><option>AMER</option><option>APAC</option>
+          </select>
+        </div>
+      </div>
+      <hr>
+      <div id="questions"></div>
+      <button class="btn btn-primary mt-3" type="submit">Generate report</button>
+    </form>
+  </div>
+  <script>
+    const qWrap = document.getElementById('questions');
+    const vSel = document.getElementById('vertical');
+
+    async function loadQuestions() {
+      const res = await fetch('/api/assessments/questions?vertical=' + vSel.value);
+      const json = await res.json();
+      qWrap.innerHTML = '';
+      for (const [pillar, items] of Object.entries(json.questions.pillars)) {
+        const sec = document.createElement('section');
+        sec.className = 'mb-3';
+        sec.innerHTML = `<h4 class="mb-2">${pillar}</h4>`;
+        for (const item of items) {
+          const id = `${pillar}_${item.id}`.replace(/\s+/g,'_');
+          sec.innerHTML += `
+            <div class="row align-items-center mb-2">
+              <div class="col"><label class="form-label">${item.text}</label></div>
+              <div class="col-3">
+                <input class="form-control" name="${pillar}:${item.id}" type="number" min="0" max="5" step="1" value="3">
+              </div>
+            </div>`;
+        }
+        qWrap.appendChild(sec);
+      }
+    }
+    vSel.addEventListener('change', loadQuestions);
+    loadQuestions();
+
+    document.getElementById('assessForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const data = Object.fromEntries(new FormData(form).entries());
+      const answers = {};
+      for (const [k,v] of Object.entries(data)) {
+        if (k.includes(':')) {
+          const [pillar, qid] = k.split(':');
+          answers[pillar] = answers[pillar] || {};
+          answers[pillar][qid] = Number(v);
+          delete data[k];
+        }
+      }
+      data.answers = answers;
+      const res = await fetch('/api/assessments', {
+        method: 'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(data)
+      });
+      const json = await res.json();
+      if (json.ok) location.href = '/report.html?id=' + json.reportId;
+      else alert(json.error || 'Error');
+    });
+  </script>
+</body>
+</html>

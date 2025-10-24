@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: agama-tech
+    rootDir: backend
+    runtime: node
+    repo: https://example.com/your/repo.git   # replace after pushing
+    buildCommand: npm ci && npm run build-frontend
+    startCommand: npm start
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: https://www.agamatechnologies.com

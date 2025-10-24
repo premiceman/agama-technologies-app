@@ -1,0 +1,11 @@
+{
+  "medians": {
+    "overall": 60,
+    "pillars": {
+      "Observability": 62,
+      "Security": 58,
+      "AIOps": 55,
+      "Business Analytics": 61
+    }
+  }
+}
