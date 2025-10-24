@@ -1,0 +1,29 @@
+{
+  "pillars": {
+    "Observability": [
+      {"id":"obs_1","text":"Full-fidelity tracing across multi-tenant services","weight":1},
+      {"id":"obs_2","text":"Customer journey dashboards with SLO guardrails","weight":1},
+      {"id":"obs_3","text":"Progressive delivery observability gates","weight":1},
+      {"id":"obs_4","text":"Automated incident retrospectives","weight":1}
+    ],
+    "Security": [
+      {"id":"sec_1","text":"Tenant isolation hardening and continuous testing","weight":1},
+      {"id":"sec_2","text":"Application security pipeline (SAST/DAST/IAST)","weight":1},
+      {"id":"sec_3","text":"Live compliance reporting (SOC2, ISO)","weight":1},
+      {"id":"sec_4","text":"Customer data protection with data mesh governance","weight":1}
+    ],
+    "AIOps": [
+      {"id":"aiops_1","text":"Predictive churn signals fed into support workflows","weight":1},
+      {"id":"aiops_2","text":"Automated rollback / remediation workflows","weight":1},
+      {"id":"aiops_3","text":"Noise reduction with ML-driven event correlation","weight":1},
+      {"id":"aiops_4","text":"Capacity & cost forecasting integrated with FinOps","weight":1}
+    ],
+    "Business Analytics": [
+      {"id":"ba_1","text":"Product analytics loops for experimentation","weight":1},
+      {"id":"ba_2","text":"AI-assisted revenue forecasting and pricing models","weight":1},
+      {"id":"ba_3","text":"Data contracts across domains","weight":1},
+      {"id":"ba_4","text":"Embedded analytics within customer experience","weight":1}
+    ]
+  },
+  "scale": { "min": 0, "max": 5, "label": "0-5 maturity per item" }
+}
