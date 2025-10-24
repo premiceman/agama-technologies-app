@@ -112,7 +112,9 @@ app.get('/api/assessments/questions', (req, res) => {
 // Create assessment -> compute report (partial by default)
 app.post('/api/assessments', requireAuth, async (req, res) => {
   try {
-    const { vertical='generic', companySize='SMB', region='EMEA', answers={} } = req.body || {};
+    const { vertical: verticalRaw='generic', companySize='SMB', region='EMEA', answers={} } = req.body || {};
+    const safeVertical = String(verticalRaw || 'generic').toLowerCase();
+    const vertical = ['generic', 'saas'].includes(safeVertical) ? safeVertical : 'generic';
     const assessment = await Assessment.create({
       userId: req.auth.uid,
       vertical, companySize, region, answers
@@ -139,15 +141,42 @@ app.get('/api/reports/:id', requireAuth, async (req, res) => {
     const partial = {
       _id: rep._id,
       createdAt: rep.createdAt,
+      vertical: rep.vertical,
       summary: rep.summary,
       headlineScore: rep.headlineScore,
       pillarScores: rep.pillarScores,
-      benchmarks: rep.benchmarks,
+      benchmarks: { medians: rep.benchmarks?.medians },
       recommendations: rep.recommendations.slice(0, 3),
+      competitorSummary: rep.competitorSummary ? {
+        percentile: rep.competitorSummary.percentile,
+        narrative: rep.competitorSummary.narrative,
+        median: rep.competitorSummary.median
+      } : undefined,
+      pillarInsights: Object.fromEntries(Object.entries(rep.pillarInsights || {}).slice(0, 1)),
+      investmentOutlook: {
+        savingsNarrative: rep.investmentOutlook?.savingsNarrative,
+        pillarAllocations: Object.fromEntries(Object.entries(rep.investmentOutlook?.pillarAllocations || {}).slice(0, 1))
+      },
+      roadmap: Object.fromEntries(Object.entries(rep.roadmap || {}).slice(0, 1)),
+      technologyRadar: (rep.technologyRadar || []).slice(0, 1),
       paid: rep.paid,
       partial: !rep.paid
     };
     res.json({ ok: true, report: rep.paid ? rep : partial });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// List latest reports for dashboard
+app.get('/api/reports', requireAuth, async (req, res) => {
+  try {
+    const reports = await Report.find({ userId: req.auth.uid })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .select('_id createdAt headlineScore paid vertical');
+    res.json({ ok: true, reports });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

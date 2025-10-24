@@ -8,57 +8,74 @@
   <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body class="bg-body">
-  <div class="container py-4" style="max-width:900px">
-    <h1 class="mb-3">Free Maturity Assessment</h1>
-    <p class="text-fg-3">Answer a few questions across Observability, Security, AIOps, and Business Analytics. Scores are 0–5 for each line item.</p>
+  <div class="container py-5 report-wrapper">
+    <div class="mb-4 text-center">
+      <span class="eyebrow">Executive Assessment</span>
+      <h1 class="fw-bold">Build your Observability · Security · AIOps · Analytics maturity baseline</h1>
+      <p class="text-fg-3">The assessment takes ~5 minutes. Scores use a 0–5 scale. You'll instantly receive a complimentary preview of your benchmarked report.</p>
+    </div>
     <form id="assessForm" class="card glass p-4">
       <div class="row g-3">
-        <div class="col-md-4"><label class="form-label">Industry</label>
+        <div class="col-md-4">
+          <label class="form-label">Industry vertical</label>
           <select class="form-select" name="vertical" id="vertical">
-            <option value="generic" selected>Generic</option>
-            <option value="saas">SaaS</option>
+            <option value="generic" selected>Cross-industry</option>
+            <option value="saas">SaaS & Product</option>
           </select>
         </div>
-        <div class="col-md-4"><label class="form-label">Company size</label>
+        <div class="col-md-4">
+          <label class="form-label">Company size</label>
           <select class="form-select" name="companySize">
-            <option>SMB</option><option>Mid-market</option><option>Enterprise</option>
+            <option>SMB</option>
+            <option>Mid-market</option>
+            <option>Enterprise</option>
           </select>
         </div>
-        <div class="col-md-4"><label class="form-label">Region</label>
+        <div class="col-md-4">
+          <label class="form-label">Region</label>
           <select class="form-select" name="region">
-            <option>EMEA</option><option>AMER</option><option>APAC</option>
+            <option>EMEA</option>
+            <option>AMER</option>
+            <option>APAC</option>
           </select>
         </div>
       </div>
-      <hr>
-      <div id="questions"></div>
-      <button class="btn btn-primary mt-3" type="submit">Generate report</button>
+      <hr class="my-4" />
+      <div id="questions" class="d-flex flex-column gap-4"></div>
+      <div class="notice mt-4">
+        <strong>Preview access:</strong> You will see your overall score, pillar breakdown, and initial recommendations for free. Unlock detailed benchmarks, roadmap, budget alignment, and technology radar with the full report.
+      </div>
+      <button class="btn btn-primary btn-lg mt-4" type="submit">Generate my maturity report</button>
     </form>
   </div>
+
   <script>
     const qWrap = document.getElementById('questions');
     const vSel = document.getElementById('vertical');
 
     async function loadQuestions() {
-      const res = await fetch('/api/assessments/questions?vertical=' + vSel.value);
+      const res = await fetch('/api/assessments/questions?vertical=' + encodeURIComponent(vSel.value));
+      if (!res.ok) { alert('Unable to load questions.'); return; }
       const json = await res.json();
       qWrap.innerHTML = '';
-      for (const [pillar, items] of Object.entries(json.questions.pillars)) {
+      Object.entries(json.questions.pillars).forEach(([pillar, items]) => {
         const sec = document.createElement('section');
-        sec.className = 'mb-3';
-        sec.innerHTML = `<h4 class="mb-2">${pillar}</h4>`;
-        for (const item of items) {
+        sec.innerHTML = `<div class="d-flex justify-content-between align-items-center mb-2"><h4 class="m-0">${pillar}</h4><span class="badge-pill">0-5 maturity</span></div>`;
+        items.forEach(item => {
           const id = `${pillar}_${item.id}`.replace(/\s+/g,'_');
-          sec.innerHTML += `
-            <div class="row align-items-center mb-2">
-              <div class="col"><label class="form-label">${item.text}</label></div>
-              <div class="col-3">
-                <input class="form-control" name="${pillar}:${item.id}" type="number" min="0" max="5" step="1" value="3">
-              </div>
+          const row = document.createElement('div');
+          row.className = 'row g-3 align-items-center mb-2';
+          row.innerHTML = `
+            <div class="col-lg-9">
+              <label class="form-label" for="${id}">${item.text}</label>
+            </div>
+            <div class="col-lg-3">
+              <input class="form-control" id="${id}" name="${pillar}:${item.id}" type="number" min="0" max="5" step="1" value="3">
             </div>`;
-        }
+          sec.appendChild(row);
+        });
         qWrap.appendChild(sec);
-      }
+      });
     }
     vSel.addEventListener('change', loadQuestions);
     loadQuestions();
@@ -68,21 +85,32 @@
       const form = e.target;
       const data = Object.fromEntries(new FormData(form).entries());
       const answers = {};
-      for (const [k,v] of Object.entries(data)) {
-        if (k.includes(':')) {
-          const [pillar, qid] = k.split(':');
+      Object.entries(data).forEach(([key, value]) => {
+        if (key.includes(':')) {
+          const [pillar, qid] = key.split(':');
           answers[pillar] = answers[pillar] || {};
-          answers[pillar][qid] = Number(v);
-          delete data[k];
+          answers[pillar][qid] = Number(value);
+          delete data[key];
         }
-      }
+      });
       data.answers = answers;
       const res = await fetch('/api/assessments', {
-        method: 'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(data)
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data)
       });
+      if (res.status === 401) {
+        alert('Please sign in to save your assessment.');
+        location.href = '/login.html';
+        return;
+      }
       const json = await res.json();
-      if (json.ok) location.href = '/report.html?id=' + json.reportId;
-      else alert(json.error || 'Error');
+      if (json.ok) {
+        location.href = '/report.html?id=' + json.reportId;
+      } else {
+        alert(json.error || 'Unable to generate report');
+      }
     });
   </script>
 </body>
