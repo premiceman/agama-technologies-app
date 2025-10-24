@@ -3,115 +3,140 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Free Assessment — Agama Technologies</title>
+  <title>Enterprise Assessment Wizard — Agama Technologies</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body class="bg-body">
   <div class="container py-5 report-wrapper">
     <div class="mb-4 text-center">
-      <span class="eyebrow">Executive Assessment</span>
-      <h1 class="fw-bold">Build your Observability · Security · AIOps · Analytics maturity baseline</h1>
-      <p class="text-fg-3">The assessment takes ~5 minutes. Scores use a 0–5 scale. You'll instantly receive a complimentary preview of your benchmarked report.</p>
+      <span class="eyebrow">Enterprise-grade assessment</span>
+      <h1 class="fw-bold">Design your modernisation blueprint</h1>
+      <p class="text-fg-3">
+        Navigate the four-step wizard to capture strategic focus, company context, technology landscape, and maturity baselines.
+        Your complimentary executive preview will highlight benchmarks, risks, and persona-ready actions.
+      </p>
     </div>
-    <form id="assessForm" class="card glass p-4">
-      <div class="row g-3">
-        <div class="col-md-4">
-          <label class="form-label">Industry vertical</label>
-          <select class="form-select" name="vertical" id="vertical">
-            <option value="generic" selected>Cross-industry</option>
-            <option value="saas">SaaS & Product</option>
-          </select>
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">Company size</label>
-          <select class="form-select" name="companySize">
-            <option>SMB</option>
-            <option>Mid-market</option>
-            <option>Enterprise</option>
-          </select>
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">Region</label>
-          <select class="form-select" name="region">
-            <option>EMEA</option>
-            <option>AMER</option>
-            <option>APAC</option>
-          </select>
-        </div>
+
+    <form id="assessmentWizard" class="card glass p-4">
+      <div class="wizard-progress mb-4">
+        <div class="wizard-step active" data-step="1">Focus</div>
+        <div class="wizard-step" data-step="2">Company</div>
+        <div class="wizard-step" data-step="3">Technology</div>
+        <div class="wizard-step" data-step="4">Maturity</div>
       </div>
-      <hr class="my-4" />
-      <div id="questions" class="d-flex flex-column gap-4"></div>
-      <div class="notice mt-4">
-        <strong>Preview access:</strong> You will see your overall score, pillar breakdown, and initial recommendations for free. Unlock detailed benchmarks, roadmap, budget alignment, and technology radar with the full report.
+
+      <section class="wizard-section" data-step="1">
+        <h3 class="h4 mb-3">Choose your primary assessment</h3>
+        <div id="capabilityOptions" class="row g-3"></div>
+        <div class="mt-3">
+          <label class="form-label">Additional capability focus</label>
+          <select id="capabilityFocus" class="form-select" multiple></select>
+          <div class="form-text">Hold Ctrl/Cmd to select multiple focus domains relevant to your transformation.</div>
+        </div>
+        <div class="row g-3 mt-1">
+          <div class="col-md-4">
+            <label class="form-label">Company size</label>
+            <select name="companySize" class="form-select" required>
+              <option value="SMB">1-499 employees</option>
+              <option value="Mid-market">500-4,999 employees</option>
+              <option value="Enterprise">5,000+ employees</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Primary region</label>
+            <select name="region" class="form-select" required>
+              <option value="EMEA">EMEA</option>
+              <option value="AMER">AMER</option>
+              <option value="APAC">APAC</option>
+              <option value="Global">Global footprint</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Industry</label>
+            <select name="industry" id="industry" class="form-select" required></select>
+          </div>
+        </div>
+        <div class="mt-3">
+          <label class="form-label">Strategic drivers</label>
+          <div id="strategicDrivers" class="row g-2"></div>
+        </div>
+        <div class="mt-3">
+          <label class="form-label">Official organisation intelligence</label>
+          <select id="officialOrg" class="form-select">
+            <option value="">Select an official organisation (optional)</option>
+          </select>
+          <div class="form-text">We automatically synthesise guidance from the selected organisation (e.g. Gartner, NIST) using the OpenAI intelligence engine.</div>
+        </div>
+      </section>
+
+      <section class="wizard-section d-none" data-step="2">
+        <h3 class="h4 mb-3">Company profile & personas</h3>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Company name</label>
+            <input type="text" name="companyName" class="form-control" placeholder="e.g. Horizon Cloud" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Headcount</label>
+            <input type="number" name="headcount" class="form-control" min="1" placeholder="e.g. 1200" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Annual revenue (USD)</label>
+            <input type="number" name="annualRevenue" class="form-control" min="0" step="1000000" placeholder="e.g. 75000000" required>
+          </div>
+        </div>
+        <div class="row g-3 mt-1">
+          <div class="col-md-6">
+            <label class="form-label">Transformation stage</label>
+            <select name="transformationStage" class="form-select" required>
+              <option value="Modernisation programme mobilising">Modernisation programme mobilising</option>
+              <option value="Scaling transformation">Scaling transformation</option>
+              <option value="Optimising for value">Optimising for value</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Risk appetite</label>
+            <select name="riskAppetite" class="form-select" required>
+              <option value="Conservative">Conservative</option>
+              <option value="Balanced">Balanced</option>
+              <option value="Bold innovation">Bold innovation</option>
+            </select>
+          </div>
+        </div>
+        <div class="mt-3">
+          <label class="form-label">Key personas involved</label>
+          <div id="personaOptions" class="row g-2"></div>
+          <div class="form-text">Select all personas who will consume the report. We tailor briefings for each stakeholder.</div>
+        </div>
+        <div class="mt-3">
+          <label class="form-label">Narrative context</label>
+          <textarea name="narrativeContext" class="form-control" rows="3" placeholder="Summarise current initiatives, pain points, or board-level priorities."></textarea>
+        </div>
+      </section>
+
+      <section class="wizard-section d-none" data-step="3">
+        <h3 class="h4 mb-3">Technology landscape</h3>
+        <p class="text-fg-3">Document the systems, vendors, or initiatives aligned to each capability area.</p>
+        <div id="techLandscape" class="row g-3"></div>
+      </section>
+
+      <section class="wizard-section d-none" data-step="4">
+        <h3 class="h4 mb-3">Maturity baseline (0-5 scale)</h3>
+        <div id="questionnaire" class="d-flex flex-column gap-4"></div>
+        <div class="notice mt-3">
+          <strong>Executive preview access:</strong> your complimentary report includes maturity summary, persona briefings, core risks, and recommended next steps. Upgrade after viewing to unlock deep-dive analytics and premium questionnaire.
+        </div>
+      </section>
+
+      <div class="d-flex justify-content-between align-items-center mt-4">
+        <button type="button" class="btn btn-outline-light" id="prevStep" disabled>Back</button>
+        <button type="button" class="btn btn-primary" id="nextStep">Next</button>
+        <button type="submit" class="btn btn-primary d-none" id="submitWizard">Generate my executive preview</button>
       </div>
-      <button class="btn btn-primary btn-lg mt-4" type="submit">Generate my maturity report</button>
     </form>
   </div>
 
-  <script>
-    const qWrap = document.getElementById('questions');
-    const vSel = document.getElementById('vertical');
-
-    async function loadQuestions() {
-      const res = await fetch('/api/assessments/questions?vertical=' + encodeURIComponent(vSel.value));
-      if (!res.ok) { alert('Unable to load questions.'); return; }
-      const json = await res.json();
-      qWrap.innerHTML = '';
-      Object.entries(json.questions.pillars).forEach(([pillar, items]) => {
-        const sec = document.createElement('section');
-        sec.innerHTML = `<div class="d-flex justify-content-between align-items-center mb-2"><h4 class="m-0">${pillar}</h4><span class="badge-pill">0-5 maturity</span></div>`;
-        items.forEach(item => {
-          const id = `${pillar}_${item.id}`.replace(/\s+/g,'_');
-          const row = document.createElement('div');
-          row.className = 'row g-3 align-items-center mb-2';
-          row.innerHTML = `
-            <div class="col-lg-9">
-              <label class="form-label" for="${id}">${item.text}</label>
-            </div>
-            <div class="col-lg-3">
-              <input class="form-control" id="${id}" name="${pillar}:${item.id}" type="number" min="0" max="5" step="1" value="3">
-            </div>`;
-          sec.appendChild(row);
-        });
-        qWrap.appendChild(sec);
-      });
-    }
-    vSel.addEventListener('change', loadQuestions);
-    loadQuestions();
-
-    document.getElementById('assessForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const form = e.target;
-      const data = Object.fromEntries(new FormData(form).entries());
-      const answers = {};
-      Object.entries(data).forEach(([key, value]) => {
-        if (key.includes(':')) {
-          const [pillar, qid] = key.split(':');
-          answers[pillar] = answers[pillar] || {};
-          answers[pillar][qid] = Number(value);
-          delete data[key];
-        }
-      });
-      data.answers = answers;
-      const res = await fetch('/api/assessments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(data)
-      });
-      if (res.status === 401) {
-        alert('Please sign in to save your assessment.');
-        location.href = '/login.html';
-        return;
-      }
-      const json = await res.json();
-      if (json.ok) {
-        location.href = '/report.html?id=' + json.reportId;
-      } else {
-        alert(json.error || 'Unable to generate report');
-      }
-    });
-  </script>
+  <script type="module" src="/js/free-assessment.js"></script>
 </body>
 </html>

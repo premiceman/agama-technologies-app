@@ -18,6 +18,7 @@
         <div id="reportActions">
           <a href="/dashboard.html" class="btn btn-outline-light">Dashboard</a>
           <button id="unlock" class="btn btn-primary d-none">Unlock full report (mock payment)</button>
+          <a id="premiumIntake" class="btn btn-outline-light d-none">Complete premium intake</a>
         </div>
       </div>
 
@@ -101,6 +102,71 @@
           <div class="locked-overlay d-none" data-lock-overlay>
             <div class="h5">Technology radar locked</div>
             <p class="text-fg-3">Unlock tailored vendor recommendations, adoption guidance, and integration notes.</p>
+            <button class="btn btn-primary" data-lock-unlock>Unlock full report</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card glass p-4 mb-4" data-lockable="true" id="personaCard">
+        <div class="position-relative">
+          <h5 class="section-heading">Persona briefings</h5>
+          <div id="personaBriefings" class="row g-3"></div>
+          <div class="locked-overlay d-none" data-lock-overlay>
+            <div class="h5">Persona playbooks locked</div>
+            <p class="text-fg-3">Upgrade for full CxO briefings, analyst guidance, and talent recommendations.</p>
+            <button class="btn btn-primary" data-lock-unlock>Unlock full report</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-4 mb-4">
+        <div class="col-lg-6">
+          <div class="card glass p-4 h-100" data-lockable="true" id="riskCard">
+            <div class="position-relative">
+              <h5 class="section-heading">Risk register</h5>
+              <div id="riskRegister" class="d-flex flex-column gap-2"></div>
+              <div class="locked-overlay d-none" data-lock-overlay>
+                <div class="h5">Full risk register locked</div>
+                <p class="text-fg-3">Unlock quantified impact, mitigation owners, and sequencing.</p>
+                <button class="btn btn-primary" data-lock-unlock>Unlock full report</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card glass p-4 h-100" data-lockable="true" id="revenueCard">
+            <div class="position-relative">
+              <h5 class="section-heading">Value opportunities</h5>
+              <div id="revenueOpportunities" class="d-flex flex-column gap-2"></div>
+              <div class="locked-overlay d-none" data-lock-overlay>
+                <div class="h5">Value roadmap locked</div>
+                <p class="text-fg-3">Upgrade to view revenue, cost, and experience levers with business cases.</p>
+                <button class="btn btn-primary" data-lock-unlock>Unlock full report</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card glass p-4 mb-4" data-lockable="true" id="operatingCard">
+        <div class="position-relative">
+          <h5 class="section-heading">Operating model game plan</h5>
+          <div id="operatingPlan" class="roadmap-grid"></div>
+          <div class="locked-overlay d-none" data-lock-overlay>
+            <div class="h5">Operating plan locked</div>
+            <p class="text-fg-3">Unlock detailed sequencing, accountable owners, and automation levers.</p>
+            <button class="btn btn-primary" data-lock-unlock>Unlock full report</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card glass p-4" data-lockable="true" id="aiNarrativeCard">
+        <div class="position-relative">
+          <h5 class="section-heading">AI-authored executive narrative</h5>
+          <div id="aiNarrative" class="d-flex flex-column gap-2"></div>
+          <div class="locked-overlay d-none" data-lock-overlay>
+            <div class="h5">Full narrative locked</div>
+            <p class="text-fg-3">Upgrade to access executive summary, risk analysis, and persona guidance powered by OpenAI.</p>
             <button class="btn btn-primary" data-lock-unlock>Unlock full report</button>
           </div>
         </div>
@@ -204,6 +270,92 @@
         tech.appendChild(col);
       });
 
+      const personaBriefings = document.getElementById('personaBriefings');
+      personaBriefings.innerHTML = '';
+      (r.personaBriefings || []).forEach(persona => {
+        const col = document.createElement('div');
+        col.className = 'col-md-6';
+        col.innerHTML = `
+          <div class="persona-card h-100">
+            <h6>${persona.title}<span class="badge-pill">${persona.maturityLens || ''}</span></h6>
+            <div class="small text-fg-3 mb-2">Focus: ${persona.focusPillars ? persona.focusPillars.join(' & ') : ''}</div>
+            <ul>
+              ${(persona.actions || []).map(action => `<li>${action}</li>`).join('')}
+            </ul>
+          </div>`;
+        personaBriefings.appendChild(col);
+      });
+
+      const riskRegister = document.getElementById('riskRegister');
+      riskRegister.innerHTML = '';
+      (r.riskRegister || []).forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'risk-item';
+        div.innerHTML = `
+          <strong>${item.pillar}: ${item.risk}</strong>
+          <div class="small text-fg-3">Impact: ${item.impact} · Gap ${item.gap} pts · Priority ${item.priority}</div>
+          <div class="small">${item.mitigation}</div>
+        `;
+        riskRegister.appendChild(div);
+      });
+
+      const revenueWrap = document.getElementById('revenueOpportunities');
+      revenueWrap.innerHTML = '';
+      (r.revenueOpportunities || []).forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'value-item';
+        div.innerHTML = `
+          <strong>${item.pillar}</strong>
+          <div class="small text-fg-3">Score ${item.score}</div>
+          <div class="small">${item.narrative}</div>
+        `;
+        revenueWrap.appendChild(div);
+      });
+
+      const operating = document.getElementById('operatingPlan');
+      operating.innerHTML = '';
+      Object.entries(r.operationalPlan || {}).forEach(([phase, actions]) => {
+        const card = document.createElement('div');
+        card.className = 'roadmap-card';
+        card.innerHTML = `<h6>${phase}</h6><ul class="small text-fg-2 mb-0">${(actions || []).map(a => `<li>${a}</li>`).join('')}</ul>`;
+        operating.appendChild(card);
+      });
+
+      const aiNarrative = document.getElementById('aiNarrative');
+      aiNarrative.innerHTML = '';
+      const ai = r.aiNarrative || {};
+      if (ai.executiveSummary) {
+        const block = document.createElement('div');
+        block.className = 'ai-block';
+        block.innerHTML = `<h6>Executive summary</h6><ul class="mb-0">${ai.executiveSummary.map(item => `<li>${item}</li>`).join('')}</ul>`;
+        aiNarrative.appendChild(block);
+      }
+      if (ai.strategicRisks) {
+        const block = document.createElement('div');
+        block.className = 'ai-block';
+        block.innerHTML = `<h6>Strategic risks</h6><ul class="mb-0">${ai.strategicRisks.map(risk => `<li><strong>${risk.risk || ''}</strong> — Impact: ${risk.impact || ''}. Mitigation: ${risk.mitigation || ''}</li>`).join('')}</ul>`;
+        aiNarrative.appendChild(block);
+      }
+      if (ai.valueRealisation) {
+        const block = document.createElement('div');
+        block.className = 'ai-block';
+        block.innerHTML = `<h6>Value realisation</h6><ul class="mb-0">${ai.valueRealisation.map(item => `<li>${item}</li>`).join('')}</ul>`;
+        aiNarrative.appendChild(block);
+      }
+      if (ai.personaGuidance) {
+        const block = document.createElement('div');
+        const entries = Object.entries(ai.personaGuidance);
+        block.className = 'ai-block';
+        block.innerHTML = `<h6>Persona guidance</h6>${entries.map(([persona, guidance]) => `<div class="mb-2"><strong>${persona}</strong><ul class="mb-0">${guidance.map(item => `<li>${item}</li>`).join('')}</ul></div>`).join('')}`;
+        aiNarrative.appendChild(block);
+      }
+      if (ai.operatingModel) {
+        const block = document.createElement('div');
+        block.className = 'ai-block';
+        block.innerHTML = `<h6>Operating model</h6><ul class="mb-0">${Object.entries(ai.operatingModel).map(([phase, detail]) => `<li><strong>${phase}:</strong> ${detail}</li>`).join('')}</ul>`;
+        aiNarrative.appendChild(block);
+      }
+
       const lockables = document.querySelectorAll('[data-lockable="true"]');
       lockables.forEach(section => {
         const overlay = section.querySelector('[data-lock-overlay]');
@@ -225,6 +377,19 @@
         unlock.classList.remove('d-none');
       } else {
         unlock.classList.add('d-none');
+      }
+
+      const premiumIntake = document.getElementById('premiumIntake');
+      if (!partial && r.assessmentId) {
+        if (r.stage !== 'premium') {
+          premiumIntake.href = `/premium-assessment.html?assessmentId=${r.assessmentId}`;
+          premiumIntake.classList.remove('d-none');
+        } else {
+          premiumIntake.href = `/premium-assessment.html?assessmentId=${r.assessmentId}`;
+          premiumIntake.textContent = 'Premium intake completed';
+          premiumIntake.classList.remove('d-none');
+          premiumIntake.classList.add('disabled');
+        }
       }
 
       document.getElementById('content').classList.remove('d-none');
