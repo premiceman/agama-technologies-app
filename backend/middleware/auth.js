@@ -2,9 +2,14 @@ const jwt = require('jsonwebtoken');
 
 const COOKIE = process.env.JWT_COOKIE_NAME || 'at_session';
 const DAYS = parseInt(process.env.JWT_EXPIRES_DAYS || '7', 10);
+const SECRET = process.env.JWT_SECRET;
+
+if (!SECRET) {
+  throw new Error('JWT_SECRET environment variable is required for authentication middleware.');
+}
 
 function issueTokenCookie(res, payload) {
-  const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: `${DAYS}d` });
+  const token = jwt.sign(payload, SECRET, { expiresIn: `${DAYS}d` });
   res.cookie(COOKIE, token, {
     httpOnly: true,
     secure: true,
@@ -23,7 +28,7 @@ function requireAuth(req, res, next) {
   const token = req.cookies[COOKIE] || (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, SECRET);
     req.auth = decoded;
     return next();
   } catch {
