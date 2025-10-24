@@ -20,8 +20,14 @@ function copyDir(src, dest) {
 }
 
 // Clean public then copy fresh
-const SRC = path.resolve(__dirname, '..', 'frontend');
-const DEST = path.resolve(__dirname, '..', 'backend', 'public');
+const SRC = path.resolve(__dirname, '..', '..', 'frontend');
+const DEST = path.resolve(__dirname, '..', 'public');
+
+if (!fs.existsSync(SRC)) {
+  console.error(`❌ Frontend source directory not found at ${SRC}`);
+  process.exit(1);
+}
+
 try {
   fs.rmSync(DEST, { recursive: true, force: true });
 } catch {}
