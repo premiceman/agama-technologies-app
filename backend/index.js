@@ -51,6 +51,15 @@ const Payment = require('./models/Payment');
 // ---- Utils ----
 const { requireAuth, issueTokenCookie, clearTokenCookie } = require('./middleware/auth');
 const { computeReport } = require('./utils/scoring');
+const {
+  INDUSTRIES,
+  OFFICIAL_ORGANISATIONS,
+  STRATEGIC_DRIVERS,
+  CAPABILITY_CATALOG,
+  getQuestionnaire,
+  getCapability
+} = require('./data/catalog');
+const { fetchOrganizationIntel } = require('./utils/openai');
 
 // ---- Routes ----
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: Date.now() }));
@@ -97,36 +106,172 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
   res.json({ ok: true, user: user.public() });
 });
 
-// Questions
+// Assessment catalog & questions
+app.get('/api/assessments/catalog', (req, res) => {
+  res.json({
+    ok: true,
+    catalog: {
+      capabilities: CAPABILITY_CATALOG,
+      industries: INDUSTRIES,
+      organisations: OFFICIAL_ORGANISATIONS,
+      strategicDrivers: STRATEGIC_DRIVERS
+    }
+  });
+});
+
 app.get('/api/assessments/questions', (req, res) => {
-  const { vertical = 'generic' } = req.query;
-  try {
-    const questions = require(path.join(__dirname, 'data', 'questions', `${vertical}.json`));
-    res.json({ ok: true, vertical, questions });
-  } catch {
-    const questions = require(path.join(__dirname, 'data', 'questions', `generic.json`));
-    res.json({ ok: true, vertical: 'generic', questions });
-  }
+  const { stage = 'free' } = req.query;
+  const safeStage = stage === 'premium' ? 'premium' : 'free';
+  const questions = getQuestionnaire(safeStage);
+  res.json({ ok: true, stage: safeStage, questions });
 });
 
 // Create assessment -> compute report (partial by default)
 app.post('/api/assessments', requireAuth, async (req, res) => {
   try {
-    const { vertical: verticalRaw='generic', companySize='SMB', region='EMEA', answers={} } = req.body || {};
+      const {
+        stage = 'free',
+        assessmentType = 'security',
+        vertical: verticalRaw = 'generic',
+        companySize = 'SMB',
+        region = 'EMEA',
+        industry = '',
+        strategicDrivers = [],
+      organization = {},
+      companyProfile = {},
+      capabilityFocus = [],
+      techLandscape = {},
+      personas = [],
+      vendorStrategy = {},
+      operatingModel = {},
+      answers = {},
+      premiumAnswers = {}
+    } = req.body || {};
+
+    const safeStage = stage === 'premium' ? 'premium' : 'free';
     const safeVertical = String(verticalRaw || 'generic').toLowerCase();
     const vertical = ['generic', 'saas'].includes(safeVertical) ? safeVertical : 'generic';
+    const capability = getCapability(assessmentType);
+
+    let organizationIntel = {};
+    if (organization?.name) {
+      organizationIntel = await fetchOrganizationIntel({
+        organization: organization.name,
+        assessmentType: capability.name,
+        industry: industry || vertical
+      });
+    }
+
     const assessment = await Assessment.create({
       userId: req.auth.uid,
-      vertical, companySize, region, answers
+      assessmentType,
+      stage: safeStage,
+      vertical,
+      industry,
+      companySize,
+      region,
+      strategicDrivers,
+      organization: {
+        name: organization?.name || '',
+        extract: organizationIntel.summary || organization?.extract || '',
+        intel: organizationIntel
+      },
+      companyProfile,
+      capabilityFocus: capabilityFocus.length ? capabilityFocus : capability.domains,
+      techLandscape,
+      vendorStrategy,
+      operatingModel,
+      personas: personas.length ? personas : capability.personas,
+      answers,
+      premiumAnswers: safeStage === 'premium' ? premiumAnswers : {}
     });
+
     const reportData = await computeReport({ assessment });
     const report = await Report.create({
       userId: req.auth.uid,
       assessmentId: assessment._id,
       ...reportData,
-      paid: false
+      paid: safeStage === 'premium'
     });
-    res.json({ ok: true, assessmentId: assessment._id, reportId: report._id });
+
+    res.json({ ok: true, assessmentId: assessment._id, reportId: report._id, stage: report.stage });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.get('/api/assessments/:id', requireAuth, async (req, res) => {
+  try {
+    const assessment = await Assessment.findOne({ _id: req.params.id, userId: req.auth.uid });
+    if (!assessment) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true, assessment });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.put('/api/assessments/:id/premium', requireAuth, async (req, res) => {
+  try {
+    const assessment = await Assessment.findOne({ _id: req.params.id, userId: req.auth.uid });
+    if (!assessment) return res.status(404).json({ error: 'Not found' });
+
+    const {
+      strategicDrivers = [],
+      organization = {},
+      companyProfile = {},
+      capabilityFocus = [],
+      techLandscape = {},
+      vendorStrategy = {},
+      operatingModel = {},
+      personas = [],
+      answers = {},
+      premiumAnswers = {}
+    } = req.body || {};
+
+    const targetType = nextAssessmentType || assessment.assessmentType;
+    const capability = getCapability(targetType);
+    assessment.assessmentType = capability.id;
+
+    let organizationIntel = assessment.organization?.intel || {};
+    if (organization?.name && organization.name !== assessment.organization?.name) {
+      organizationIntel = await fetchOrganizationIntel({
+        organization: organization.name,
+        assessmentType: capability.name,
+        industry: assessment.industry || assessment.vertical
+      });
+    } else if (!organization?.name) {
+      organizationIntel = {};
+    }
+
+    assessment.stage = 'premium';
+    assessment.strategicDrivers = strategicDrivers.length ? strategicDrivers : assessment.strategicDrivers;
+    const orgName = organization?.name || '';
+    assessment.organization = {
+      name: orgName,
+      extract: orgName ? (organizationIntel.summary || organization?.extract || assessment.organization?.extract || '') : '',
+      intel: orgName ? organizationIntel : {}
+    };
+    assessment.companyProfile = { ...(assessment.companyProfile || {}), ...companyProfile };
+    assessment.capabilityFocus = capabilityFocus.length ? capabilityFocus : (assessment.capabilityFocus || capability.domains);
+    assessment.techLandscape = { ...(assessment.techLandscape || {}), ...techLandscape };
+    assessment.vendorStrategy = { ...(assessment.vendorStrategy || {}), ...vendorStrategy };
+    assessment.operatingModel = { ...(assessment.operatingModel || {}), ...operatingModel };
+    assessment.personas = personas.length ? personas : (assessment.personas?.length ? assessment.personas : capability.personas);
+    assessment.answers = { ...(assessment.answers || {}), ...answers };
+    assessment.premiumAnswers = { ...(assessment.premiumAnswers || {}), ...premiumAnswers };
+
+    await assessment.save();
+
+    const reportData = await computeReport({ assessment });
+    const report = await Report.findOneAndUpdate(
+      { assessmentId: assessment._id, userId: req.auth.uid },
+      { ...reportData, paid: true, assessmentId: assessment._id, userId: req.auth.uid },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    res.json({ ok: true, assessmentId: assessment._id, reportId: report._id, stage: report.stage });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -142,6 +287,9 @@ app.get('/api/reports/:id', requireAuth, async (req, res) => {
       _id: rep._id,
       createdAt: rep.createdAt,
       vertical: rep.vertical,
+      assessmentType: rep.assessmentType,
+      stage: rep.stage,
+      assessmentId: rep.assessmentId,
       summary: rep.summary,
       headlineScore: rep.headlineScore,
       pillarScores: rep.pillarScores,
@@ -159,6 +307,11 @@ app.get('/api/reports/:id', requireAuth, async (req, res) => {
       },
       roadmap: Object.fromEntries(Object.entries(rep.roadmap || {}).slice(0, 1)),
       technologyRadar: (rep.technologyRadar || []).slice(0, 1),
+      personaBriefings: (rep.personaBriefings || []).slice(0, 1),
+      riskRegister: (rep.riskRegister || []).slice(0, 1),
+      revenueOpportunities: (rep.revenueOpportunities || []).slice(0, 1),
+      operationalPlan: Object.fromEntries(Object.entries(rep.operationalPlan || {}).slice(0, 1)),
+      aiNarrative: rep.aiNarrative && rep.aiNarrative.executiveSummary ? { executiveSummary: rep.aiNarrative.executiveSummary } : {},
       paid: rep.paid,
       partial: !rep.paid
     };
@@ -199,7 +352,7 @@ app.post('/api/payments/mock/checkout', requireAuth, async (req, res) => {
     });
     rep.paid = true;
     await rep.save();
-    res.json({ ok: true, paymentId: pay._id, reportId: rep._id });
+    res.json({ ok: true, paymentId: pay._id, reportId: rep._id, assessmentId: rep.assessmentId });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

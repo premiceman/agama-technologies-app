@@ -1,5 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+const { getCapability, PERSONA_BLUEPRINTS } = require('../data/catalog');
+const { generateExecutiveNarrative } = require('./openai');
 
 function clamp(v, min = 0, max = 100) {
   return Math.max(min, Math.min(max, v));
@@ -19,58 +21,128 @@ function loadBenchmarks(vertical) {
 const PLAYBOOKS = {
   Observability: {
     foundational: [
-      'Establish golden signals with service-level objectives across critical journeys',
-      'Instrument tracing coverage for top customer workflows'
+      'Stand up golden signals and SLOs across customer-critical services',
+      'Instrument distributed tracing for top revenue journeys'
     ],
     scaling: [
-      'Automate alert routing with AIOps correlation and intelligent suppression',
-      'Expand runbook automation and embed retrospectives into delivery cadence'
+      'Operationalise adaptive alerting with automation and AI triage',
+      'Extend incident post-mortems into product planning'
     ],
     optimised: [
-      'Optimise telemetry costs with adaptive sampling and usage governance',
-      'Extend observability data into business KPIs and customer health scoring'
+      'Align observability KPIs directly to customer experience metrics',
+      'Optimise telemetry spend with tiered retention and sampling'
     ]
   },
   Security: {
     foundational: [
-      'Implement identity hardening (MFA/SSO) and tiered access reviews',
-      'Stand up automated vulnerability scanning with remediation SLAs'
+      'Close identity gaps with MFA/SSO expansion and privileged access reviews',
+      'Deploy continuous vulnerability discovery with remediation SLAs'
     ],
     scaling: [
-      'Integrate detection engineering with observability data for unified SOC insights',
-      'Automate incident response playbooks with tabletop validation'
+      'Fuse detection engineering with threat intelligence and purple teaming',
+      'Automate incident containment workflows integrated with SOC tooling'
     ],
     optimised: [
-      'Adopt continuous compliance monitoring with policy as code',
-      'Deploy predictive threat modelling with ML-based anomaly detection'
+      'Adopt predictive threat hunting with advanced analytics and AI copilots',
+      'Implement policy-as-code for continuous compliance readiness'
     ]
   },
   AIOps: {
     foundational: [
-      'Aggregate events into a unified lake with topology context',
-      'Deploy anomaly detection to critical services and platforms'
+      'Unify event streams with topology context to reduce noise',
+      'Deploy anomaly detection to high-value services and platforms'
     ],
     scaling: [
-      'Automate remediation workflows for recurring incidents',
-      'Enrich events with business impact scoring to prioritise response'
+      'Automate enrichment and remediation for the top recurring incident types',
+      'Use business impact scoring to prioritise operations backlog'
     ],
     optimised: [
-      'Operationalise predictive maintenance models tied to FinOps signals',
-      'Embed AI copilots into incident response and runbook authoring'
+      'Operationalise predictive maintenance models with closed-loop automation',
+      'Embed copilots across incident response, runbooks, and change management'
     ]
   },
   'Business Analytics': {
     foundational: [
-      'Define governed data contracts and ingestion quality guardrails',
-      'Deliver executive dashboards for core KPIs and OKRs'
+      'Define governed data contracts and executive-aligned KPIs',
+      'Establish high-trust dashboards for core customer & revenue metrics'
     ],
     scaling: [
-      'Roll out experimentation and causal analytics across product squads',
-      'Automate metric anomaly detection with ML-enabled observability'
+      'Embed experimentation & causal analytics across teams',
+      'Automate data quality monitoring with anomaly detection'
     ],
     optimised: [
-      'Implement decision intelligence loops with AI-assisted forecasting',
-      'Operationalise privacy-preserving ML for customer insight and growth'
+      'Deploy decision intelligence loops linking telemetry and financial outcomes',
+      'Operationalise privacy-preserving AI for insight generation'
+    ]
+  },
+  'Platform Engineering': {
+    foundational: [
+      'Launch an internal developer platform with paved-path templates',
+      'Codify secure defaults for CI/CD and infrastructure provisioning'
+    ],
+    scaling: [
+      'Introduce golden paths with policy-as-code and workload standards',
+      'Instrument platform SLAs and developer experience metrics'
+    ],
+    optimised: [
+      'Automate governance, compliance, and resilience testing across the platform',
+      'Continuously evolve platform capabilities based on product feedback'
+    ]
+  },
+  'People & Skills': {
+    foundational: [
+      'Create a capability heatmap and targeted enablement plan',
+      'Define clear role charters aligned to observability/security/AI outcomes'
+    ],
+    scaling: [
+      'Launch communities of practice and structured upskilling pathways',
+      'Align incentives and OKRs to cross-functional collaboration'
+    ],
+    optimised: [
+      'Institutionalise talent rotation, mentoring, and guilds driving innovation',
+      'Embed workforce analytics to track proficiency and impact'
+    ]
+  },
+  'Process & Governance': {
+    foundational: [
+      'Stand up integrated DevSecOps operating rhythms with shared dashboards',
+      'Document decision rights and escalation paths for critical events'
+    ],
+    scaling: [
+      'Automate evidence capture and controls testing within workflows',
+      'Introduce executive scorecards linking risk, reliability, and value'
+    ],
+    optimised: [
+      'Adopt continuous compliance with policy-as-code and regulatory mapping',
+      'Run governance forums using predictive insights and scenario planning'
+    ]
+  },
+  'Data & AI': {
+    foundational: [
+      'Define data contracts, lineage, and quality SLAs for mission-critical domains',
+      'Implement responsible AI guardrails for model development'
+    ],
+    scaling: [
+      'Automate anomaly detection and incident routing for data quality',
+      'Operationalise AI models with monitoring and shadow deployments'
+    ],
+    optimised: [
+      'Monetise data products with embedded analytics and AI services',
+      'Continuously evaluate AI fairness, drift, and regulatory alignment'
+    ]
+  },
+  'Operations & Automation': {
+    foundational: [
+      'Codify end-to-end incident playbooks and ownership matrices',
+      'Prioritise automation for toil-heavy processes'
+    ],
+    scaling: [
+      'Deploy workflow automation and low-code actions across operations',
+      'Measure automation ROI and redeploy reclaimed capacity'
+    ],
+    optimised: [
+      'Adopt predictive runbooks with AI copilots triggering remediation',
+      'Integrate automation insights into quarterly business reviews'
     ]
   }
 };
@@ -81,7 +153,7 @@ const TECH_RECS = {
       horizon: 'Now',
       category: 'Telemetry Fabric',
       vendors: ['Grafana Cloud', 'Chronosphere'],
-      rationale: 'Accelerate SLO instrumentation and achieve high-cardinality cost control with governance.'
+      rationale: 'Accelerate SLO instrumentation and govern high-cardinality telemetry spend.'
     },
     {
       horizon: 'Next',
@@ -95,7 +167,7 @@ const TECH_RECS = {
       horizon: 'Now',
       category: 'Zero Trust Access',
       vendors: ['Okta Workforce Identity', 'Teleport'],
-      rationale: 'Centralise identity assurance with least-privilege enforcement and session recording.'
+      rationale: 'Centralise identity assurance with least-privilege enforcement and session intelligence.'
     },
     {
       horizon: 'Next',
@@ -115,7 +187,7 @@ const TECH_RECS = {
       horizon: 'Future',
       category: 'Predictive Operations',
       vendors: ['IBM Turbonomic', 'Azure Machine Learning'],
-      rationale: 'Drive capacity forecasting and cost optimisation with policy-driven automation.'
+      rationale: 'Drive capacity forecasting and cost optimisation with AI-driven policy.'
     }
   ],
   'Business Analytics': [
@@ -130,6 +202,76 @@ const TECH_RECS = {
       category: 'Decision Intelligence',
       vendors: ['ThoughtSpot Sage', 'Looker Blocks'],
       rationale: 'Empower teams with AI-assisted insights and scenario modelling.'
+    }
+  ],
+  'Platform Engineering': [
+    {
+      horizon: 'Now',
+      category: 'Internal Developer Platforms',
+      vendors: ['Humanitec', 'Backstage'],
+      rationale: 'Accelerate golden path adoption and reduce cognitive load on product teams.'
+    },
+    {
+      horizon: 'Next',
+      category: 'Secure SDLC Automation',
+      vendors: ['GitHub Advanced Security', 'Snyk'],
+      rationale: 'Bake security guardrails into pipelines and infrastructure automation.'
+    }
+  ],
+  'People & Skills': [
+    {
+      horizon: 'Now',
+      category: 'Skills Intelligence',
+      vendors: ['Pluralsight Flow', 'Skillsoft'],
+      rationale: 'Baseline capability gaps and launch targeted enablement programs.'
+    },
+    {
+      horizon: 'Next',
+      category: 'Knowledge Management',
+      vendors: ['Notion', 'Confluence', 'Guru'],
+      rationale: 'Codify playbooks and accelerate onboarding with searchable knowledge bases.'
+    }
+  ],
+  'Process & Governance': [
+    {
+      horizon: 'Now',
+      category: 'Policy Automation',
+      vendors: ['Drata', 'Vanta'],
+      rationale: 'Automate evidence collection for SOC2, ISO, and regulatory frameworks.'
+    },
+    {
+      horizon: 'Future',
+      category: 'Integrated Risk Management',
+      vendors: ['ServiceNow GRC', 'OneTrust'],
+      rationale: 'Unify risk, compliance, and control monitoring across portfolios.'
+    }
+  ],
+  'Data & AI': [
+    {
+      horizon: 'Now',
+      category: 'Data Quality & Observability',
+      vendors: ['Monte Carlo', 'Bigeye'],
+      rationale: 'Guarantee trusted data and AI inputs through automated monitoring.'
+    },
+    {
+      horizon: 'Next',
+      category: 'Responsible AI Platforms',
+      vendors: ['Fiddler AI', 'Arthur AI'],
+      rationale: 'Monitor fairness, drift, and compliance for production AI workloads.'
+    }
+  ],
+  'Operations & Automation': [
+    {
+      horizon: 'Now',
+      category: 'Runbook Automation',
+      vendors: ['RunDeck', 'StackStorm'],
+      rationale: 'Codify and orchestrate recurring operational workflows.'
+    },
+    {
+      horizon: 'Future',
+      category: 'Copilot Adoption',
+      vendors: ['Microsoft Copilot Studio', 'Forethought Solve'],
+      rationale: 'Embed AI assistants across operations to unlock human capacity.'
     }
   ]
 };
@@ -155,8 +297,118 @@ function narrativeForOverall(percentile, median, vertical) {
   return `There is significant upside versus the ${vertical} median (score ${median}). Prioritise foundational execution to close capability gaps.`;
 }
 
+function mergeAnswers(base = {}, extension = {}) {
+  const merged = JSON.parse(JSON.stringify(base));
+  for (const [pillar, entries] of Object.entries(extension || {})) {
+    merged[pillar] = Object.assign({}, merged[pillar] || {}, entries || {});
+  }
+  return merged;
+}
+
+function buildPersonaBriefings({ capability, assessment, pillarScores }) {
+  const personas = assessment.personas?.length ? assessment.personas : PERSONA_BLUEPRINTS[assessment.assessmentType] || [];
+  const focusPillars = Object.entries(pillarScores)
+    .sort((a, b) => a[1] - b[1])
+    .slice(0, 2)
+    .map(([pillar]) => pillar);
+  const strengthPillars = Object.entries(pillarScores)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2)
+    .map(([pillar]) => pillar);
+
+  return personas.map(persona => {
+    const maturityLens = focusPillars.includes(capability.domains[0]) ? 'Stabilise foundations' : 'Accelerate differentiation';
+    return {
+      id: persona.id,
+      title: persona.title,
+      outcomes: persona.outcomes,
+      focusPillars,
+      strengthPillars,
+      maturityLens,
+      actions: [
+        `Prioritise ${focusPillars.join(' & ')} initiatives to unlock ${persona.outcomes[0]}.`,
+        `Leverage ${strengthPillars.join(' & ')} strengths to showcase quick wins to stakeholders.`
+      ],
+      metrics: [
+        'Leading indicator: MTTR / time-to-detect trend',
+        'Lagging indicator: Customer trust / revenue at risk'
+      ]
+    };
+  });
+}
+
+function buildRiskRegister({ pillarScores, benchmarks, assessment }) {
+  const items = [];
+  for (const [pillar, score] of Object.entries(pillarScores)) {
+    const median = benchmarks.medians?.pillars?.[pillar] ?? benchmarks.medians?.overall ?? 60;
+    if (score >= median) continue;
+    const gap = median - score;
+    const priority = gap > 20 ? '0-30 days' : gap > 10 ? '30-90 days' : 'Quarter 2+';
+    items.push({
+      pillar,
+      gap,
+      risk: `${pillar} capability deficit`,
+      impact: gap > 20 ? 'Severe' : gap > 10 ? 'High' : 'Moderate',
+      mitigation: `Allocate targeted investment to ${pillar.toLowerCase()} with executive sponsorship and automation focus.`,
+      priority,
+      owner: assessment.personas?.[0]?.title || 'Executive Sponsor'
+    });
+  }
+  if (!items.length) {
+    items.push({
+      pillar: 'Cross-capability',
+      gap: 0,
+      risk: 'Sustainability of gains',
+      impact: 'Moderate',
+      mitigation: 'Embed continuous improvement cadences and FinOps guardrails to maintain leadership position.',
+      priority: 'Quarter 2+',
+      owner: assessment.personas?.[0]?.title || 'Transformation Office'
+    });
+  }
+  return items;
+}
+
+function buildRevenueOpportunities({ pillarScores, assessment }) {
+  const strategicDrivers = assessment.strategicDrivers || [];
+  const strengths = Object.entries(pillarScores)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
+  return strengths.map(([pillar, score]) => ({
+    pillar,
+    score,
+    narrative: `Leverage ${pillar.toLowerCase()} maturity (score ${score}) to advance '${strategicDrivers[0] || 'growth'}' outcomes through AI-enabled services and customer journey optimisation.`
+  }));
+}
+
+function buildOperationalPlan({ focusPillars, capability, assessment }) {
+  const focusKey = focusPillars[0] || capability.domains?.[0] || 'priority capability';
+  const focusLabel = focusPillars.length ? focusPillars.join(' & ') : focusKey;
+  return {
+    '0-30 days': [
+      `Mobilise a cross-functional ${capability.name} squad with executive sponsor ${assessment.personas?.[0]?.title || 'C-suite leader'}.`,
+      `Baseline KPIs, risk, and telemetry for ${focusLabel}.`,
+      'Define governance forums and reporting cadence tied to board priorities.'
+    ],
+    '30-90 days': [
+      `Execute top automation plays for ${focusKey} leveraging preferred vendors and internal champions.`,
+      'Expand enablement programs and update operating model playbooks.',
+      'Integrate financial and customer impact tracking into executive dashboards.'
+    ],
+    'Quarter 2+': [
+      'Scale data-driven decisioning with AI copilots across personas.',
+      `Continuously optimise vendor portfolio aligned to ${capability.name} ROI.`,
+      'Institutionalise continuous improvement, retrospectives, and innovation backlog.'
+    ]
+  };
+}
+
 async function computeReport({ assessment }) {
-  const answers = assessment.answers || {};
+  const stage = assessment.stage || 'free';
+  const capability = getCapability(assessment.assessmentType || 'security');
+
+  const baseAnswers = assessment.answers || {};
+  const premiumAnswers = stage === 'premium' ? assessment.premiumAnswers || {} : {};
+  const answers = mergeAnswers(baseAnswers, premiumAnswers);
   const pillars = Object.keys(answers);
   const pillarScores = {};
 
@@ -188,8 +440,8 @@ async function computeReport({ assessment }) {
   const recommendations = [];
   for (const [pillar, score] of Object.entries(pillarScores)) {
     const maturity = deriveMaturity(score);
-    const book = PLAYBOOKS[pillar]?.[maturity.toLowerCase()] || [];
-    const primary = book[0] || `${pillar}: Focus initiatives on measurable outcomes.`;
+    const playbook = PLAYBOOKS[pillar]?.[maturity.toLowerCase()] || [];
+    const primary = playbook[0] || `${pillar}: Focus initiatives on measurable outcomes.`;
     recommendations.push(`${pillar}: ${primary}`);
   }
 
@@ -207,7 +459,7 @@ async function computeReport({ assessment }) {
     const median = bm.medians?.pillars?.[pillar] ?? overallMedian;
     const percentile = percentileFromMedian(score, median);
     const maturity = deriveMaturity(score);
-    const book = PLAYBOOKS[pillar];
+    const playbook = PLAYBOOKS[pillar];
     pillarInsights[pillar] = {
       score,
       median,
@@ -217,7 +469,7 @@ async function computeReport({ assessment }) {
         score >= median
           ? `Ahead of peers by ${Math.abs(score - median)} pts. Continue scaling automation to solidify leadership.`
           : `Lagging peers by ${Math.abs(score - median)} pts. Prioritise foundational capabilities and ownership to catch up.`,
-      quickWins: book ? book[maturity.toLowerCase()].slice(0, 2) : []
+      quickWins: playbook ? playbook[maturity.toLowerCase()].slice(0, 2) : []
     };
   }
 
@@ -230,7 +482,7 @@ async function computeReport({ assessment }) {
     ],
     '30-90 days': [
       'Deploy target-state architecture blueprints with measurable adoption metrics.',
-      ...focusPillars.map(p => `Implement top-two initiatives for ${p.toLowerCase()} including tooling enablement and training.`)
+      ...focusPillars.map(p => `Implement top initiatives for ${p.toLowerCase()} including tooling enablement and training.`)
     ],
     'Quarter 2+': [
       'Scale cross-functional operating rhythms with OKRs and automation guardrails.',
@@ -269,10 +521,28 @@ async function computeReport({ assessment }) {
   }
 
   const summary = `Your overall maturity score is ${headlineScore}. Compared to ${verticalLabel}, you are ${headlineScore >= overallMedian ? 'ahead of' : 'behind'} the median of ${overallMedian}.`;
-  const strategicNarrative = `Agama Technologies experts analysed your ${verticalLabel} operating model. Drawing on over 100 years of delivery experience, we identified where AI, security, observability, and analytics can jointly drive modernisation with up to 95% cost optimisation.`;
+  const strategicNarrative = `Agama Technologies experts analysed your ${capability.name} operating model. Drawing on industry research (Gartner, Forrester, MITRE) we identified where AI, security, observability, and analytics can jointly drive modernisation with up to 95% cost optimisation.`;
+
+  const personaBriefings = buildPersonaBriefings({ capability, assessment, pillarScores });
+  const riskRegister = buildRiskRegister({ pillarScores, benchmarks, assessment });
+  const revenueOpportunities = buildRevenueOpportunities({ pillarScores, assessment });
+  const operationalPlan = buildOperationalPlan({ focusPillars, capability, assessment });
+
+  const aiNarrative = await generateExecutiveNarrative({ assessment, report: {
+    headlineScore,
+    pillarScores,
+    recommendations,
+    roadmap,
+    investmentOutlook,
+    personaBriefings,
+    riskRegister,
+    revenueOpportunities
+  }, capability });
 
   return {
+    stage,
     vertical: verticalKey,
+    assessmentType: assessment.assessmentType,
     headlineScore,
     pillarScores,
     benchmarks,
@@ -283,7 +553,12 @@ async function computeReport({ assessment }) {
     pillarInsights,
     roadmap,
     investmentOutlook,
-    technologyRadar
+    technologyRadar,
+    personaBriefings,
+    riskRegister,
+    revenueOpportunities,
+    operationalPlan,
+    aiNarrative
   };
 }
 
