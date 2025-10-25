@@ -3,6 +3,7 @@ const Schema = mongoose.Schema;
 
 const AssessmentSchema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: 'User', index: true, required: true },
+  projectId: { type: Schema.Types.ObjectId, ref: 'Project', index: true, required: true },
   assessmentType: { type: String, default: 'security' },
   stage: {
     type: String,
@@ -33,7 +34,8 @@ const AssessmentSchema = new Schema({
   answers: { type: Schema.Types.Mixed, default: {} },
   premiumAnswers: { type: Schema.Types.Mixed, default: {} }, // legacy support
   extendedAnswers: { type: Schema.Types.Mixed, default: {} },
-  commandAnswers: { type: Schema.Types.Mixed, default: {} }
+  commandAnswers: { type: Schema.Types.Mixed, default: {} },
+  projectSnapshot: { type: Schema.Types.Mixed, default: {} }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Assessment', AssessmentSchema);

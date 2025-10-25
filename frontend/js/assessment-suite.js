@@ -20,6 +20,757 @@ const architecturePreview = document.getElementById('architecturePreview');
 const timelineList = document.getElementById('timelineList');
 const addInitiativeBtn = document.getElementById('addInitiative');
 
+const projectLauncher = document.getElementById('projectLauncher');
+const projectSelect = document.getElementById('projectSelect');
+const projectAnalyticsPreview = document.getElementById('projectAnalyticsPreview');
+const launchProjectWizardBtn = document.getElementById('launchProjectWizard');
+const replayProjectTourBtn = document.getElementById('replayProjectTour');
+const projectOverlay = document.getElementById('projectOnboarding');
+const projectWizardProgress = document.getElementById('projectWizardProgress');
+const projectSections = Array.from(projectOverlay?.querySelectorAll('.onboarding-section') || []);
+const projectNextBtn = document.getElementById('projectNext');
+const projectPrevBtn = document.getElementById('projectPrev');
+const projectSkipBtn = document.getElementById('projectSkipTour');
+const projectCloseBtn = document.getElementById('closeProjectWizard');
+const projectTourInsight = document.getElementById('projectTourInsight');
+const projectFoundationInsight = document.getElementById('projectFoundationInsight');
+const projectStrategyInsight = document.getElementById('projectStrategyInsight');
+const projectSummaryInsight = document.getElementById('projectSummaryInsight');
+const projectReadinessScore = document.getElementById('projectReadinessScore');
+const projectClarityScore = document.getElementById('projectClarityScore');
+const projectSentiment = document.getElementById('projectSentiment');
+const projectIndustrySelect = document.getElementById('projectIndustry');
+const projectRegionTiles = document.getElementById('projectRegionTiles');
+const projectSizeTiles = document.getElementById('projectSizeTiles');
+const projectStageTiles = document.getElementById('projectStageTiles');
+const projectRiskTiles = document.getElementById('projectRiskTiles');
+const projectDriverTiles = document.getElementById('projectDriverTiles');
+const projectCapabilityTiles = document.getElementById('projectCapabilityTiles');
+const projectRegionInput = document.getElementById('projectRegion');
+const projectSizeInput = document.getElementById('projectSize');
+const projectStageInput = document.getElementById('projectStage');
+const projectRiskInput = document.getElementById('projectRisk');
+const projectNameInput = document.getElementById('projectName');
+const projectDomainInput = document.getElementById('projectDomain');
+const projectHeadcountInput = document.getElementById('projectHeadcount');
+const projectRevenueInput = document.getElementById('projectRevenue');
+const projectBudgetInput = document.getElementById('projectBudget');
+const projectObjectivesInput = document.getElementById('projectObjectives');
+const projectComplianceInput = document.getElementById('projectCompliance');
+const projectNarrativeInput = document.getElementById('projectNarrative');
+const projectGovernanceInput = document.getElementById('projectGovernance');
+const projectDiscoveryInput = document.getElementById('projectDiscovery');
+const projectPersonasInput = document.getElementById('projectPersonas');
+
+const formCompanySizeTiles = document.getElementById('formCompanySizeTiles');
+const formRegionTiles = document.getElementById('formRegionTiles');
+const formStageTiles = document.getElementById('formStageTiles');
+const formRiskTiles = document.getElementById('formRiskTiles');
+
+function renderTileOptions(groupEl, options = []) {
+  if (!groupEl) return;
+  groupEl.innerHTML = '';
+  options.forEach(option => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `tile-option${option.multiple ? ' multiple' : ''}`;
+    btn.dataset.value = option.value;
+    if (option.disabled) btn.dataset.disabled = 'true';
+    btn.innerHTML = `
+      <span>${option.label}</span>
+      ${option.hint ? `<span class="tile-hint">${option.hint}</span>` : ''}`;
+    groupEl.appendChild(btn);
+  });
+}
+
+function initTileGroup(groupEl, { multiple = false, values = [], onChange } = {}) {
+  if (!groupEl) return null;
+  let selected = new Set(Array.isArray(values) ? values : [values].filter(Boolean));
+
+  const commit = () => {
+    groupEl.querySelectorAll('.tile-option').forEach(btn => {
+      const value = btn.dataset.value;
+      btn.classList.toggle('selected', value && selected.has(value));
+    });
+    onChange?.(Array.from(selected));
+  };
+
+  groupEl.addEventListener('click', (event) => {
+    const button = event.target.closest('.tile-option');
+    if (!button || !groupEl.contains(button) || button.dataset.disabled === 'true') return;
+    const value = button.dataset.value;
+    if (!value) return;
+    if (multiple) {
+      if (selected.has(value)) {
+        selected.delete(value);
+      } else {
+        selected.add(value);
+      }
+    } else {
+      selected = new Set([value]);
+    }
+    commit();
+  });
+
+  commit();
+
+  return {
+    getValues: () => Array.from(selected),
+    setValues: (vals = []) => {
+      if (!Array.isArray(vals)) vals = [vals].filter(Boolean);
+      selected = new Set(multiple ? vals : vals.slice(0, 1));
+      commit();
+    },
+    clear: () => {
+      selected.clear();
+      commit();
+    }
+  };
+}
+
+function parseList(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.filter(Boolean);
+  return String(value)
+    .split(/\n|;|,|·/)
+    .map(entry => entry.trim())
+    .filter(Boolean);
+}
+
+function renderFormTileGroups() {
+  if (!form) return;
+  if (formCompanySizeTiles) {
+    renderTileOptions(formCompanySizeTiles, SIZE_CHOICES);
+    formCompanySizeGroup = initTileGroup(formCompanySizeTiles, {
+      values: [form.companySize?.value || 'SMB'],
+      onChange: (values) => {
+        if (form.companySize) form.companySize.value = values[0] || '';
+      }
+    });
+  }
+  if (formRegionTiles) {
+    renderTileOptions(formRegionTiles, REGION_CHOICES);
+    formRegionGroup = initTileGroup(formRegionTiles, {
+      values: [form.region?.value || 'EMEA'],
+      onChange: (values) => {
+        if (form.region) form.region.value = values[0] || '';
+      }
+    });
+  }
+  if (formStageTiles) {
+    renderTileOptions(formStageTiles, STAGE_CHOICES);
+    formStageGroup = initTileGroup(formStageTiles, {
+      values: [form.transformationStage?.value || STAGE_CHOICES[1]?.value],
+      onChange: (values) => {
+        if (form.transformationStage) form.transformationStage.value = values[0] || '';
+      }
+    });
+  }
+  if (formRiskTiles) {
+    renderTileOptions(formRiskTiles, RISK_CHOICES);
+    formRiskGroup = initTileGroup(formRiskTiles, {
+      values: [form.riskAppetite?.value || 'Balanced'],
+      onChange: (values) => {
+        if (form.riskAppetite) form.riskAppetite.value = values[0] || '';
+      }
+    });
+  }
+}
+
+function renderProjectTileGroups() {
+  if (projectRegionTiles) {
+    renderTileOptions(projectRegionTiles, REGION_CHOICES);
+    projectRegionGroup = initTileGroup(projectRegionTiles, {
+      values: [projectRegionInput?.value || 'EMEA'],
+      onChange: (values) => {
+        if (projectRegionInput) projectRegionInput.value = values[0] || '';
+        updateProjectWizardInsights();
+      }
+    });
+  }
+  if (projectSizeTiles) {
+    renderTileOptions(projectSizeTiles, SIZE_CHOICES);
+    projectSizeGroup = initTileGroup(projectSizeTiles, {
+      values: [projectSizeInput?.value || 'SMB'],
+      onChange: (values) => {
+        if (projectSizeInput) projectSizeInput.value = values[0] || '';
+        updateProjectWizardInsights();
+      }
+    });
+  }
+  if (projectStageTiles) {
+    renderTileOptions(projectStageTiles, STAGE_CHOICES);
+    projectStageGroup = initTileGroup(projectStageTiles, {
+      values: [projectStageInput?.value || STAGE_CHOICES[1]?.value],
+      onChange: (values) => {
+        if (projectStageInput) projectStageInput.value = values[0] || '';
+        updateProjectWizardInsights();
+      }
+    });
+  }
+  if (projectRiskTiles) {
+    renderTileOptions(projectRiskTiles, RISK_CHOICES);
+    projectRiskGroup = initTileGroup(projectRiskTiles, {
+      values: [projectRiskInput?.value || 'Balanced'],
+      onChange: (values) => {
+        if (projectRiskInput) projectRiskInput.value = values[0] || '';
+        updateProjectWizardInsights();
+      }
+    });
+  }
+
+  if (projectCapabilityTiles && catalog) {
+    const capabilityOptions = catalog.capabilities.map(cap => ({
+      value: cap.id,
+      label: cap.name,
+      hint: cap.description,
+      multiple: true
+    }));
+    renderTileOptions(projectCapabilityTiles, capabilityOptions);
+    projectCapabilityGroup = initTileGroup(projectCapabilityTiles, {
+      multiple: true,
+      onChange: (values) => {
+        projectCapabilitySelection = new Set(values);
+        updateProjectWizardInsights();
+      }
+    });
+    projectCapabilitySelection = new Set(projectCapabilityGroup?.getValues() || []);
+  }
+
+  if (projectDriverTiles && catalog) {
+    const driverOptions = catalog.strategicDrivers.map(driver => ({
+      value: driver,
+      label: driver,
+      hint: '',
+      multiple: true
+    }));
+    renderTileOptions(projectDriverTiles, driverOptions);
+    projectDriverGroup = initTileGroup(projectDriverTiles, {
+      multiple: true,
+      onChange: (values) => {
+        projectDriverSelection = new Set(values);
+        updateProjectWizardInsights();
+      }
+    });
+    projectDriverSelection = new Set(projectDriverGroup?.getValues() || []);
+  }
+}
+
+function hasSeenProjectTour() {
+  try {
+    return localStorage.getItem('agama.projectTourShown') === '1';
+  } catch (err) {
+    return false;
+  }
+}
+
+function markProjectTourSeen() {
+  try {
+    localStorage.setItem('agama.projectTourShown', '1');
+  } catch (err) {
+    // ignore storage errors
+  }
+}
+
+function computeProjectInsights({
+  stage,
+  riskAppetite,
+  strategicDrivers = [],
+  capabilityFocus = [],
+  companyProfile = {},
+  operatingModel = {}
+} = {}) {
+  const stageScores = {
+    'Discovery & Fit': 42,
+    'Mobilising programme': 56,
+    'Scaling transformation': 72,
+    'Optimising value': 84
+  };
+  const riskScores = {
+    'Conservative': -6,
+    'Balanced': 0,
+    'Bold innovation': 8
+  };
+  const base = stageScores[stage] || 40;
+  const risk = riskScores[riskAppetite] || 0;
+  const driverContribution = Math.min(strategicDrivers.length * 6, 24);
+  const focusContribution = Math.min(capabilityFocus.length * 5, 20);
+  const readinessScore = Math.max(35, Math.min(base + risk + driverContribution + focusContribution, 96));
+
+  const narrativeSignals = [
+    companyProfile.executiveObjectives,
+    companyProfile.narrativeContext,
+    companyProfile.complianceDrivers
+  ].filter(Boolean).length;
+  const governanceSignals = [
+    operatingModel.governanceRhythms,
+    operatingModel.changeManagement,
+    operatingModel.processNotes
+  ].filter(Boolean).length;
+  const clarityScore = Math.min(45 + narrativeSignals * 12 + governanceSignals * 8, 95);
+
+  const sentiment = readinessScore >= 80
+    ? 'Programme is change-ready with strong acceleration potential.'
+    : readinessScore >= 60
+      ? 'Momentum forming—reinforce governance and stakeholder choreography.'
+      : 'Establish foundational guardrails before expanding the programme.';
+
+  return {
+    readinessScore,
+    clarityScore,
+    sentiment,
+    driverCount: strategicDrivers.length,
+    focusCount: capabilityFocus.length,
+    stage,
+    riskAppetite
+  };
+}
+
+function gatherProjectDraft() {
+  const strategicDrivers = Array.from(projectDriverSelection);
+  const capabilityFocus = Array.from(projectCapabilitySelection);
+  return {
+    name: projectNameInput?.value.trim() || '',
+    companyDomain: projectDomainInput?.value.trim() || '',
+    industry: projectIndustrySelect?.value || '',
+    region: projectRegionInput?.value || '',
+    companySize: projectSizeInput?.value || '',
+    headcount: Number(projectHeadcountInput?.value || 0),
+    stage: projectStageInput?.value || '',
+    riskAppetite: projectRiskInput?.value || '',
+    strategicDrivers,
+    capabilityFocus,
+    overview: projectNarrativeInput?.value.trim() || '',
+    companyProfile: {
+      legalName: projectNameInput?.value.trim() || '',
+      headcount: Number(projectHeadcountInput?.value || 0),
+      annualRevenue: Number(projectRevenueInput?.value || 0),
+      strategicBudget: Number(projectBudgetInput?.value || 0),
+      executiveObjectives: projectObjectivesInput?.value.trim() || '',
+      complianceDrivers: projectComplianceInput?.value.trim() || '',
+      narrativeContext: projectNarrativeInput?.value.trim() || '',
+      discoveryObjectives: parseList(projectDiscoveryInput?.value || '')
+    },
+    operatingModel: {
+      governanceRhythms: projectGovernanceInput?.value.trim() || '',
+      changeManagement: '',
+      processNotes: ''
+    },
+    personas: parseList(projectPersonasInput?.value || '')
+  };
+}
+
+function updateProjectWizardInsights() {
+  const draft = gatherProjectDraft();
+  const analytics = computeProjectInsights(draft);
+  if (projectReadinessScore) {
+    projectReadinessScore.textContent = analytics.readinessScore ? Math.round(analytics.readinessScore) : '--';
+  }
+  if (projectClarityScore) {
+    projectClarityScore.textContent = analytics.clarityScore ? Math.round(analytics.clarityScore) : '--';
+  }
+  if (projectSentiment) {
+    projectSentiment.textContent = analytics.sentiment || 'Complete the steps to preview analytics.';
+  }
+  if (projectFoundationInsight) {
+    const p = projectFoundationInsight.querySelector('p');
+    if (p) {
+      if (draft.industry && draft.region) {
+        p.textContent = `Benchmarking ${draft.industry} peers across ${draft.region} operations.`;
+      } else if (draft.industry) {
+        p.textContent = `Benchmarking ${draft.industry} peers once region is confirmed.`;
+      } else {
+        p.textContent = 'Set your industry and footprint to tune the benchmark cohort.';
+      }
+    }
+  }
+  if (projectStrategyInsight) {
+    const p = projectStrategyInsight.querySelector('p');
+    if (p) {
+      if (draft.stage && draft.riskAppetite) {
+        p.textContent = `Stage: ${draft.stage}. Risk profile: ${draft.riskAppetite}. We will calibrate guardrails and pace.`;
+      } else {
+        p.textContent = 'Capture transformation stage and risk appetite to align the advisory tone.';
+      }
+    }
+  }
+  if (projectSummaryInsight) {
+    const driverLine = analytics.driverCount ? `${analytics.driverCount} strategic drivers` : 'Define strategic drivers';
+    const focusLine = analytics.focusCount ? `${analytics.focusCount} focus domains` : 'Select focus domains';
+    const sentimentLine = projectSummaryInsight.querySelector('.project-summary-footnote');
+    if (sentimentLine) {
+      sentimentLine.textContent = `${driverLine} · ${focusLine}`;
+    }
+  }
+}
+
+function renderProjectProgress() {
+  if (!projectWizardProgress) return;
+  projectWizardProgress.innerHTML = '';
+  projectSections.forEach(section => {
+    const chip = document.createElement('div');
+    chip.className = 'onboarding-step-chip';
+    const step = Number(section.dataset.step);
+    if (step === projectWizardStep) chip.classList.add('active');
+    const heading = section.querySelector('h4');
+    chip.textContent = heading ? heading.textContent : `Step ${step}`;
+    projectWizardProgress.appendChild(chip);
+  });
+}
+
+function showProjectWizardStep(step) {
+  if (!projectOverlay) return;
+  projectWizardStep = Math.min(Math.max(step, 1), projectSections.length);
+  projectSections.forEach(section => {
+    const active = Number(section.dataset.step) === projectWizardStep;
+    section.classList.toggle('active', active);
+  });
+  if (projectPrevBtn) projectPrevBtn.disabled = projectWizardStep === 1;
+  if (projectNextBtn) {
+    projectNextBtn.textContent = projectWizardStep === projectSections.length ? 'Create project' : 'Next';
+  }
+  renderProjectProgress();
+  updateProjectWizardInsights();
+}
+
+function openProjectWizard({ startAt = 1 } = {}) {
+  if (!projectOverlay) return;
+  projectOverlay.classList.remove('hidden');
+  projectOverlay.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+  showProjectWizardStep(startAt);
+}
+
+function closeProjectWizard(force = false) {
+  if (!projectOverlay) return;
+  if (!force && !activeProject) return;
+  projectOverlay.classList.add('hidden');
+  projectOverlay.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+}
+
+function validateProjectStep(step) {
+  const draft = gatherProjectDraft();
+  if (step === 2) {
+    if (!draft.name.trim()) {
+      alert('Provide a project or organisation name.');
+      projectNameInput?.focus();
+      return false;
+    }
+    if (!draft.industry) {
+      alert('Select an industry to calibrate benchmarks.');
+      projectIndustrySelect?.focus();
+      return false;
+    }
+    if (!draft.region) {
+      alert('Choose a primary region.');
+      return false;
+    }
+    if (!draft.companySize) {
+      alert('Select your company size.');
+      return false;
+    }
+  }
+  if (step === 3) {
+    if (!draft.stage) {
+      alert('Select a transformation stage.');
+      return false;
+    }
+    if (!draft.riskAppetite) {
+      alert('Select a risk appetite.');
+      return false;
+    }
+    if (projectDriverSelection.size === 0) {
+      alert('Choose at least one strategic driver.');
+      return false;
+    }
+  }
+  if (step === 4) {
+    if (projectCapabilitySelection.size === 0) {
+      alert('Select at least one capability domain to focus on.');
+      return false;
+    }
+  }
+  return true;
+}
+
+  async function createProject() {
+    if (projectCreatePending) {
+      return;
+    }
+    const draft = gatherProjectDraft();
+    if (!validateProjectStep(projectWizardStep)) return;
+    if (!draft.industry || !draft.region || !draft.companySize) {
+      alert('Complete the foundation details before creating the project.');
+      return;
+    }
+
+  const payload = {
+    name: draft.name,
+    companyDomain: draft.companyDomain,
+    industry: draft.industry,
+    region: draft.region,
+    companySize: draft.companySize,
+    headcount: draft.headcount,
+    stage: draft.stage,
+    riskAppetite: draft.riskAppetite,
+    strategicDrivers: draft.strategicDrivers,
+    capabilityFocus: draft.capabilityFocus,
+    overview: draft.overview,
+    companyProfile: draft.companyProfile,
+    operatingModel: draft.operatingModel,
+    personas: draft.personas,
+    techLandscape: { priorityFocus: draft.capabilityFocus }
+  };
+
+    projectCreatePending = true;
+    projectNextBtn.disabled = true;
+    projectNextBtn.textContent = 'Creating...';
+
+  try {
+    const res = await fetch('/api/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.ok) {
+      throw new Error(json.error || 'Unable to create project');
+    }
+    const project = json.project;
+    projects = [project, ...projects.filter(p => p.id !== project.id)];
+    renderProjectOptions();
+    setActiveProject(project);
+    markProjectTourSeen();
+    closeProjectWizard(true);
+    engagePulseSpotlight('Project workspace ready — select a tier to dive deeper.', 3600);
+  } catch (err) {
+    console.error(err);
+    alert(err.message || 'Unable to create project.');
+    } finally {
+      projectCreatePending = false;
+      projectNextBtn.disabled = false;
+      projectNextBtn.textContent = 'Create project';
+    }
+  }
+
+function handleProjectNext() {
+  if (!validateProjectStep(projectWizardStep)) return;
+  if (projectWizardStep === projectSections.length) {
+    createProject();
+  } else {
+    showProjectWizardStep(projectWizardStep + 1);
+  }
+}
+
+function renderProjectOptions() {
+  if (!projectSelect) return;
+  projectSelect.innerHTML = '';
+  if (!projects.length) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'Create your first project to begin';
+    projectSelect.appendChild(opt);
+    projectSelect.disabled = true;
+    return;
+  }
+  projectSelect.disabled = false;
+  projects.forEach(project => {
+    const opt = document.createElement('option');
+    opt.value = project.id;
+    opt.textContent = project.name;
+    projectSelect.appendChild(opt);
+  });
+  if (activeProject) {
+    projectSelect.value = activeProject.id;
+  }
+}
+
+function updateProjectAnalyticsPreview(project) {
+  if (!projectAnalyticsPreview) return;
+  if (!project) {
+    projectAnalyticsPreview.innerHTML = '<div class="text-fg-3">Create a project to unlock readiness analytics.</div>';
+    return;
+  }
+  const analytics = project.analytics || {};
+  const readiness = analytics.readinessScore ? Math.round(analytics.readinessScore) : '--';
+  const clarity = analytics.clarityScore ? Math.round(analytics.clarityScore) : '--';
+  const driverNote = analytics.driverCount !== undefined ? `${analytics.driverCount} strategic drivers` : `${(project.strategicDrivers || []).length} strategic drivers`;
+  const focusNote = analytics.focusCount !== undefined ? `${analytics.focusCount} focus domains` : `${(project.capabilityFocus || []).length} focus domains`;
+  projectAnalyticsPreview.innerHTML = `
+    <div class="project-analytics__tile">
+      <span class="project-analytics__label">Readiness</span>
+      <div class="project-analytics__value">${readiness}</div>
+      <p class="project-analytics__note">${analytics.sentiment || 'Complete more detail to see readiness signals.'}</p>
+    </div>
+    <div class="project-analytics__tile">
+      <span class="project-analytics__label">Clarity</span>
+      <div class="project-analytics__value">${clarity}</div>
+      <p class="project-analytics__note">Context depth from executive objectives & governance.</p>
+    </div>
+    <div class="project-analytics__tile">
+      <span class="project-analytics__label">Coverage</span>
+      <div class="project-analytics__value">${driverNote}</div>
+      <p class="project-analytics__note">${focusNote}</p>
+    </div>`;
+}
+
+function applyProjectContext(project) {
+  if (!form || !project) return;
+  if (form.companyName) form.companyName.value = project.companyProfile?.legalName || project.name || '';
+  if (form.headcount) form.headcount.value = project.companyProfile?.headcount || project.headcount || '';
+  if (form.annualRevenue) form.annualRevenue.value = project.companyProfile?.annualRevenue || '';
+  if (form.strategicBudget) form.strategicBudget.value = project.companyProfile?.strategicBudget || '';
+  if (form.executiveObjectives) form.executiveObjectives.value = Array.isArray(project.companyProfile?.executiveObjectives)
+    ? project.companyProfile.executiveObjectives.join('\n')
+    : (project.companyProfile?.executiveObjectives || '');
+  if (form.narrativeContext) form.narrativeContext.value = project.companyProfile?.narrativeContext || '';
+  if (form.governanceRhythms) form.governanceRhythms.value = project.operatingModel?.governanceRhythms || '';
+  if (form.changeManagement) form.changeManagement.value = project.operatingModel?.changeManagement || '';
+  if (form.teamObjectives) form.teamObjectives.value = project.operatingModel?.teamObjectives || '';
+  if (form.dataPractices) form.dataPractices.value = project.operatingModel?.dataPractices || '';
+  if (form.vendorNotes) form.vendorNotes.value = project.vendorStrategy?.notes || '';
+  if (form.vendorQuestions) form.vendorQuestions.value = project.vendorStrategy?.questions || '';
+
+  if (industrySelect && project.industry) industrySelect.value = project.industry;
+  formCompanySizeGroup?.setValues([project.companySize || 'SMB']);
+  formRegionGroup?.setValues([project.region || 'EMEA']);
+  formStageGroup?.setValues([project.companyProfile?.transformationStage || project.stage || STAGE_CHOICES[1]?.value]);
+  formRiskGroup?.setValues([project.companyProfile?.riskAppetite || project.riskAppetite || 'Balanced']);
+  strategicDriverGroup?.setValues(project.strategicDrivers || []);
+  strategicDriverSelection = new Set(strategicDriverGroup?.getValues() || []);
+
+    const focusDomains = new Set();
+    if (Array.isArray(project.capabilityFocus)) {
+      project.capabilityFocus.forEach(entry => {
+        if (!entry) return;
+        if (!catalog) {
+          focusDomains.add(String(entry));
+          return;
+        }
+        const byId = catalog.capabilities.find(cap => cap.id === entry);
+        if (byId) {
+          byId.domains.forEach(domain => focusDomains.add(domain));
+          return;
+        }
+        const domainMatch = catalog.capabilities.some(cap => cap.domains.includes(entry));
+        if (domainMatch) {
+          focusDomains.add(entry);
+          return;
+        }
+        focusDomains.add(String(entry));
+      });
+    }
+    if (capabilityFocusSelect) {
+      const hasResolvedDomains = focusDomains.size > 0;
+      Array.from(capabilityFocusSelect.options).forEach(opt => {
+        if (hasResolvedDomains) {
+          opt.selected = focusDomains.has(opt.value);
+        } else {
+          opt.selected = Array.isArray(project.capabilityFocus) ? project.capabilityFocus.includes(opt.value) : false;
+        }
+      });
+    }
+
+  if (projectIndustrySelect) projectIndustrySelect.value = project.industry || '';
+  if (projectRegionInput) projectRegionInput.value = project.region || 'EMEA';
+  if (projectSizeInput) projectSizeInput.value = project.companySize || 'SMB';
+  if (projectStageInput) projectStageInput.value = project.stage || STAGE_CHOICES[1]?.value || '';
+  if (projectRiskInput) projectRiskInput.value = project.riskAppetite || 'Balanced';
+  projectRegionGroup?.setValues([project.region || 'EMEA']);
+  projectSizeGroup?.setValues([project.companySize || 'SMB']);
+  projectStageGroup?.setValues([project.stage || STAGE_CHOICES[1]?.value]);
+  projectRiskGroup?.setValues([project.riskAppetite || 'Balanced']);
+  const capabilityIds = Array.isArray(project.capabilityFocus)
+    ? Array.from(new Set(project.capabilityFocus.map(entry => {
+        if (!catalog) return entry;
+        const byId = catalog.capabilities.find(cap => cap.id === entry);
+        if (byId) return byId.id;
+        const byDomain = catalog.capabilities.find(cap => cap.domains.includes(entry));
+        return byDomain ? byDomain.id : entry;
+      })))
+    : [];
+  projectCapabilityGroup?.setValues(capabilityIds);
+  projectCapabilitySelection = new Set(projectCapabilityGroup?.getValues() || []);
+  projectDriverGroup?.setValues(project.strategicDrivers || []);
+  projectDriverSelection = new Set(projectDriverGroup?.getValues() || []);
+
+  if (projectNameInput) projectNameInput.value = project.name || '';
+  if (projectDomainInput) projectDomainInput.value = project.companyDomain || '';
+  if (projectHeadcountInput) projectHeadcountInput.value = project.companyProfile?.headcount || project.headcount || '';
+  if (projectRevenueInput) projectRevenueInput.value = project.companyProfile?.annualRevenue || '';
+  if (projectBudgetInput) projectBudgetInput.value = project.companyProfile?.strategicBudget || '';
+  if (projectObjectivesInput) projectObjectivesInput.value = Array.isArray(project.companyProfile?.executiveObjectives)
+    ? project.companyProfile.executiveObjectives.join('\n')
+    : (project.companyProfile?.executiveObjectives || '');
+  if (projectComplianceInput) projectComplianceInput.value = project.companyProfile?.complianceDrivers || '';
+  if (projectNarrativeInput) projectNarrativeInput.value = project.companyProfile?.narrativeContext || '';
+  if (projectGovernanceInput) projectGovernanceInput.value = project.operatingModel?.governanceRhythms || '';
+  if (projectDiscoveryInput) {
+    let discovery = project.companyProfile?.discoveryObjectives;
+    if (!Array.isArray(discovery) && Array.isArray(project.operatingModel?.discoveryObjectives)) {
+      discovery = project.operatingModel.discoveryObjectives;
+    }
+    projectDiscoveryInput.value = Array.isArray(discovery) ? discovery.join('\n') : (discovery || '');
+  }
+  if (projectPersonasInput) {
+    const rawPersonas = project.personas;
+    const personasList = Array.isArray(rawPersonas)
+      ? rawPersonas
+          .map(persona => {
+            if (!persona) return '';
+            if (typeof persona === 'string') return persona;
+            return persona.title || persona.name || '';
+          })
+          .filter(Boolean)
+      : [];
+    projectPersonasInput.value = personasList.join(' · ');
+  }
+
+  updateProjectWizardInsights();
+}
+
+function setActiveProject(projectOrId) {
+  let project = projectOrId;
+  if (!project && typeof projectOrId === 'string') {
+    project = projects.find(p => p.id === projectOrId);
+  }
+  if (!project || typeof project === 'string') {
+    activeProject = null;
+    updateProjectAnalyticsPreview(null);
+    return;
+  }
+  activeProject = project;
+  if (projectSelect) {
+    projectSelect.value = project.id;
+  }
+  updateProjectAnalyticsPreview(project);
+  applyProjectContext(project);
+}
+
+async function loadProjects() {
+  try {
+    const res = await fetch('/api/projects', { credentials: 'include' });
+    if (!res.ok) throw new Error('Unable to fetch projects');
+    const json = await res.json();
+    projects = Array.isArray(json.projects) ? json.projects : [];
+  } catch (err) {
+    console.error(err);
+    projects = [];
+  }
+  renderProjectOptions();
+  if (projects.length) {
+    setActiveProject(projects[0]);
+    if (!hasSeenProjectTour()) {
+      openProjectWizard({ startAt: 1 });
+    }
+  } else {
+    setActiveProject(null);
+    openProjectWizard({ startAt: 1 });
+  }
+}
+
 const STEP_LABELS = {
   1: 'Focus',
   2: 'Company',
@@ -93,6 +844,54 @@ let questionnaireLoadedStage = null;
 let architectureFiles = [];
 let pulseTimeout = null;
 let pulseLocked = false;
+let me = null;
+let projects = [];
+let activeProject = null;
+let projectWizardStep = 1;
+let strategicDriverSelection = new Set();
+let selectedPersonaIds = new Set();
+let projectCapabilitySelection = new Set();
+let projectDriverSelection = new Set();
+
+let strategicDriverGroup;
+let personaGroup;
+let formCompanySizeGroup;
+let formRegionGroup;
+let formStageGroup;
+let formRiskGroup;
+let projectRegionGroup;
+let projectSizeGroup;
+let projectStageGroup;
+let projectRiskGroup;
+let projectCapabilityGroup;
+let projectDriverGroup;
+let projectCreatePending = false;
+
+const REGION_CHOICES = [
+  { value: 'EMEA', label: 'EMEA', hint: 'Europe, Middle East & Africa' },
+  { value: 'AMER', label: 'AMER', hint: 'North & South America' },
+  { value: 'APAC', label: 'APAC', hint: 'Asia Pacific' },
+  { value: 'Global', label: 'Global footprint', hint: 'Distributed / multi-region' }
+];
+
+const SIZE_CHOICES = [
+  { value: 'SMB', label: 'SMB', hint: '1-499 people' },
+  { value: 'Mid-market', label: 'Mid-market', hint: '500-4,999 people' },
+  { value: 'Enterprise', label: 'Enterprise', hint: '5,000+ people' }
+];
+
+const STAGE_CHOICES = [
+  { value: 'Discovery & Fit', label: 'Discovery & Fit', hint: 'Framing opportunities and early pilots' },
+  { value: 'Mobilising programme', label: 'Mobilising programme', hint: 'Funding approved, squads forming' },
+  { value: 'Scaling transformation', label: 'Scaling transformation', hint: 'Multi-stream delivery underway' },
+  { value: 'Optimising value', label: 'Optimising value', hint: 'Refining ROI and embedding guardrails' }
+];
+
+const RISK_CHOICES = [
+  { value: 'Conservative', label: 'Conservative', hint: 'Guardrail-first, low experimentation' },
+  { value: 'Balanced', label: 'Balanced', hint: 'Managed experimentation with governance' },
+  { value: 'Bold innovation', label: 'Bold innovation', hint: 'Aggressive bets and rapid iteration' }
+];
 
 function setValuePulse(message, { force = false, highlight = false } = {}) {
   if (!valuePulse) return;
@@ -193,7 +992,14 @@ function selectStage(stage) {
 }
 
 tierCards.forEach(card => {
-  card.addEventListener('click', () => selectStage(card.dataset.stage));
+  card.addEventListener('click', () => {
+    if (!activeProject) {
+      engagePulseSpotlight('Create a project workspace to unlock assessments.', 3200);
+      openProjectWizard({ startAt: 1 });
+      return;
+    }
+    selectStage(card.dataset.stage);
+  });
 });
 
 function renderCapabilities() {
@@ -226,31 +1032,41 @@ function renderCapabilities() {
 
 function renderStrategicDrivers() {
   strategicDriversWrap.innerHTML = '';
-  catalog.strategicDrivers.forEach((driver, index) => {
-    const col = document.createElement('div');
-    col.className = 'col-md-6';
-    const driverSlug = driver
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
-    const driverId = `driver-${driverSlug || index}`;
-    col.innerHTML = `
-      <label class="driver-card" for="${driverId}">
-        <input class="driver-card-input" type="checkbox" value="${driver}" id="${driverId}" name="strategicDrivers">
-        <span class="driver-card-content">${driver}</span>
-      </label>`;
-    strategicDriversWrap.appendChild(col);
+  const options = catalog.strategicDrivers.map(driver => ({
+    value: driver,
+    label: driver,
+    hint: ''
+  }));
+  renderTileOptions(strategicDriversWrap, options.map(option => ({ ...option, multiple: true })));
+  strategicDriverGroup = initTileGroup(strategicDriversWrap, {
+    multiple: true,
+    onChange: (values) => {
+      strategicDriverSelection = new Set(values);
+    }
   });
+  strategicDriverSelection = new Set(strategicDriverGroup?.getValues() || []);
 }
 
 function renderIndustries() {
-  industrySelect.innerHTML = '<option value="">Select industry</option>';
+  if (industrySelect) {
+    industrySelect.innerHTML = '<option value="">Select industry</option>';
+  }
+  if (projectIndustrySelect) {
+    projectIndustrySelect.innerHTML = '<option value="">Select industry</option>';
+  }
   catalog.industries.forEach(ind => {
-    const opt = document.createElement('option');
-    opt.value = ind;
-    opt.textContent = ind;
-    industrySelect.appendChild(opt);
+    if (industrySelect) {
+      const opt = document.createElement('option');
+      opt.value = ind;
+      opt.textContent = ind;
+      industrySelect.appendChild(opt);
+    }
+    if (projectIndustrySelect) {
+      const optProj = document.createElement('option');
+      optProj.value = ind;
+      optProj.textContent = ind;
+      projectIndustrySelect.appendChild(optProj);
+    }
   });
 }
 
@@ -293,15 +1109,22 @@ function renderPersonas() {
     const col = document.createElement('div');
     col.className = 'col-md-6';
     col.innerHTML = `
-      <div class="form-check persona-check">
-        <input class="form-check-input" type="checkbox" value="${persona.id}" id="persona-${persona.id}" name="personaSelection" checked>
-        <label class="form-check-label" for="persona-${persona.id}">
-          <strong>${persona.title}</strong>
-          <div class="small text-fg-3">Outcomes: ${persona.outcomes.join(', ')}</div>
-        </label>
-      </div>`;
+      <button type="button" class="tile-option multiple" data-value="${persona.id}">
+        <div class="d-flex flex-column gap-1 text-start">
+          <span class="fw-semibold">${persona.title}</span>
+          <span class="tile-hint">Outcomes: ${persona.outcomes.join(', ')}</span>
+        </div>
+      </button>`;
     personaWrap.appendChild(col);
   });
+  personaGroup = initTileGroup(personaWrap, {
+    multiple: true,
+    values: personaBlueprint.map(p => p.id),
+    onChange: (values) => {
+      selectedPersonaIds = new Set(values);
+    }
+  });
+  selectedPersonaIds = new Set(personaGroup?.getValues() || []);
 }
 
 function renderTechLandscape() {
@@ -356,10 +1179,6 @@ async function loadQuestionnaire(stage) {
 
 function validateStep(step) {
   if (step === 1) {
-    if (!currentStage) {
-      alert('Select a report tier to continue.');
-      return false;
-    }
     if (!selectedCapability) {
       alert('Select a primary capability focus.');
       return false;
@@ -368,8 +1187,7 @@ function validateStep(step) {
       alert('Select your industry.');
       return false;
     }
-    const driversSelected = strategicDriversWrap.querySelectorAll('input[name="strategicDrivers"]:checked');
-    if (driversSelected.length === 0) {
+    if (strategicDriverSelection.size === 0) {
       alert('Choose at least one strategic driver.');
       return false;
     }
@@ -380,6 +1198,10 @@ function validateStep(step) {
       if (!field.reportValidity()) {
         return false;
       }
+    }
+    if (selectedPersonaIds.size === 0) {
+      alert('Select at least one persona to tailor the insights.');
+      return false;
     }
   }
   if (step === 5 && questionnaireLoadedStage !== currentStage) {
@@ -470,6 +1292,65 @@ function renderArchitecturePreview() {
   });
 }
 
+if (projectSelect) {
+  projectSelect.addEventListener('change', () => {
+    const value = projectSelect.value;
+    if (!value) return;
+    const project = projects.find(p => p.id === value);
+    setActiveProject(project || null);
+  });
+}
+
+if (launchProjectWizardBtn) {
+  launchProjectWizardBtn.addEventListener('click', () => openProjectWizard({ startAt: 1 }));
+}
+
+if (replayProjectTourBtn) {
+  replayProjectTourBtn.addEventListener('click', () => openProjectWizard({ startAt: 1 }));
+}
+
+if (projectCloseBtn) {
+  projectCloseBtn.addEventListener('click', () => closeProjectWizard(!!activeProject));
+}
+
+if (projectPrevBtn) {
+  projectPrevBtn.addEventListener('click', () => showProjectWizardStep(projectWizardStep - 1));
+}
+
+if (projectNextBtn) {
+  projectNextBtn.addEventListener('click', handleProjectNext);
+}
+
+if (projectSkipBtn) {
+  projectSkipBtn.addEventListener('click', () => {
+    if (projectWizardStep === 1) {
+      showProjectWizardStep(2);
+    } else if (activeProject) {
+      closeProjectWizard(true);
+    } else {
+      alert('Capture the project foundations to continue.');
+    }
+  });
+}
+
+[
+  projectNameInput,
+  projectIndustrySelect,
+  projectObjectivesInput,
+  projectComplianceInput,
+  projectNarrativeInput,
+  projectGovernanceInput,
+  projectDiscoveryInput,
+  projectHeadcountInput,
+  projectRevenueInput,
+  projectBudgetInput,
+  projectPersonasInput
+].forEach(input => {
+  if (!input) return;
+  input.addEventListener('input', updateProjectWizardInsights);
+  input.addEventListener('change', updateProjectWizardInsights);
+});
+
 function addTimelineEntry(preset = {}) {
   if (!timelineList) return;
   const wrapper = document.createElement('div');
@@ -545,10 +1426,14 @@ form.addEventListener('submit', async (event) => {
   submitBtn.textContent = 'Generating...';
 
   try {
-    const strategicDrivers = Array.from(strategicDriversWrap.querySelectorAll('input[name="strategicDrivers"]:checked')).map(input => input.value);
+    if (!activeProject) {
+      alert('Create a project workspace before generating an assessment.');
+      openProjectWizard({ startAt: 1 });
+      return;
+    }
+    const strategicDrivers = Array.from(strategicDriverSelection);
     const capabilityFocus = Array.from(capabilityFocusSelect.selectedOptions).map(opt => opt.value);
-    const selectedPersonas = Array.from(personaWrap.querySelectorAll('input[name="personaSelection"]:checked')).map(input => input.value);
-    const personas = personaBlueprint.filter(p => selectedPersonas.includes(p.id));
+    const personas = personaBlueprint.filter(p => selectedPersonaIds.has(p.id));
     const techLandscape = {};
     techLandscapeWrap.querySelectorAll('textarea[data-tech]').forEach(area => {
       techLandscape[area.dataset.tech] = area.value.trim();
@@ -557,6 +1442,7 @@ form.addEventListener('submit', async (event) => {
     const timeline = gatherTimeline();
 
     const payload = {
+      projectId: activeProject.id,
       stage: currentStage,
       assessmentType: selectedCapability.id,
       companySize: form.companySize.value,
@@ -654,6 +1540,22 @@ async function readFileAsDataURL(file) {
 }
 
 async function init() {
+  try {
+    const authRes = await fetch('/api/auth/me', { credentials: 'include' });
+    if (authRes.status === 401) {
+      location.href = '/signup.html?redirect=/assessment.html';
+      return;
+    }
+    const authJson = await authRes.json();
+    me = authJson.user;
+  } catch (err) {
+    console.error(err);
+    alert('Unable to verify your session.');
+    return;
+  }
+
+  renderFormTileGroups();
+
   const res = await fetch('/api/assessments/catalog');
   if (!res.ok) {
     alert('Unable to load assessment catalog.');
@@ -661,15 +1563,24 @@ async function init() {
   }
   const json = await res.json();
   catalog = json.catalog;
+
   renderCapabilities();
   renderStrategicDrivers();
   renderIndustries();
   renderOrganisations();
   renderCapabilityFocusOptions();
+  renderProjectTileGroups();
+
+  await loadProjects();
+
   const params = new URLSearchParams(location.search);
   const stageParam = params.get('stage');
-  if (stageParam && STAGE_CONFIG[stageParam]) {
+  if (stageParam && STAGE_CONFIG[stageParam] && activeProject) {
     selectStage(stageParam);
+  }
+
+  if (!activeProject) {
+    setValuePulse('Create a project workspace to begin.', { force: true });
   }
 }
 

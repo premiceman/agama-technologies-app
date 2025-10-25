@@ -38,6 +38,11 @@ const assistantClose = assistantWidget?.querySelector('.btn-close');
 const assistantForm = document.getElementById('assistantForm');
 const assistantPrompt = document.getElementById('assistantPrompt');
 const assistantMessages = document.getElementById('assistantMessages');
+const projectSummaryCard = document.getElementById('projectExecutiveSummary');
+const projectSummaryName = document.getElementById('projectSummaryName');
+const projectSummaryContext = document.getElementById('projectSummaryContext');
+const projectSummaryDrivers = document.getElementById('projectSummaryDrivers');
+const projectSummaryMetrics = document.getElementById('projectSummaryMetrics');
 
 let currentStep = 1;
 let catalog;
@@ -50,6 +55,12 @@ let orgMatchLookup = [];
 let organizationIntelProfile = null;
 let valuePathModel = [];
 let loadingInterval = null;
+let projectSummaryInfo = null;
+let strategicDriverGroup = null;
+let strategicDriverSelection = new Set();
+let personaGroup = null;
+let personaSelection = new Set();
+let capabilityFocusTouched = false;
 const loadingMessages = [
   'Synchronising analyst benchmarks...',
   'Triangulating telemetry choke points...',
@@ -65,6 +76,207 @@ const parseMultiline = (value) =>
     .split(/\n+/)
     .map(entry => entry.trim())
     .filter(Boolean);
+
+function renderTileOptions(groupEl, options = []) {
+  if (!groupEl) return;
+  groupEl.innerHTML = '';
+  options.forEach(option => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    const extraClass = option.className ? ` ${option.className}` : '';
+    btn.className = `tile-option${option.multiple ? ' multiple' : ''}${extraClass}`;
+    btn.dataset.value = option.value;
+    if (option.disabled) btn.dataset.disabled = 'true';
+    btn.innerHTML = option.html || `<span>${option.label}</span>${option.hint ? `<span class="tile-hint">${option.hint}</span>` : ''}`;
+    groupEl.appendChild(btn);
+  });
+}
+
+function initTileGroup(groupEl, { multiple = false, values = [], onChange } = {}) {
+  if (!groupEl) return null;
+  let selected = new Set(Array.isArray(values) ? values : [values].filter(Boolean));
+
+  const commit = () => {
+    groupEl.querySelectorAll('.tile-option').forEach(btn => {
+      const value = btn.dataset.value;
+      btn.classList.toggle('selected', value && selected.has(value));
+    });
+    onChange?.(Array.from(selected));
+  };
+
+  const handleClick = (event) => {
+    const button = event.target.closest('.tile-option');
+    if (!button || button.dataset.disabled === 'true') return;
+    const value = button.dataset.value;
+    if (!value) return;
+    if (multiple) {
+      if (selected.has(value)) {
+        selected.delete(value);
+      } else {
+        selected.add(value);
+      }
+    } else {
+      selected = new Set([value]);
+    }
+    commit();
+  };
+
+  groupEl.addEventListener('click', handleClick);
+  commit();
+
+  return {
+    getValues: () => Array.from(selected),
+    setValues: (vals = []) => {
+      if (!Array.isArray(vals)) vals = [vals].filter(Boolean);
+      selected = new Set(multiple ? vals : vals.slice(0, 1));
+      commit();
+    },
+    clear: () => {
+      selected.clear();
+      commit();
+    },
+    destroy: () => {
+      groupEl.removeEventListener('click', handleClick);
+    }
+  };
+}
+
+function extractList(value, mapper) {
+  if (!value) return [];
+  const apply = (item) => {
+    if (typeof mapper === 'function') return mapper(item);
+    if (typeof item === 'string') return item;
+    if (item && typeof item === 'object') {
+      return item.name || item.title || item.label || item.function || item.leader || item.owner || '';
+    }
+    return String(item || '');
+  };
+  if (Array.isArray(value)) {
+    return value
+      .map(item => apply(item))
+      .map(entry => (typeof entry === 'string' ? entry.trim() : String(entry || '').trim()))
+      .filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    return parseMultiline(value);
+  }
+  if (typeof mapper === 'function' && value && typeof value === 'object') {
+    const mapped = apply(value);
+    return mapped ? [String(mapped).trim()] : [];
+  }
+  return [];
+}
+
+function resolveList() {
+  const args = Array.from(arguments);
+  let mapper = null;
+  if (args.length && typeof args[0] === 'function') {
+    mapper = args.shift();
+  }
+  for (const source of args) {
+    const list = extractList(source, mapper);
+    if (list.length) return list;
+  }
+  return [];
+}
+
+function formatList() {
+  const list = resolveList.apply(null, arguments);
+  return list.length ? list.join('\n') : '';
+}
+
+function coalesceValue() {
+  for (const candidate of arguments) {
+    if (candidate === undefined || candidate === null) continue;
+    if (typeof candidate === 'number') {
+      if (!Number.isNaN(candidate)) return candidate;
+    } else if (typeof candidate === 'string') {
+      const trimmed = candidate.trim();
+      if (trimmed.length) return trimmed;
+    }
+  }
+  return '';
+}
+
+function seedFocusDomains(targetSet, entries = []) {
+  if (!Array.isArray(entries)) return;
+  entries.forEach(entry => {
+    if (!entry) return;
+    if (!catalog) {
+      targetSet.add(String(entry));
+      return;
+    }
+    const capability = catalog.capabilities.find(cap => cap.id === entry);
+    if (capability) {
+      capability.domains.forEach(domain => targetSet.add(domain));
+      return;
+    }
+    const domain = String(entry);
+    if (catalog.capabilities.some(cap => cap.domains.includes(domain))) {
+      targetSet.add(domain);
+      return;
+    }
+    targetSet.add(domain);
+  });
+}
+
+function resolveStageValue(stage) {
+  const map = {
+    'Discovery & Fit': 'Discovery & Fit',
+    'Mobilising programme': 'Mobilising programme',
+    'Modernisation programme mobilising': 'Mobilising programme',
+    'Scaling transformation': 'Scaling transformation',
+    'Optimising for value': 'Optimising value',
+    'Optimising value': 'Optimising value'
+  };
+  return map[stage] || 'Mobilising programme';
+}
+
+if (capabilityFocusSelect) {
+  capabilityFocusSelect.addEventListener('change', () => {
+    capabilityFocusTouched = true;
+  });
+}
+
+function renderProjectSummary(project) {
+  if (!projectSummaryCard) return;
+  if (!project) {
+    projectSummaryCard.classList.add('d-none');
+    return;
+  }
+  projectSummaryCard.classList.remove('d-none');
+  projectSummaryName.textContent = project.name || 'Project workspace';
+  const contextBits = [project.companySize, project.region, project.industry].filter(Boolean);
+  const overview = project.overview || '';
+  projectSummaryContext.textContent = contextBits.length ? contextBits.join(' · ') : (overview || 'Project workspace context will load shortly.');
+  const drivers = Array.isArray(project.strategicDrivers) && project.strategicDrivers.length
+    ? `Drivers: ${project.strategicDrivers.join(' · ')}`
+    : 'Drivers pending definition.';
+  const focus = Array.isArray(project.capabilityFocus) && project.capabilityFocus.length
+    ? `Focus domains: ${project.capabilityFocus.join(', ')}`
+    : 'Focus domains to be confirmed.';
+  projectSummaryDrivers.textContent = `${drivers} ${focus}`.trim();
+
+  const analytics = project.analytics || {};
+  const readiness = analytics.readinessScore ? Math.round(analytics.readinessScore) : '--';
+  const clarity = analytics.clarityScore ? Math.round(analytics.clarityScore) : '--';
+  projectSummaryMetrics.innerHTML = `
+    <div class="project-analytics__tile">
+      <span class="project-analytics__label">Readiness</span>
+      <div class="project-analytics__value">${readiness}</div>
+      <p class="project-analytics__note">${analytics.sentiment || 'Complete the project workspace to calibrate readiness.'}</p>
+    </div>
+    <div class="project-analytics__tile">
+      <span class="project-analytics__label">Clarity</span>
+      <div class="project-analytics__value">${clarity}</div>
+      <p class="project-analytics__note">Context depth from executive objectives.</p>
+    </div>
+    <div class="project-analytics__tile">
+      <span class="project-analytics__label">Coverage</span>
+      <div class="project-analytics__value">${project.capabilityFocus?.length || 0}</div>
+      <p class="project-analytics__note">${project.strategicDrivers?.length || 0} strategic drivers</p>
+    </div>`;
+}
 
 function showStep(step) {
   currentStep = step;
@@ -89,26 +301,24 @@ function validateStep(step) {
     }
   }
 
-  if (step === 2) {
-    if (!selectedCapability) {
-      alert('Select a primary assessment focus.');
-      return false;
+    if (step === 2) {
+      if (!selectedCapability) {
+        alert('Select a primary assessment focus.');
+        return false;
+      }
+      if (strategicDriverSelection.size === 0) {
+        alert('Select at least one strategic driver.');
+        return false;
+      }
     }
-    const drivers = strategicDriversWrap.querySelectorAll('input[name="strategicDrivers"]:checked');
-    if (drivers.length === 0) {
-      alert('Select at least one strategic driver.');
-      return false;
-    }
-  }
 
-  if (step === 5) {
-    const personasSelected = personaWrap.querySelectorAll('input[name="personaSelection"]:checked');
-    if (personasSelected.length === 0) {
-      alert('Select at least one persona to tailor the report.');
-      return false;
-    }
-    if (!form.discoveryObjectives.value.trim()) {
-      alert('Capture the discovery objectives to tie the roadmap to executive goals.');
+    if (step === 5) {
+      if (personaWrap?.querySelector('.tile-option') && personaSelection.size === 0) {
+        alert('Select at least one persona to tailor the report.');
+        return false;
+      }
+      if (!form.discoveryObjectives.value.trim()) {
+        alert('Capture the discovery objectives to tie the roadmap to executive goals.');
       form.discoveryObjectives.focus();
       return false;
     }
@@ -146,18 +356,27 @@ function renderCapabilities() {
 }
 
 function renderStrategicDrivers() {
-  strategicDriversWrap.innerHTML = '';
-  catalog.strategicDrivers.forEach(driver => {
-    const col = document.createElement('div');
-    col.className = 'col-md-6';
-    const checked = (assessment.strategicDrivers || []).includes(driver) ? 'checked' : '';
-    col.innerHTML = `
-      <div class="form-check">
-        <input class="form-check-input" type="checkbox" value="${driver}" id="driver-${driver}" name="strategicDrivers" ${checked}>
-        <label class="form-check-label" for="driver-${driver}">${driver}</label>
-      </div>`;
-    strategicDriversWrap.appendChild(col);
+  if (!strategicDriversWrap) return;
+  strategicDriverGroup?.destroy();
+  const options = (catalog?.strategicDrivers || []).map(driver => ({
+    value: driver,
+    label: driver,
+    multiple: true
+  }));
+  renderTileOptions(strategicDriversWrap, options);
+  let defaults = Array.isArray(assessment.strategicDrivers) && assessment.strategicDrivers.length
+    ? assessment.strategicDrivers
+    : (Array.isArray(projectSummaryInfo?.strategicDrivers) && projectSummaryInfo.strategicDrivers.length
+      ? projectSummaryInfo.strategicDrivers
+      : options.slice(0, 2).map(option => option.value));
+  strategicDriverGroup = initTileGroup(strategicDriversWrap, {
+    multiple: true,
+    values: defaults,
+    onChange: (values) => {
+      strategicDriverSelection = new Set(values);
+    }
   });
+  strategicDriverSelection = new Set(strategicDriverGroup?.getValues() || []);
 }
 
 function renderIndustries() {
@@ -339,49 +558,89 @@ function applyOrgIntel(intel) {
   setEnrichmentStatus(`Loaded intelligence for ${profile.canonicalName || assessment.organization?.name || 'organisation'}.`, 'success');
 }
 
-function renderCapabilityFocusOptions() {
-  capabilityFocusSelect.innerHTML = '';
-  const uniqueDomains = new Set();
-  catalog.capabilities.forEach(cap => cap.domains.forEach(d => uniqueDomains.add(d)));
-  uniqueDomains.forEach(domain => {
-    const opt = document.createElement('option');
-    opt.value = domain;
-    opt.textContent = domain;
-    if ((assessment.capabilityFocus || []).includes(domain)) opt.selected = true;
-    capabilityFocusSelect.appendChild(opt);
-  });
-}
+  function renderCapabilityFocusOptions() {
+    if (!capabilityFocusSelect || !catalog?.capabilities) return;
+    capabilityFocusTouched = false;
+    capabilityFocusSelect.innerHTML = '';
+    const uniqueDomains = new Set();
+    catalog.capabilities.forEach(cap => cap.domains.forEach(d => uniqueDomains.add(d)));
+    const preselected = new Set();
+    seedFocusDomains(preselected, assessment.capabilityFocus || []);
+    seedFocusDomains(preselected, projectSummaryInfo?.capabilityFocus || []);
+    uniqueDomains.forEach(domain => {
+      const opt = document.createElement('option');
+      opt.value = domain;
+      opt.textContent = domain;
+      if (preselected.has(domain)) opt.selected = true;
+      capabilityFocusSelect.appendChild(opt);
+    });
+  }
 
-function updateCapabilitySelection() {
-  document.querySelectorAll('#premiumCapabilityOptions .capability-card').forEach(card => {
-    card.classList.toggle('selected', card.dataset.id === selectedCapability.id);
-  });
-  personaBlueprint = selectedCapability.personas;
-  renderPersonas();
-  renderTechLandscape();
-  Array.from(capabilityFocusSelect.options).forEach(opt => {
-    opt.selected = (assessment.capabilityFocus || []).includes(opt.value) || selectedCapability.domains.includes(opt.value);
-  });
-}
+  function updateCapabilitySelection() {
+    document.querySelectorAll('#premiumCapabilityOptions .capability-card').forEach(card => {
+      card.classList.toggle('selected', card.dataset.id === selectedCapability.id);
+    });
+    personaBlueprint = selectedCapability.personas;
+    renderPersonas();
+    renderTechLandscape();
+    if (capabilityFocusSelect && !capabilityFocusTouched) {
+      const seeds = new Set(Array.from(capabilityFocusSelect.selectedOptions).map(opt => opt.value));
+      seedFocusDomains(seeds, assessment.capabilityFocus || []);
+      seedFocusDomains(seeds, projectSummaryInfo?.capabilityFocus || []);
+      if (Array.isArray(selectedCapability.domains)) {
+        selectedCapability.domains.forEach(domain => seeds.add(domain));
+      }
+      Array.from(capabilityFocusSelect.options).forEach(opt => {
+        opt.selected = seeds.has(opt.value);
+      });
+    }
+  }
 
-function renderPersonas() {
-  personaWrap.innerHTML = '';
-  const selectedPersonaIds = (assessment.personas || []).map(p => p.id || p.title);
-  personaBlueprint.forEach(persona => {
-    const col = document.createElement('div');
-    col.className = 'col-md-6';
-    const checked = selectedPersonaIds.includes(persona.id) || selectedPersonaIds.includes(persona.title) ? 'checked' : '';
-    col.innerHTML = `
-      <div class="form-check">
-        <input class="form-check-input" type="checkbox" value="${persona.id}" id="persona-${persona.id}" name="personaSelection" ${checked}>
-        <label class="form-check-label" for="persona-${persona.id}">
-          <strong>${persona.title}</strong>
-          <div class="small text-fg-3">Outcomes: ${persona.outcomes.join(', ')}</div>
-        </label>
-      </div>`;
-    personaWrap.appendChild(col);
-  });
-}
+  function renderPersonas() {
+    if (!personaWrap) return;
+    personaGroup?.destroy();
+    personaWrap.innerHTML = '';
+    if (!Array.isArray(personaBlueprint) || personaBlueprint.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'text-fg-3 small';
+      empty.textContent = 'Personas will appear here once a capability is selected.';
+      personaWrap.appendChild(empty);
+      personaSelection = new Set();
+      return;
+    }
+    const options = personaBlueprint.map(persona => {
+      const id = persona.id || persona.title || persona.name;
+      const outcomes = Array.isArray(persona.outcomes) ? persona.outcomes.join(', ') : '';
+      const hint = outcomes ? `Outcomes: ${outcomes}` : '';
+      return {
+        value: id,
+        html: `
+          <span>${persona.title || persona.name || id}</span>
+          ${hint ? `<span class="tile-hint">${hint}</span>` : ''}`,
+        multiple: true,
+        className: 'w-100'
+      };
+    });
+    renderTileOptions(personaWrap, options);
+    const existing = Array.isArray(assessment.personas)
+      ? assessment.personas.map(persona => persona?.id || persona?.title || persona).filter(Boolean)
+      : [];
+    const projectDefaults = Array.isArray(projectSummaryInfo?.personas)
+      ? projectSummaryInfo.personas.map(persona => persona?.id || persona?.title || persona?.name || persona).filter(Boolean)
+      : [];
+    let defaults = existing.length ? existing : projectDefaults;
+    if (!defaults.length) {
+      defaults = options.slice(0, Math.min(2, options.length)).map(option => option.value);
+    }
+    personaGroup = initTileGroup(personaWrap, {
+      multiple: true,
+      values: defaults,
+      onChange: (values) => {
+        personaSelection = new Set(values);
+      }
+    });
+    personaSelection = new Set(personaGroup?.getValues() || []);
+  }
 
 function renderTechLandscape() {
   techLandscapeWrap.innerHTML = '';
@@ -398,76 +657,138 @@ function renderTechLandscape() {
   });
 }
 
-function prefillCompanyProfile() {
-  const profile = assessment.companyProfile || {};
-  const intelProfile = assessment.organization?.intel?.profile || {};
-  organizationIntelProfile = intelProfile;
-  form.companyName.value = profile.name || intelProfile.canonicalName || '';
-  if (form.companyDomain) {
-    form.companyDomain.value = profile.domain || intelProfile.primaryDomain || '';
+  function prefillCompanyProfile() {
+    const projectProfile = projectSummaryInfo?.companyProfile || {};
+    const profile = { ...projectProfile, ...(assessment.companyProfile || {}) };
+    const intelProfile = assessment.organization?.intel?.profile || {};
+    organizationIntelProfile = intelProfile;
+
+    const assign = (field, ...values) => {
+      if (!field) return;
+      const value = coalesceValue(...values);
+      field.value = value === '' ? '' : value;
+    };
+
+    assign(form.companyName, profile.name, projectSummaryInfo?.name, intelProfile.canonicalName, assessment.organization?.name);
+    if (form.companyDomain) {
+      assign(form.companyDomain, profile.domain, projectSummaryInfo?.companyDomain, intelProfile.primaryDomain);
+    }
+    assign(form.headcount, profile.headcount, projectSummaryInfo?.headcount, intelProfile.headcountEstimate, profile.employeeRange);
+    assign(form.annualRevenue, profile.annualRevenue, projectProfile.annualRevenue, intelProfile.annualRevenueEstimate);
+    assign(form.turnover, profile.turnover, intelProfile.turnover);
+    if (form.transformationStage) {
+      form.transformationStage.value = resolveStageValue(profile.transformationStage || projectSummaryInfo?.stage);
+    }
+    if (form.riskAppetite) {
+      form.riskAppetite.value = coalesceValue(profile.riskAppetite, projectSummaryInfo?.riskAppetite, 'Balanced') || 'Balanced';
+    }
+    assign(form.strategicBudget, profile.strategicBudget, projectProfile.strategicBudget);
+    assign(form.narrativeContext, profile.narrativeContext, projectSummaryInfo?.overview, assessment.organization?.extract);
+    form.complianceDrivers.value = formatList(profile.complianceDrivers, projectProfile.complianceDrivers, intelProfile.complianceDrivers);
+    form.customerSegments.value = formatList(profile.customerSegments, projectProfile.customerSegments, intelProfile.customerSegments);
+    form.investmentRounds.value = formatList(
+      (item) => {
+        if (typeof item === 'string') return item;
+        if (!item) return '';
+        const parts = [item.round || item.stage, item.amount || item.value, item.year || item.date, item.investor];
+        return parts.filter(Boolean).join(' · ');
+      },
+      profile.investmentRounds,
+      projectProfile.investmentRounds,
+      intelProfile.investmentHighlights
+    );
+    form.keyInitiatives.value = formatList(
+      (item) => {
+        if (typeof item === 'string') return item;
+        if (!item) return '';
+        const objective = item.objective ? ` · ${item.objective}` : '';
+        return `${item.name || item.title || ''}${objective}`.trim();
+      },
+      profile.keyInitiatives,
+      projectProfile.keyInitiatives,
+      intelProfile.keyInitiatives
+    );
+    form.organisationStructure.value = formatList(
+      (item) => {
+        if (typeof item === 'string') return item;
+        if (!item) return '';
+        const remit = item.remit ? ` → ${item.remit}` : '';
+        return `${item.function || item.leader || item.title || ''}${remit}`.trim();
+      },
+      profile.organisationStructure,
+      projectProfile.organisationStructure,
+      intelProfile.organisationStructure
+    );
+    if (form.preferredVendors) {
+      form.preferredVendors.value = formatList(
+        assessment.vendorStrategy?.preferredVendors,
+        projectSummaryInfo?.vendorStrategy?.preferredVendors,
+        profile.preferredVendors
+      );
+    }
+    if (form.integrationChallenges) {
+      form.integrationChallenges.value = formatList(
+        assessment.vendorStrategy?.integrationChallenges,
+        projectSummaryInfo?.techLandscape?.integrationChallenges,
+        profile.integrationChallenges
+      );
+    }
+    assign(form.operatingRhythms, assessment.operatingModel?.operatingRhythms, projectSummaryInfo?.operatingModel?.governanceRhythms);
+    assign(form.talentFocus, assessment.operatingModel?.talentFocus, projectSummaryInfo?.operatingModel?.talentFocus);
+    assign(form.processConstraints, assessment.operatingModel?.processConstraints, projectSummaryInfo?.operatingModel?.processNotes);
+    assign(form.changeManagement, assessment.operatingModel?.changeManagement, projectSummaryInfo?.operatingModel?.changeManagement);
+    if (form.dataPipelines) {
+      form.dataPipelines.value = formatList(
+        (item) => {
+          if (typeof item === 'string') return item;
+          if (!item) return '';
+          const source = item.source || item.tool || '';
+          const destination = item.destination ? ` → ${item.destination}` : '';
+          const note = item.purpose ? ` (${item.purpose})` : '';
+          return `${source}${destination}${note}`.trim();
+        },
+        assessment.operatingModel?.dataPipelines,
+        profile.dataPipelines,
+        projectSummaryInfo?.techLandscape?.dataPipelines
+      );
+    }
+    if (form.insightExpectations) {
+      form.insightExpectations.value = formatList(
+        assessment.operatingModel?.insightExpectations,
+        profile.insightExpectations,
+        projectSummaryInfo?.techLandscape?.insightExpectations
+      );
+    }
+    assign(form.successMetrics, assessment.operatingModel?.successMetrics, projectSummaryInfo?.operatingModel?.successMetrics, profile.successMetrics);
+    assign(form.procurementProcess, assessment.operatingModel?.procurementProcess, projectSummaryInfo?.operatingModel?.procurementProcess, profile.procurementProcess);
+    form.reportingChains.value = formatList(
+      assessment.operatingModel?.reportingChains,
+      assessment.operatingModel?.reportingLines,
+      projectSummaryInfo?.operatingModel?.reportingChains,
+      profile.reportingChains
+    );
+    assign(form.meanTimeToInnocence, assessment.operatingModel?.meanTimeToInnocence, assessment.operatingModel?.mtti, profile.meanTimeToInnocence);
+    const discoveryObjectives = resolveList(
+      (item) => {
+        if (typeof item === 'string') return item;
+        if (!item) return '';
+        const objective = item.objective || '';
+        const kpis = item.linkedKpis ? ` · KPIs: ${Array.isArray(item.linkedKpis) ? item.linkedKpis.join(', ') : item.linkedKpis}` : '';
+        const timeframe = item.timeframe ? ` · ${item.timeframe}` : '';
+        return `${objective}${kpis}${timeframe}`.trim();
+      },
+      assessment.operatingModel?.discoveryObjectives,
+      profile.discoveryObjectives,
+      projectSummaryInfo?.operatingModel?.discoveryObjectives,
+      intelProfile.discoveryObjectives
+    );
+    form.discoveryObjectives.value = discoveryObjectives.join('\n');
+
+    if (intelProfile.dataConfidence) {
+      const tone = intelProfile.dataConfidence.toLowerCase().includes('low') ? 'warning' : 'success';
+      setEnrichmentStatus(intelProfile.dataConfidence, tone);
+    }
   }
-  form.headcount.value = profile.headcount || intelProfile.headcountEstimate || '';
-  form.annualRevenue.value = profile.annualRevenue || intelProfile.annualRevenueEstimate || '';
-  form.turnover.value = profile.turnover || intelProfile.turnover || '';
-  form.transformationStage.value = profile.transformationStage || 'Modernisation programme mobilising';
-  form.riskAppetite.value = profile.riskAppetite || 'Balanced';
-  form.strategicBudget.value = profile.strategicBudget || '';
-  form.narrativeContext.value = profile.narrativeContext || '';
-  form.complianceDrivers.value = profile.complianceDrivers || '';
-  form.customerSegments.value = profile.customerSegments || '';
-  const investmentRounds = Array.isArray(profile.investmentRounds)
-    ? profile.investmentRounds
-    : Array.isArray(intelProfile.investmentHighlights)
-      ? intelProfile.investmentHighlights
-      : [];
-  form.investmentRounds.value = investmentRounds.join('\n');
-  const initiatives = Array.isArray(profile.keyInitiatives)
-    ? profile.keyInitiatives
-    : Array.isArray(intelProfile.keyInitiatives)
-      ? intelProfile.keyInitiatives.map(item => `${item.name || ''}${item.objective ? ` · ${item.objective}` : ''}`.trim())
-      : [];
-  form.keyInitiatives.value = initiatives.join('\n');
-  const orgStructure = Array.isArray(profile.organisationStructure)
-    ? profile.organisationStructure
-    : Array.isArray(intelProfile.organisationStructure)
-      ? intelProfile.organisationStructure.map(item => `${item.function || item.leader || ''}${item.remit ? ` → ${item.remit}` : ''}`.trim())
-      : [];
-  form.organisationStructure.value = orgStructure.join('\n');
-  form.preferredVendors.value = assessment.vendorStrategy?.preferredVendors || '';
-  form.integrationChallenges.value = assessment.vendorStrategy?.integrationChallenges || '';
-  form.operatingRhythms.value = assessment.operatingModel?.operatingRhythms || '';
-  form.talentFocus.value = assessment.operatingModel?.talentFocus || '';
-  form.processConstraints.value = assessment.operatingModel?.processConstraints || '';
-  form.changeManagement.value = assessment.operatingModel?.changeManagement || '';
-  if (form.dataPipelines) {
-    const pipelines = assessment.operatingModel?.dataPipelines || profile.dataPipelines || [];
-    form.dataPipelines.value = Array.isArray(pipelines) ? pipelines.join('\n') : pipelines || '';
-  }
-  if (form.insightExpectations) {
-    const expectations = assessment.operatingModel?.insightExpectations || profile.insightExpectations || '';
-    form.insightExpectations.value = Array.isArray(expectations) ? expectations.join('\n') : expectations || '';
-  }
-  form.successMetrics.value = assessment.operatingModel?.successMetrics || '';
-  form.procurementProcess.value = assessment.operatingModel?.procurementProcess || '';
-  form.reportingChains.value = assessment.operatingModel?.reportingChains || assessment.operatingModel?.reportingLines || '';
-  form.meanTimeToInnocence.value = assessment.operatingModel?.meanTimeToInnocence || assessment.operatingModel?.mtti || '';
-  const discoveryObjectives = Array.isArray(assessment.operatingModel?.discoveryObjectives)
-    ? assessment.operatingModel.discoveryObjectives
-    : Array.isArray(profile.discoveryObjectives)
-      ? profile.discoveryObjectives
-      : Array.isArray(intelProfile.discoveryObjectives)
-        ? intelProfile.discoveryObjectives.map(item =>
-            typeof item === 'string'
-              ? item
-              : `${item.objective || ''}${item.linkedKpis ? ` · KPIs: ${Array.isArray(item.linkedKpis) ? item.linkedKpis.join(', ') : item.linkedKpis}` : ''}${item.timeframe ? ` · ${item.timeframe}` : ''}`.trim()
-          )
-        : [];
-  form.discoveryObjectives.value = discoveryObjectives.join('\n');
-  if (intelProfile.dataConfidence) {
-    const tone = intelProfile.dataConfidence.toLowerCase().includes('low') ? 'warning' : 'success';
-    setEnrichmentStatus(intelProfile.dataConfidence, tone);
-  }
-}
 
 function renderQuestionnaire() {
   questionnaireWrap.innerHTML = '';
@@ -693,14 +1014,14 @@ function collectStepContext(step) {
         region: form.region?.value,
         industry: industrySelect?.value
       };
-    case 2:
-      return {
-        capability: selectedCapability?.id,
-        strategicDrivers: Array.from(strategicDriversWrap.querySelectorAll('input[name="strategicDrivers"]:checked')).map(input => input.value),
-        transformationStage: form.transformationStage.value,
-        riskAppetite: form.riskAppetite.value,
-        capabilityFocus: Array.from(capabilityFocusSelect.selectedOptions).map(opt => opt.value)
-      };
+      case 2:
+        return {
+          capability: selectedCapability?.id,
+          strategicDrivers: Array.from(strategicDriverSelection),
+          transformationStage: form.transformationStage.value,
+          riskAppetite: form.riskAppetite.value,
+          capabilityFocus: Array.from(capabilityFocusSelect.selectedOptions).map(opt => opt.value)
+        };
     case 3:
       return {
         annualRevenue: form.annualRevenue.value,
@@ -718,18 +1039,18 @@ function collectStepContext(step) {
         dataPipelines: parseMultiline(form.dataPipelines?.value),
         insightExpectations: parseMultiline(form.insightExpectations?.value)
       };
-    case 5:
-      return {
-        operatingRhythms: form.operatingRhythms.value.trim(),
-        talentFocus: form.talentFocus.value.trim(),
-        processConstraints: form.processConstraints.value.trim(),
-        changeManagement: form.changeManagement.value.trim(),
-        procurementProcess: form.procurementProcess.value.trim(),
-        reportingChains: form.reportingChains.value.trim(),
-        meanTimeToInnocence: form.meanTimeToInnocence.value.trim(),
-        discoveryObjectives: parseMultiline(form.discoveryObjectives.value),
-        personas: Array.from(personaWrap.querySelectorAll('input[name="personaSelection"]:checked')).map(input => input.value)
-      };
+      case 5:
+        return {
+          operatingRhythms: form.operatingRhythms.value.trim(),
+          talentFocus: form.talentFocus.value.trim(),
+          processConstraints: form.processConstraints.value.trim(),
+          changeManagement: form.changeManagement.value.trim(),
+          procurementProcess: form.procurementProcess.value.trim(),
+          reportingChains: form.reportingChains.value.trim(),
+          meanTimeToInnocence: form.meanTimeToInnocence.value.trim(),
+          discoveryObjectives: parseMultiline(form.discoveryObjectives.value),
+          personas: Array.from(personaSelection)
+        };
     default:
       return null;
   }
@@ -799,14 +1120,14 @@ followUpClear?.addEventListener('click', () => {
   renderFollowUps([]);
 });
 
-function collectAssistantDraft() {
-  syncValuePathModelFromDom();
-  const strategicDrivers = Array.from(strategicDriversWrap.querySelectorAll('input[name="strategicDrivers"]:checked')).map(input => input.value);
-  const capabilityFocus = Array.from(capabilityFocusSelect.selectedOptions).map(opt => opt.value);
-  const personasSelected = Array.from(personaWrap.querySelectorAll('input[name="personaSelection"]:checked')).map(input => input.value);
-  const techLandscape = {};
-  techLandscapeWrap.querySelectorAll('textarea[data-tech]').forEach(area => {
-    techLandscape[area.dataset.tech] = area.value.trim();
+  function collectAssistantDraft() {
+    syncValuePathModelFromDom();
+    const strategicDrivers = Array.from(strategicDriverSelection);
+    const capabilityFocus = Array.from(capabilityFocusSelect.selectedOptions).map(opt => opt.value);
+    const personasSelected = Array.from(personaSelection);
+    const techLandscape = {};
+    techLandscapeWrap.querySelectorAll('textarea[data-tech]').forEach(area => {
+      techLandscape[area.dataset.tech] = area.value.trim();
   });
   return {
     company: {
@@ -971,10 +1292,13 @@ form.addEventListener('submit', async (event) => {
 
   try {
     syncValuePathModelFromDom();
-    const strategicDrivers = Array.from(strategicDriversWrap.querySelectorAll('input[name="strategicDrivers"]:checked')).map(input => input.value);
+    const strategicDrivers = Array.from(strategicDriverSelection);
     const capabilityFocus = Array.from(capabilityFocusSelect.selectedOptions).map(opt => opt.value);
-    const personaIds = Array.from(personaWrap.querySelectorAll('input[name="personaSelection"]:checked')).map(input => input.value);
-    const personas = (personaBlueprint || []).filter(p => personaIds.includes(p.id));
+    const personaIds = Array.from(personaSelection);
+    const personas = personaIds.map(id => {
+      const match = (personaBlueprint || []).find(p => (p?.id || p?.title || p?.name) === id);
+      return match || { id, title: id, outcomes: [] };
+    });
 
     const techLandscape = {};
     techLandscapeWrap.querySelectorAll('textarea[data-tech]').forEach(area => {
@@ -1129,7 +1453,10 @@ async function init() {
     }
 
     catalog = (await catalogRes.json()).catalog;
-    assessment = (await assessmentRes.json()).assessment;
+    const assessmentJson = await assessmentRes.json();
+    assessment = assessmentJson.assessment;
+    projectSummaryInfo = assessmentJson.project || null;
+    renderProjectSummary(projectSummaryInfo);
     questionsPremium = (await premiumQRes.json()).questions;
     const baseQuestions = (await baseQRes.json()).questions;
     basePillars = new Set(Object.keys(baseQuestions));

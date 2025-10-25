@@ -46,6 +46,7 @@ mongoose.connect(MONGODB_URI)
 // ---- Models ----
 const User = require('./models/User');
 const Assessment = require('./models/Assessment');
+const Project = require('./models/Project');
 const Report = require('./models/Report');
 const Payment = require('./models/Payment');
 
@@ -66,6 +67,63 @@ const {
   generateFollowUpPrompts,
   generateAssessmentAssistantReply
 } = require('./utils/openai');
+
+function computeProjectAnalyticsSnapshot({
+  stage,
+  riskAppetite,
+  strategicDrivers = [],
+  capabilityFocus = [],
+  companyProfile = {},
+  operatingModel = {}
+} = {}) {
+  const stageScores = {
+    'Discovery & Fit': 42,
+    'Mobilising programme': 56,
+    'Scaling transformation': 72,
+    'Optimising value': 84
+  };
+  const riskScores = {
+    'Conservative': -6,
+    'Balanced': 0,
+    'Bold innovation': 8
+  };
+  const base = stageScores[stage] || 40;
+  const risk = riskScores[riskAppetite] || 0;
+  const driverContribution = Math.min(strategicDrivers.length * 6, 24);
+  const focusContribution = Math.min(capabilityFocus.length * 5, 20);
+  const readinessScore = Math.max(
+    35,
+    Math.min(base + risk + driverContribution + focusContribution, 96)
+  );
+
+  const narrativeSignals = [
+    companyProfile.executiveObjectives,
+    companyProfile.narrativeContext,
+    companyProfile.complianceDrivers
+  ].filter(Boolean).length;
+  const governanceSignals = [
+    operatingModel.governanceRhythms,
+    operatingModel.changeManagement,
+    operatingModel.processNotes
+  ].filter(Boolean).length;
+  const clarityScore = Math.min(45 + narrativeSignals * 12 + governanceSignals * 8, 95);
+
+  const sentiment = readinessScore >= 80
+    ? 'Programme is change-ready with strong acceleration potential.'
+    : readinessScore >= 60
+      ? 'Momentum forming—reinforce governance and stakeholder choreography.'
+      : 'Establish foundational guardrails before expanding the programme.';
+
+  return {
+    readinessScore,
+    clarityScore,
+    sentiment,
+    driverCount: strategicDrivers.length,
+    focusCount: capabilityFocus.length,
+    stage,
+    riskAppetite
+  };
+}
 
 // ---- Routes ----
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: Date.now() }));
@@ -110,6 +168,105 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
   const user = await User.findById(req.auth.uid);
   if (!user) return res.status(404).json({ error: 'Not found' });
   res.json({ ok: true, user: user.public() });
+});
+
+// Projects
+app.get('/api/projects', requireAuth, async (req, res) => {
+  const projects = await Project.find({ userId: req.auth.uid }).sort({ updatedAt: -1 });
+  res.json({ ok: true, projects: projects.map(project => project.public()) });
+});
+
+app.post('/api/projects', requireAuth, async (req, res) => {
+  try {
+    const {
+      name,
+      companyDomain,
+      industry,
+      region,
+      companySize,
+      headcount,
+      stage,
+      riskAppetite,
+      strategicDrivers = [],
+      capabilityFocus = [],
+      overview,
+      companyProfile = {},
+      operatingModel = {},
+      techLandscape = {},
+      personas = []
+    } = req.body || {};
+
+    if (!name || !industry || !region || !companySize) {
+      return res.status(400).json({ error: 'Project name, industry, region, and company size are required.' });
+    }
+
+    const projectData = {
+      userId: req.auth.uid,
+      name: String(name).trim().slice(0, 140),
+      companyDomain: String(companyDomain || '').trim().slice(0, 160),
+      industry,
+      region,
+      companySize,
+      headcount: Number(headcount) || 0,
+      stage,
+      riskAppetite,
+      strategicDrivers: Array.isArray(strategicDrivers) ? strategicDrivers.slice(0, 10) : [],
+      capabilityFocus: Array.isArray(capabilityFocus) ? capabilityFocus.slice(0, 12) : [],
+      overview: String(overview || '').trim().slice(0, 500),
+      companyProfile,
+      operatingModel,
+      techLandscape,
+      personas: Array.isArray(personas) ? personas.slice(0, 12) : []
+    };
+
+    projectData.analytics = computeProjectAnalyticsSnapshot(projectData);
+
+    const project = await Project.create(projectData);
+    res.json({ ok: true, project: project.public() });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to create project' });
+  }
+});
+
+app.get('/api/projects/:id', requireAuth, async (req, res) => {
+  try {
+    const project = await Project.findOne({ _id: req.params.id, userId: req.auth.uid });
+    if (!project) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true, project: project.public() });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to load project' });
+  }
+});
+
+app.put('/api/projects/:id', requireAuth, async (req, res) => {
+  try {
+    const project = await Project.findOne({ _id: req.params.id, userId: req.auth.uid });
+    if (!project) return res.status(404).json({ error: 'Not found' });
+
+    const updates = req.body || {};
+    ['name', 'companyDomain', 'industry', 'region', 'companySize', 'stage', 'riskAppetite', 'overview'].forEach(field => {
+      if (updates[field] !== undefined) {
+        project[field] = String(updates[field]).trim();
+      }
+    });
+    if (updates.headcount !== undefined) project.headcount = Number(updates.headcount) || 0;
+    if (Array.isArray(updates.strategicDrivers)) project.strategicDrivers = updates.strategicDrivers.slice(0, 10);
+    if (Array.isArray(updates.capabilityFocus)) project.capabilityFocus = updates.capabilityFocus.slice(0, 12);
+    if (updates.companyProfile) project.companyProfile = updates.companyProfile;
+    if (updates.operatingModel) project.operatingModel = updates.operatingModel;
+    if (updates.techLandscape) project.techLandscape = updates.techLandscape;
+    if (Array.isArray(updates.personas)) project.personas = updates.personas.slice(0, 12);
+
+    project.analytics = computeProjectAnalyticsSnapshot(project.toObject());
+
+    await project.save();
+    res.json({ ok: true, project: project.public() });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to update project' });
+  }
 });
 
 // Assessment catalog & questions
@@ -226,6 +383,7 @@ app.post('/api/assessments/assistant', requireAuth, async (req, res) => {
 app.post('/api/assessments', requireAuth, async (req, res) => {
   try {
     const {
+      projectId,
       stage = 'insight',
       assessmentType = 'security',
       vertical: verticalRaw = 'generic',
@@ -250,6 +408,15 @@ app.post('/api/assessments', requireAuth, async (req, res) => {
       extendedAnswers = {},
       commandAnswers = {}
     } = req.body || {};
+
+    if (!projectId) {
+      return res.status(400).json({ error: 'A project is required before starting an assessment.' });
+    }
+
+    const project = await Project.findOne({ _id: projectId, userId: req.auth.uid });
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
 
     const stageMap = { free: 'insight', premium: 'strategic' };
     const requestedStage = stageMap[stage] || stage;
@@ -281,20 +448,21 @@ app.post('/api/assessments', requireAuth, async (req, res) => {
     };
 
     const enrichedCompanyProfile = {
+      ...project.companyProfile,
       ...companyProfile,
       headcount: companyProfile.headcount || profileIntel.headcountEstimate || profileIntel.employeeRange,
-      annualRevenue: companyProfile.annualRevenue || profileIntel.annualRevenueEstimate,
-      turnover: companyProfile.turnover || profileIntel.turnover,
-      investmentRounds: normaliseList(companyProfile.investmentRounds || profileIntel.investmentHighlights),
+      annualRevenue: companyProfile.annualRevenue || project.companyProfile?.annualRevenue || profileIntel.annualRevenueEstimate,
+      turnover: companyProfile.turnover || project.companyProfile?.turnover || profileIntel.turnover,
+      investmentRounds: normaliseList(companyProfile.investmentRounds || project.companyProfile?.investmentRounds || profileIntel.investmentHighlights),
       keyInitiatives: normaliseList(
-        companyProfile.keyInitiatives || (profileIntel.keyInitiatives || []).map(k => `${k.name}: ${k.objective || k.description || ''}`)
+        companyProfile.keyInitiatives || project.companyProfile?.keyInitiatives || (profileIntel.keyInitiatives || []).map(k => `${k.name}: ${k.objective || k.description || ''}`)
       ),
       organisationStructure: normaliseList(
-        companyProfile.organisationStructure || (profileIntel.organisationStructure || []).map(o => `${o.function || o.leader}: ${o.remit || ''}`)
+        companyProfile.organisationStructure || project.companyProfile?.organisationStructure || (profileIntel.organisationStructure || []).map(o => `${o.function || o.leader}: ${o.remit || ''}`)
       ),
-      personaKpis: companyProfile.personaKpis || profileIntel.personaKpis || {},
+      personaKpis: companyProfile.personaKpis || project.companyProfile?.personaKpis || profileIntel.personaKpis || {},
       discoveryObjectives: normaliseList(
-        companyProfile.discoveryObjectives || (profileIntel.discoveryObjectives || []).map(d => `${d.objective || ''}${d.linkedKpis ? ` · KPIs: ${Array.isArray(d.linkedKpis) ? d.linkedKpis.join(', ') : d.linkedKpis}` : ''}${d.timeframe ? ` · ${d.timeframe}` : ''}`)
+        companyProfile.discoveryObjectives || project.companyProfile?.discoveryObjectives || (profileIntel.discoveryObjectives || []).map(d => `${d.objective || ''}${d.linkedKpis ? ` · KPIs: ${Array.isArray(d.linkedKpis) ? d.linkedKpis.join(', ') : d.linkedKpis}` : ''}${d.timeframe ? ` · ${d.timeframe}` : ''}`)
       )
     };
 
@@ -344,42 +512,46 @@ app.post('/api/assessments', requireAuth, async (req, res) => {
 
     const assessment = await Assessment.create({
       userId: req.auth.uid,
+      projectId: project._id,
       assessmentType,
       stage: safeStage,
       vertical,
-      industry,
-      companySize,
-      region,
-      strategicDrivers,
+      industry: industry || project.industry,
+      companySize: companySize || project.companySize,
+      region: region || project.region,
+      strategicDrivers: strategicDrivers.length ? strategicDrivers : project.strategicDrivers,
       organization: {
-        name: organization?.name || '',
-        extract: organizationIntel.summary || organization?.extract || '',
+        name: organization?.name || project.companyProfile?.legalName || '',
+        extract: organizationIntel.summary || organization?.extract || project.companyProfile?.summary || '',
         intel: organizationIntel
       },
       companyProfile: enrichedCompanyProfile,
-      capabilityFocus: capabilityFocus.length ? capabilityFocus : capability.domains,
+      capabilityFocus: capabilityFocus.length ? capabilityFocus : (project.capabilityFocus?.length ? project.capabilityFocus : capability.domains),
       techLandscape,
       vendorStrategy,
       operatingModel: {
+        ...project.operatingModel,
         ...operatingModel,
-        discoveryObjectives: operatingModel.discoveryObjectives || enrichedCompanyProfile.discoveryObjectives
+        discoveryObjectives: operatingModel.discoveryObjectives || project.operatingModel?.discoveryObjectives || enrichedCompanyProfile.discoveryObjectives
       },
       stakeholderProfile,
       investmentProfile,
       initiativeTimeline: normalizedTimeline,
       architectureUploads: sanitizedUploads,
       architectureSignals: sanitizedSignals,
-      personas: personas.length ? personas : capability.personas,
+      personas: personas.length ? personas : (project.personas?.length ? project.personas : capability.personas),
       answers,
       premiumAnswers: storedPremiumAnswers,
       extendedAnswers: storedExtendedAnswers,
-      commandAnswers: storedCommandAnswers
+      commandAnswers: storedCommandAnswers,
+      projectSnapshot: project.public()
     });
 
     const reportData = await computeReport({ assessment });
     const report = await Report.create({
       userId: req.auth.uid,
       assessmentId: assessment._id,
+      projectId: project._id,
       ...reportData,
       architectureUploads: sanitizedUploads,
       architectureSignals: sanitizedSignals,
@@ -397,7 +569,13 @@ app.get('/api/assessments/:id', requireAuth, async (req, res) => {
   try {
     const assessment = await Assessment.findOne({ _id: req.params.id, userId: req.auth.uid });
     if (!assessment) return res.status(404).json({ error: 'Not found' });
-    res.json({ ok: true, assessment });
+
+    let project = null;
+    if (assessment.projectId) {
+      const projectDoc = await Project.findOne({ _id: assessment.projectId, userId: req.auth.uid });
+      project = projectDoc ? projectDoc.public() : null;
+    }
+    res.json({ ok: true, assessment, project });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -449,9 +627,11 @@ app.put('/api/assessments/:id/premium', requireAuth, async (req, res) => {
     assessment.strategicDrivers = strategicDrivers.length ? strategicDrivers : assessment.strategicDrivers;
     const orgName = organization?.name || '';
     assessment.organization = {
-      name: orgName,
-      extract: orgName ? (organizationIntel.summary || organization?.extract || assessment.organization?.extract || '') : '',
-      intel: orgName ? organizationIntel : {}
+      name: orgName || project?.companyProfile?.legalName || '',
+      extract: orgName
+        ? (organizationIntel.summary || organization?.extract || assessment.organization?.extract || project?.companyProfile?.summary || '')
+        : (project?.companyProfile?.summary || assessment.organization?.extract || ''),
+      intel: orgName ? organizationIntel : (assessment.organization?.intel || {})
     };
     const profileIntel = organizationIntel?.profile || {};
     const normaliseList = (value) => {
@@ -495,15 +675,20 @@ app.put('/api/assessments/:id/premium', requireAuth, async (req, res) => {
     }
 
     assessment.companyProfile = mergedCompanyProfile;
-    assessment.capabilityFocus = capabilityFocus.length ? capabilityFocus : (assessment.capabilityFocus || capability.domains);
-    assessment.techLandscape = { ...(assessment.techLandscape || {}), ...techLandscape };
+    assessment.capabilityFocus = capabilityFocus.length
+      ? capabilityFocus
+      : (assessment.capabilityFocus?.length ? assessment.capabilityFocus : (project?.capabilityFocus?.length ? project.capabilityFocus : capability.domains));
+    assessment.techLandscape = { ...(project?.techLandscape || {}), ...(assessment.techLandscape || {}), ...techLandscape };
     assessment.vendorStrategy = { ...(assessment.vendorStrategy || {}), ...vendorStrategy };
     assessment.operatingModel = {
+      ...(project?.operatingModel || {}),
       ...(assessment.operatingModel || {}),
       ...operatingModel,
       discoveryObjectives: operatingModel.discoveryObjectives || mergedCompanyProfile.discoveryObjectives
     };
-    assessment.personas = personas.length ? personas : (assessment.personas?.length ? assessment.personas : capability.personas);
+    assessment.personas = personas.length
+      ? personas
+      : (assessment.personas?.length ? assessment.personas : (project?.personas?.length ? project.personas : capability.personas));
     assessment.answers = { ...(assessment.answers || {}), ...answers };
     assessment.premiumAnswers = { ...(assessment.premiumAnswers || {}), ...premiumAnswers };
     const newArchitectureSignals = Object.fromEntries(
@@ -520,12 +705,16 @@ app.put('/api/assessments/:id/premium', requireAuth, async (req, res) => {
       ...newArchitectureSignals
     };
 
+    if (project) {
+      assessment.projectSnapshot = project.public();
+    }
+
     await assessment.save();
 
     const reportData = await computeReport({ assessment });
     const report = await Report.findOneAndUpdate(
       { assessmentId: assessment._id, userId: req.auth.uid },
-      { ...reportData, paid: true, assessmentId: assessment._id, userId: req.auth.uid },
+      { ...reportData, paid: true, assessmentId: assessment._id, userId: req.auth.uid, projectId: assessment.projectId },
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
 
