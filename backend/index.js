@@ -120,8 +120,11 @@ app.get('/api/assessments/catalog', (req, res) => {
 });
 
 app.get('/api/assessments/questions', (req, res) => {
-  const { stage = 'free' } = req.query;
-  const safeStage = stage === 'premium' ? 'premium' : 'free';
+  const { stage = 'insight' } = req.query;
+  const stageMap = { free: 'insight', premium: 'strategic' };
+  const requested = stageMap[stage] || stage;
+  const allowed = ['insight', 'strategic', 'command'];
+  const safeStage = allowed.includes(requested) ? requested : 'insight';
   const questions = getQuestionnaire(safeStage);
   res.json({ ok: true, stage: safeStage, questions });
 });
@@ -129,14 +132,14 @@ app.get('/api/assessments/questions', (req, res) => {
 // Create assessment -> compute report (partial by default)
 app.post('/api/assessments', requireAuth, async (req, res) => {
   try {
-      const {
-        stage = 'free',
-        assessmentType = 'security',
-        vertical: verticalRaw = 'generic',
-        companySize = 'SMB',
-        region = 'EMEA',
-        industry = '',
-        strategicDrivers = [],
+    const {
+      stage = 'insight',
+      assessmentType = 'security',
+      vertical: verticalRaw = 'generic',
+      companySize = 'SMB',
+      region = 'EMEA',
+      industry = '',
+      strategicDrivers = [],
       organization = {},
       companyProfile = {},
       capabilityFocus = [],
@@ -144,11 +147,21 @@ app.post('/api/assessments', requireAuth, async (req, res) => {
       personas = [],
       vendorStrategy = {},
       operatingModel = {},
+      stakeholderProfile = {},
+      investmentProfile = {},
+      initiativeTimeline = [],
+      architectureUploads = [],
+      architectureSignals = {},
       answers = {},
-      premiumAnswers = {}
+      premiumAnswers = {},
+      extendedAnswers = {},
+      commandAnswers = {}
     } = req.body || {};
 
-    const safeStage = stage === 'premium' ? 'premium' : 'free';
+    const stageMap = { free: 'insight', premium: 'strategic' };
+    const requestedStage = stageMap[stage] || stage;
+    const allowedStages = ['insight', 'strategic', 'command'];
+    const safeStage = allowedStages.includes(requestedStage) ? requestedStage : 'insight';
     const safeVertical = String(verticalRaw || 'generic').toLowerCase();
     const vertical = ['generic', 'saas'].includes(safeVertical) ? safeVertical : 'generic';
     const capability = getCapability(assessmentType);
@@ -161,6 +174,44 @@ app.post('/api/assessments', requireAuth, async (req, res) => {
         industry: industry || vertical
       });
     }
+
+    const normalizedTimeline = Array.isArray(initiativeTimeline)
+      ? initiativeTimeline.slice(0, 10).map(item => ({
+          title: String(item?.title || '').slice(0, 160),
+          owner: String(item?.owner || '').slice(0, 120),
+          timeline: String(item?.timeline || '').slice(0, 80),
+          outcome: String(item?.outcome || '').slice(0, 200),
+          description: String(item?.description || '').slice(0, 240)
+        }))
+      : [];
+
+    const sanitizedUploads = Array.isArray(architectureUploads)
+      ? architectureUploads.slice(0, 5).map(file => ({
+          filename: String(file?.filename || '').slice(0, 140),
+          mimeType: String(file?.mimeType || '').slice(0, 80),
+          data: typeof file?.data === 'string' ? file.data.slice(0, 2_000_000) : ''
+        }))
+      : [];
+
+    const sanitizedSignals = Object.fromEntries(
+      Object.entries(architectureSignals || {}).map(([key, value]) => [key, String(value || '').slice(0, 1000)])
+    );
+
+    const storedExtendedAnswers =
+      safeStage === 'insight'
+        ? {}
+        : Object.keys(extendedAnswers || {}).length
+          ? extendedAnswers
+          : Object.keys(premiumAnswers || {}).length
+            ? premiumAnswers
+            : {};
+
+    const storedPremiumAnswers =
+      safeStage === 'strategic' && !Object.keys(extendedAnswers || {}).length
+        ? premiumAnswers
+        : {};
+
+    const storedCommandAnswers = safeStage === 'command' ? commandAnswers : {};
 
     const assessment = await Assessment.create({
       userId: req.auth.uid,
@@ -181,9 +232,16 @@ app.post('/api/assessments', requireAuth, async (req, res) => {
       techLandscape,
       vendorStrategy,
       operatingModel,
+      stakeholderProfile,
+      investmentProfile,
+      initiativeTimeline: normalizedTimeline,
+      architectureUploads: sanitizedUploads,
+      architectureSignals: sanitizedSignals,
       personas: personas.length ? personas : capability.personas,
       answers,
-      premiumAnswers: safeStage === 'premium' ? premiumAnswers : {}
+      premiumAnswers: storedPremiumAnswers,
+      extendedAnswers: storedExtendedAnswers,
+      commandAnswers: storedCommandAnswers
     });
 
     const reportData = await computeReport({ assessment });
@@ -191,7 +249,9 @@ app.post('/api/assessments', requireAuth, async (req, res) => {
       userId: req.auth.uid,
       assessmentId: assessment._id,
       ...reportData,
-      paid: safeStage === 'premium'
+      architectureUploads: sanitizedUploads,
+      architectureSignals: sanitizedSignals,
+      paid: safeStage !== 'insight'
     });
 
     res.json({ ok: true, assessmentId: assessment._id, reportId: report._id, stage: report.stage });
@@ -227,7 +287,8 @@ app.put('/api/assessments/:id/premium', requireAuth, async (req, res) => {
       operatingModel = {},
       personas = [],
       answers = {},
-      premiumAnswers = {}
+      premiumAnswers = {},
+      architectureSignals = {}
     } = req.body || {};
 
     const targetType = nextAssessmentType || assessment.assessmentType;
@@ -245,7 +306,7 @@ app.put('/api/assessments/:id/premium', requireAuth, async (req, res) => {
       organizationIntel = {};
     }
 
-    assessment.stage = 'premium';
+    assessment.stage = 'strategic';
     assessment.strategicDrivers = strategicDrivers.length ? strategicDrivers : assessment.strategicDrivers;
     const orgName = organization?.name || '';
     assessment.organization = {
@@ -261,6 +322,10 @@ app.put('/api/assessments/:id/premium', requireAuth, async (req, res) => {
     assessment.personas = personas.length ? personas : (assessment.personas?.length ? assessment.personas : capability.personas);
     assessment.answers = { ...(assessment.answers || {}), ...answers };
     assessment.premiumAnswers = { ...(assessment.premiumAnswers || {}), ...premiumAnswers };
+    assessment.architectureSignals = {
+      ...(assessment.architectureSignals || {}),
+      ...Object.fromEntries(Object.entries(architectureSignals || {}).map(([key, value]) => [key, String(value || '').slice(0, 1000)]))
+    };
 
     await assessment.save();
 
@@ -312,6 +377,7 @@ app.get('/api/reports/:id', requireAuth, async (req, res) => {
       revenueOpportunities: (rep.revenueOpportunities || []).slice(0, 1),
       operationalPlan: Object.fromEntries(Object.entries(rep.operationalPlan || {}).slice(0, 1)),
       aiNarrative: rep.aiNarrative && rep.aiNarrative.executiveSummary ? { executiveSummary: rep.aiNarrative.executiveSummary } : {},
+      architectureSignals: rep.architectureSignals || {},
       paid: rep.paid,
       partial: !rep.paid
     };

@@ -1,7 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 const { getCapability, PERSONA_BLUEPRINTS } = require('../data/catalog');
-const { generateExecutiveNarrative } = require('./openai');
+const {
+  generateExecutiveNarrative,
+  generateStrategicIntelligence,
+  generateCommandBlueprint
+} = require('./openai');
 
 function clamp(v, min = 0, max = 100) {
   return Math.max(min, Math.min(max, v));
@@ -297,11 +301,13 @@ function narrativeForOverall(percentile, median, vertical) {
   return `There is significant upside versus the ${vertical} median (score ${median}). Prioritise foundational execution to close capability gaps.`;
 }
 
-function mergeAnswers(base = {}, extension = {}) {
-  const merged = JSON.parse(JSON.stringify(base));
-  for (const [pillar, entries] of Object.entries(extension || {})) {
-    merged[pillar] = Object.assign({}, merged[pillar] || {}, entries || {});
-  }
+function mergeAnswers(...sources) {
+  const merged = {};
+  sources.forEach(source => {
+    for (const [pillar, entries] of Object.entries(source || {})) {
+      merged[pillar] = Object.assign({}, merged[pillar] || {}, entries || {});
+    }
+  });
   return merged;
 }
 
@@ -402,13 +408,102 @@ function buildOperationalPlan({ focusPillars, capability, assessment }) {
   };
 }
 
+function buildIndustryInsights({ assessment, benchmarks, technologyRadar }) {
+  const industry = assessment.industry || assessment.vertical || 'Cross-industry';
+  const maturitySignals = Object.entries(benchmarks.medians?.pillars || {})
+    .map(([pillar, median]) => ({ pillar, median, target: median + 10 }))
+    .slice(0, 5);
+
+  const watchlist = [];
+  if (assessment.assessmentType === 'security') {
+    watchlist.push('Monitor identity provider CVEs (Okta, Entra ID) and align patch windows to SOX-critical systems.');
+    watchlist.push('Track ransomware campaigns targeting ' + industry + ' supply chains with MITRE mapping.');
+  }
+  if (assessment.assessmentType === 'observability') {
+    watchlist.push('Adopt OpenTelemetry collectors to de-risk vendor lock-in and enable multi-cloud portability.');
+    watchlist.push('Benchmark outage communication cadences against industry leaders listed in benchmarks.leaders.');
+  }
+  if (assessment.assessmentType === 'analytics') {
+    watchlist.push('Assess data residency and AI privacy implications for regulated segments.');
+    watchlist.push('Ensure FinOps disciplines govern experimentation spend and AI workload scaling.');
+  }
+  if (assessment.assessmentType === 'aiops') {
+    watchlist.push('Confirm topology sources cover edge / OT environments to prevent blind spots.');
+    watchlist.push('Evaluate automation blast radius and rollback readiness before scaling runbook AI.');
+  }
+
+  const radarFocus = (technologyRadar || []).slice(0, 6).map(item => ({
+    capability: item.pillar,
+    category: item.category,
+    vendors: item.vendors,
+    rationale: item.rationale
+  }));
+
+  return {
+    industry,
+    maturitySignals,
+    watchlist,
+    radarFocus,
+    leaderBenchmarks: benchmarks.leaders || []
+  };
+}
+
+function buildVendorEngagements({ assessment, technologyRadar }) {
+  const personaOwner = assessment.personas?.[0]?.title || 'Executive sponsor';
+  return (technologyRadar || []).slice(0, 8).map(item => ({
+    capability: item.pillar,
+    category: item.category,
+    vendors: item.vendors,
+    pocScope: `Design a ${item.category.toLowerCase()} proof-of-concept that ${item.rationale.toLowerCase()}.`,
+    successMeasures: [
+      'Define automation, risk, and experience metrics with baselines before POC start.',
+      'Document exit criteria and commercial guardrails aligned to strategic objectives.'
+    ],
+    negotiationQuestions: [
+      `Ask ${item.vendors[0] || 'the vendor'} how pricing scales with telemetry volume and automation coverage.`,
+      'Probe roadmap alignment to OpenTelemetry, zero trust, or AI co-pilots as relevant.',
+      `Clarify professional services effort required for integration with ${personaOwner} teams.`
+    ]
+  }));
+}
+
+function buildDeliveryTimeline({ roadmap, initiativeTimeline = [] }) {
+  const structured = Object.entries(roadmap || {}).map(([phase, items]) => ({
+    phase,
+    horizon: phase,
+    initiatives: items
+  }));
+
+  initiativeTimeline.forEach(item => {
+    structured.push({
+      phase: item.title || 'Strategic initiative',
+      horizon: item.timeline || 'Custom',
+      initiatives: [
+        `${item.owner ? `${item.owner}: ` : ''}${item.description || 'Key milestone'}`,
+        item.outcome ? `Target outcome: ${item.outcome}` : undefined
+      ].filter(Boolean)
+    });
+  });
+
+  return structured;
+}
+
 async function computeReport({ assessment }) {
-  const stage = assessment.stage || 'free';
+  const stageMap = {
+    free: 'insight',
+    premium: 'strategic'
+  };
+  const rawStage = assessment.stage || 'insight';
+  const stage = stageMap[rawStage] || rawStage;
   const capability = getCapability(assessment.assessmentType || 'security');
 
   const baseAnswers = assessment.answers || {};
-  const premiumAnswers = stage === 'premium' ? assessment.premiumAnswers || {} : {};
-  const answers = mergeAnswers(baseAnswers, premiumAnswers);
+  const answers = mergeAnswers(
+    baseAnswers,
+    assessment.premiumAnswers || {},
+    assessment.extendedAnswers || {},
+    assessment.commandAnswers || {}
+  );
   const pillars = Object.keys(answers);
   const pillarScores = {};
 
@@ -528,6 +623,13 @@ async function computeReport({ assessment }) {
   const revenueOpportunities = buildRevenueOpportunities({ pillarScores, assessment });
   const operationalPlan = buildOperationalPlan({ focusPillars, capability, assessment });
 
+  const industryInsights = buildIndustryInsights({ assessment, benchmarks, technologyRadar });
+  const vendorEngagements = buildVendorEngagements({ assessment, technologyRadar });
+  const deliveryTimeline = buildDeliveryTimeline({
+    roadmap,
+    initiativeTimeline: assessment.initiativeTimeline || []
+  });
+
   const aiNarrative = await generateExecutiveNarrative({ assessment, report: {
     headlineScore,
     pillarScores,
@@ -536,8 +638,48 @@ async function computeReport({ assessment }) {
     investmentOutlook,
     personaBriefings,
     riskRegister,
-    revenueOpportunities
+    revenueOpportunities,
+    industryInsights
   }, capability });
+
+  let strategicIntelligence = {};
+  if (['strategic', 'command'].includes(stage)) {
+    strategicIntelligence = await generateStrategicIntelligence({
+      stage,
+      capability,
+      assessment,
+      report: {
+        headlineScore,
+        pillarScores,
+        benchmarks,
+        industryInsights,
+        vendorEngagements,
+        investmentOutlook,
+        riskRegister,
+        revenueOpportunities
+      }
+    });
+  }
+
+  let commandAdvisory = {};
+  if (stage === 'command') {
+    commandAdvisory = await generateCommandBlueprint({
+      capability,
+      assessment,
+      vendorEngagements,
+      deliveryTimeline,
+      industryInsights,
+      report: {
+        roadmap,
+        investmentOutlook,
+        pillarInsights,
+        benchmarks,
+        initiativeTimeline: assessment.initiativeTimeline || [],
+        architectureUploads: assessment.architectureUploads || [],
+        architectureSignals: assessment.architectureSignals || {}
+      }
+    });
+  }
 
   return {
     stage,
@@ -558,7 +700,14 @@ async function computeReport({ assessment }) {
     riskRegister,
     revenueOpportunities,
     operationalPlan,
-    aiNarrative
+    aiNarrative,
+    industryInsights,
+    vendorEngagements,
+    deliveryTimeline,
+    strategicIntelligence,
+    commandAdvisory,
+    architectureUploads: assessment.architectureUploads || [],
+    architectureSignals: assessment.architectureSignals || {}
   };
 }
 

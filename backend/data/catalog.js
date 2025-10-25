@@ -202,9 +202,53 @@ const PREMIUM_EXTENSIONS = {
   ]
 };
 
+const STRATEGIC_EXTENSIONS = {
+  'Vendor Strategy & Ecosystem': [
+    { id: 'vendor_strategy', text: 'Vendor strategy is vendor-agnostic with competitive tension maintained', weight: 1 },
+    { id: 'vendor_otel', text: 'Observability stack embraces OpenTelemetry and open standards for portability', weight: 1 },
+    { id: 'vendor_value', text: 'Commercial models measured quarterly against value delivered and renegotiated proactively', weight: 1 }
+  ],
+  'Data, People & Process': [
+    { id: 'data_ops_alignment', text: 'Data teams operate against shared OKRs with security/ops counterparts', weight: 1 },
+    { id: 'process_kpis', text: 'Transformation KPIs cascade from executive objectives to squad scorecards', weight: 1 },
+    { id: 'people_enablement', text: 'Enablement programmes and certifications exist for each stakeholder persona', weight: 1 }
+  ],
+  'Investment & Value Management': [
+    { id: 'investment_governance', text: 'Investment reviews tie initiatives to measurable ROI and risk reduction', weight: 1 },
+    { id: 'finops_maturity', text: 'FinOps practices optimise spend across cloud, tooling, and automation', weight: 1 },
+    { id: 'portfolio_prioritisation', text: 'Portfolio decisions balance innovation with resilience guardrails', weight: 1 }
+  ]
+};
+
+const COMMAND_EXTENSIONS = {
+  'Architecture & Resilience': [
+    { id: 'architecture_blueprints', text: 'Target-state architecture diagrams are maintained with version control and executive sign-off', weight: 1 },
+    { id: 'architecture_reviews', text: 'Architecture reviews integrate cyber, reliability, and data risks with quantitative scoring', weight: 1 },
+    { id: 'resilience_testing', text: 'Resilience scenarios (chaos, tabletop, CVE simulations) are executed quarterly', weight: 1 }
+  ],
+  'Vendor Execution & Assurance': [
+    { id: 'vendor_poc', text: 'POC scopes for critical vendors include success metrics, exit criteria, and run cost benchmarks', weight: 1 },
+    { id: 'vendor_due_diligence', text: 'Third-party risk assessments cover supply chain, SOC2/ISO posture, and response SLAs', weight: 1 },
+    { id: 'vendor_questions', text: 'Vendor scorecards include interrogation questions on roadmap, pricing levers, and integration depth', weight: 1 }
+  ],
+  'Change Leadership & Adoption': [
+    { id: 'adoption_playbooks', text: 'Adoption playbooks align executive storytelling, metrics, and communications cadence', weight: 1 },
+    { id: 'talent_transitions', text: 'Workforce transition plans cover reskilling, redeployment, and partner augmentation', weight: 1 },
+    { id: 'governance_council', text: 'A transformation council tracks benefits, risks, and vendor delivery on a monthly rhythm', weight: 1 }
+  ]
+};
+
 const MATURITY_QUESTIONNAIRE = {
   free: BASE_MATURITY,
-  premium: { ...BASE_MATURITY, ...PREMIUM_EXTENSIONS }
+  premium: { ...BASE_MATURITY, ...PREMIUM_EXTENSIONS },
+  insight: BASE_MATURITY,
+  strategic: { ...BASE_MATURITY, ...PREMIUM_EXTENSIONS, ...STRATEGIC_EXTENSIONS },
+  command: {
+    ...BASE_MATURITY,
+    ...PREMIUM_EXTENSIONS,
+    ...STRATEGIC_EXTENSIONS,
+    ...COMMAND_EXTENSIONS
+  }
 };
 
 const PERSONA_BLUEPRINTS = CAPABILITY_CATALOG.reduce((acc, cap) => {

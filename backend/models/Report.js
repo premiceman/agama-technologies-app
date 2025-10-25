@@ -4,7 +4,11 @@ const Schema = mongoose.Schema;
 const ReportSchema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: 'User', index: true, required: true },
   assessmentId: { type: Schema.Types.ObjectId, ref: 'Assessment', required: true },
-  stage: { type: String, enum: ['free', 'premium'], default: 'free' },
+  stage: {
+    type: String,
+    enum: ['insight', 'strategic', 'command', 'free', 'premium'],
+    default: 'insight'
+  },
   vertical: { type: String, default: 'generic' },
   assessmentType: { type: String, default: 'security' },
   headlineScore: { type: Number, required: true },
@@ -23,6 +27,13 @@ const ReportSchema = new Schema({
   revenueOpportunities: { type: [Schema.Types.Mixed], default: [] },
   operationalPlan: { type: Schema.Types.Mixed, default: {} },
   aiNarrative: { type: Schema.Types.Mixed, default: {} },
+  industryInsights: { type: Schema.Types.Mixed, default: {} },
+  vendorEngagements: { type: [Schema.Types.Mixed], default: [] },
+  deliveryTimeline: { type: [Schema.Types.Mixed], default: [] },
+  strategicIntelligence: { type: Schema.Types.Mixed, default: {} },
+  commandAdvisory: { type: Schema.Types.Mixed, default: {} },
+  architectureUploads: { type: [Schema.Types.Mixed], default: [] },
+  architectureSignals: { type: Schema.Types.Mixed, default: {} },
   paid: { type: Boolean, default: false }
 }, { timestamps: true });
 

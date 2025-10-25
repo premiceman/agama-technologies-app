@@ -171,6 +171,57 @@
           </div>
         </div>
       </div>
+
+      <div class="card glass p-4 mb-4" data-lockable="true" id="industryCard">
+        <div class="position-relative">
+          <h5 class="section-heading">Industry intelligence & maturity map</h5>
+          <div id="industryInsights" class="d-flex flex-column gap-2"></div>
+          <div id="strategicIntelligence" class="d-flex flex-column gap-2 mt-3"></div>
+          <div class="locked-overlay d-none" data-lock-overlay>
+            <div class="h5">Industry deep dive locked</div>
+            <p class="text-fg-3">Upgrade to unlock industry heatmaps, regulatory cues, and investment theses.</p>
+            <button class="btn btn-primary" data-lock-unlock>Unlock full report</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card glass p-4 mb-4" data-lockable="true" id="vendorCard">
+        <div class="position-relative">
+          <h5 class="section-heading">Vendor orchestration playbook</h5>
+          <div id="vendorEngagements" class="d-flex flex-column gap-3"></div>
+          <div class="locked-overlay d-none" data-lock-overlay>
+            <div class="h5">Vendor orchestration locked</div>
+            <p class="text-fg-3">Upgrade for POC scopes, negotiation moves, and pricing watchouts tailored to your stack.</p>
+            <button class="btn btn-primary" data-lock-unlock>Unlock full report</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card glass p-4 mb-4" data-lockable="true" id="deliveryCard">
+        <div class="position-relative">
+          <h5 class="section-heading">Delivery timeline & architecture signals</h5>
+          <div id="architectureSignals" class="d-flex flex-column gap-2 mb-3"></div>
+          <div id="deliveryTimeline" class="d-flex flex-column gap-2"></div>
+          <div id="architectureAttachments" class="d-flex flex-column gap-2 mt-3"></div>
+          <div class="locked-overlay d-none" data-lock-overlay>
+            <div class="h5">Delivery orchestration locked</div>
+            <p class="text-fg-3">Upgrade for milestone sequencing, accountable leaders, and architecture commentary.</p>
+            <button class="btn btn-primary" data-lock-unlock>Unlock full report</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card glass p-4 mb-4" data-lockable="true" id="commandCard">
+        <div class="position-relative">
+          <h5 class="section-heading">Boardroom command advisory</h5>
+          <div id="commandAdvisory" class="d-flex flex-column gap-2"></div>
+          <div class="locked-overlay d-none" data-lock-overlay>
+            <div class="h5">Boardroom advisory locked</div>
+            <p class="text-fg-3">Upgrade to access executive talking points, negotiation moves, and adoption directives.</p>
+            <button class="btn btn-primary" data-lock-unlock>Unlock full report</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -356,6 +407,201 @@
         aiNarrative.appendChild(block);
       }
 
+      const industryInsights = r.industryInsights || {};
+      const industryEl = document.getElementById('industryInsights');
+      if (industryEl) {
+        industryEl.innerHTML = '';
+        if (industryInsights.industry) {
+          const headline = document.createElement('div');
+          headline.innerHTML = `<strong>${industryInsights.industry}</strong>`;
+          industryEl.appendChild(headline);
+        }
+        if (industryInsights.maturitySignals) {
+          const list = document.createElement('div');
+          list.className = 'd-flex flex-column gap-1';
+          industryInsights.maturitySignals.forEach(signal => {
+            const row = document.createElement('div');
+            row.className = 'text-fg-3';
+            row.textContent = `${signal.pillar}: median ${signal.median} → target ${signal.target}`;
+            list.appendChild(row);
+          });
+          industryEl.appendChild(list);
+        }
+        if (industryInsights.watchlist) {
+          const ul = document.createElement('ul');
+          ul.className = 'mb-0';
+          industryInsights.watchlist.forEach(item => {
+            const li = document.createElement('li');
+            li.textContent = item;
+            ul.appendChild(li);
+          });
+          industryEl.appendChild(ul);
+        }
+      }
+
+      const strategicIntel = r.strategicIntelligence || {};
+      const strategicEl = document.getElementById('strategicIntelligence');
+      if (strategicEl) {
+        strategicEl.innerHTML = '';
+        if (strategicIntel.industryHeatmap) {
+          strategicIntel.industryHeatmap.forEach(entry => {
+            const row = document.createElement('div');
+            row.innerHTML = `<strong>${entry.dimension}</strong> — ${entry.rating}<br><span class="text-fg-3">${entry.commentary}</span>`;
+            strategicEl.appendChild(row);
+          });
+        }
+        if (strategicIntel.investmentCases) {
+          const cases = document.createElement('div');
+          cases.className = 'd-flex flex-column gap-1 mt-2';
+          strategicIntel.investmentCases.forEach(c => {
+            const block = document.createElement('div');
+            block.innerHTML = `<strong>${c.title}</strong> — ${c.outcome}<br><span class="text-fg-3">Payback: ${c.payback || 'n/a'}${c.sponsors ? ` · Sponsors: ${c.sponsors.join(', ')}` : ''}</span>`;
+            cases.appendChild(block);
+          });
+          strategicEl.appendChild(cases);
+        }
+        if (strategicIntel.riskSignals) {
+          const ul = document.createElement('ul');
+          ul.className = 'mb-0';
+          strategicIntel.riskSignals.forEach(risk => {
+            const li = document.createElement('li');
+            li.innerHTML = `<strong>${risk.title}</strong> (${risk.timeframe || 'timing n/a'}) — ${risk.trigger}. <span class="text-fg-3">Mitigation: ${risk.mitigation}</span>`;
+            ul.appendChild(li);
+          });
+          strategicEl.appendChild(ul);
+        }
+        if (strategicIntel.maturityNarrative) {
+          const narrative = document.createElement('p');
+          narrative.className = 'text-fg-3';
+          narrative.textContent = strategicIntel.maturityNarrative;
+          strategicEl.appendChild(narrative);
+        }
+      }
+
+      const vendorEl = document.getElementById('vendorEngagements');
+      if (vendorEl) {
+        vendorEl.innerHTML = '';
+        (r.vendorEngagements || []).forEach(item => {
+          const block = document.createElement('div');
+          block.className = 'notice';
+          block.innerHTML = `
+            <div class="d-flex flex-column gap-1">
+              <div><strong>${item.category}</strong> · ${item.capability}</div>
+              <div class="text-fg-3">Vendors: ${item.vendors.join(', ')}</div>
+              <div>${item.pocScope}</div>
+              <div class="small text-fg-3">Success: ${item.successMeasures.join(' | ')}</div>
+              <div class="small text-fg-3">Negotiation: ${item.negotiationQuestions.join(' | ')}</div>
+            </div>`;
+          vendorEl.appendChild(block);
+        });
+      if (!vendorEl.children.length) {
+        vendorEl.innerHTML = '<div class="text-fg-3">Vendor orchestration available on upgraded tiers.</div>';
+      }
+    }
+
+    const architectureSignalsEl = document.getElementById('architectureSignals');
+    if (architectureSignalsEl) {
+      architectureSignalsEl.innerHTML = '';
+      const signals = r.architectureSignals || {};
+      const entries = [
+        ['Telemetry standards', signals.telemetryStandards],
+        ['Security & resilience watchlist', signals.securityWatchlist],
+        ['Outages & constraints', signals.outageNarratives]
+      ];
+      entries.forEach(([label, value]) => {
+        if (!value) return;
+        const row = document.createElement('div');
+        row.className = 'insight-line';
+        const strong = document.createElement('strong');
+        strong.textContent = label;
+        const span = document.createElement('span');
+        span.className = 'text-fg-3';
+        span.textContent = value;
+        row.appendChild(strong);
+        row.appendChild(span);
+        architectureSignalsEl.appendChild(row);
+      });
+      if (!architectureSignalsEl.children.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-fg-3';
+        empty.textContent = 'Capture telemetry and resilience signals in the assessment to unlock precision playbooks.';
+        architectureSignalsEl.appendChild(empty);
+      }
+    }
+
+    const deliveryEl = document.getElementById('deliveryTimeline');
+    if (deliveryEl) {
+      deliveryEl.innerHTML = '';
+      (r.deliveryTimeline || []).forEach(item => {
+        const block = document.createElement('div');
+          block.className = 'timeline-item';
+          block.innerHTML = `<strong>${item.phase}</strong> · ${item.horizon}<br><span class="text-fg-3">${(item.initiatives || []).join('<br>')}</span>`;
+          deliveryEl.appendChild(block);
+        });
+        if (!deliveryEl.children.length) {
+          deliveryEl.innerHTML = '<div class="text-fg-3">Delivery sequencing unlocks with the command blueprint.</div>';
+        }
+      }
+
+      const attachmentsEl = document.getElementById('architectureAttachments');
+      if (attachmentsEl) {
+        attachmentsEl.innerHTML = '';
+        (r.architectureUploads || []).forEach(file => {
+          const row = document.createElement('div');
+          row.className = 'uploaded-file';
+          row.innerHTML = `<div><strong>${file.filename}</strong><div class="small text-fg-3">${file.mimeType || ''}</div></div>`;
+          attachmentsEl.appendChild(row);
+        });
+        if (!attachmentsEl.children.length) {
+          attachmentsEl.innerHTML = '<div class="text-fg-3">Upload architecture diagrams via the command blueprint tier.</div>';
+        }
+      }
+
+      const commandEl = document.getElementById('commandAdvisory');
+      if (commandEl) {
+        commandEl.innerHTML = '';
+        const command = r.commandAdvisory || {};
+        if (command.vendorOrchestration) {
+          command.vendorOrchestration.forEach(item => {
+            const row = document.createElement('div');
+            row.className = 'notice';
+            row.innerHTML = `<strong>${item.vendor}</strong> — ${item.pocFocus}<div class="small text-fg-3">Moves: ${(item.negotiationMoves || []).join(' | ')}</div><div class="small text-fg-3">Watchouts: ${(item.pricingWatchouts || []).join(' | ')}</div>`;
+            commandEl.appendChild(row);
+          });
+        }
+        if (command.architectureDirectives) {
+          const ul = document.createElement('ul');
+          ul.className = 'mb-0';
+          command.architectureDirectives.forEach(text => {
+            const li = document.createElement('li');
+            li.textContent = text;
+            ul.appendChild(li);
+          });
+          commandEl.appendChild(ul);
+        }
+        if (command.executiveTimeline) {
+          command.executiveTimeline.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'timeline-item mt-2';
+            card.innerHTML = `<strong>${item.phase}</strong> — ${item.leader}<br><span class="text-fg-3">${(item.actions || []).join(' | ')}</span>`;
+            commandEl.appendChild(card);
+          });
+        }
+        if (command.boardTalkingPoints) {
+          const ul = document.createElement('ul');
+          ul.className = 'mb-0';
+          command.boardTalkingPoints.forEach(text => {
+            const li = document.createElement('li');
+            li.textContent = text;
+            ul.appendChild(li);
+          });
+          commandEl.appendChild(ul);
+        }
+        if (!commandEl.children.length) {
+          commandEl.innerHTML = '<div class="text-fg-3">Boardroom advisory unlocks with the command blueprint tier.</div>';
+        }
+      }
+
       const lockables = document.querySelectorAll('[data-lockable="true"]');
       lockables.forEach(section => {
         const overlay = section.querySelector('[data-lock-overlay]');
@@ -381,14 +627,16 @@
 
       const premiumIntake = document.getElementById('premiumIntake');
       if (!partial && r.assessmentId) {
-        if (r.stage !== 'premium') {
-          premiumIntake.href = `/premium-assessment.html?assessmentId=${r.assessmentId}`;
+        if (r.stage === 'insight') {
+          premiumIntake.href = `/assessment.html?stage=strategic`;
+          premiumIntake.textContent = 'Upgrade to Industry Accelerator';
+          premiumIntake.classList.remove('d-none');
+        } else if (r.stage === 'strategic') {
+          premiumIntake.href = `/assessment.html?stage=command`;
+          premiumIntake.textContent = 'Upgrade to Command Blueprint';
           premiumIntake.classList.remove('d-none');
         } else {
-          premiumIntake.href = `/premium-assessment.html?assessmentId=${r.assessmentId}`;
-          premiumIntake.textContent = 'Premium intake completed';
-          premiumIntake.classList.remove('d-none');
-          premiumIntake.classList.add('disabled');
+          premiumIntake.classList.add('d-none');
         }
       }
 

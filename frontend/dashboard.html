@@ -21,6 +21,63 @@
     </div>
 
     <div class="card glass p-4 mb-4">
+      <div class="d-flex flex-wrap justify-content-between gap-3 mb-4 align-items-center">
+        <div>
+          <h5 class="mb-1">Assessment intelligence tiers</h5>
+          <p class="text-fg-3 mb-0">Choose the depth of consultancy required. Each tier unlocks richer OpenAI-guided analysis, vendor orchestration, and delivery direction.</p>
+        </div>
+        <a class="btn btn-outline-light" href="/assessment.html">View full experience</a>
+      </div>
+      <div class="row g-3" id="dashboardTiers">
+        <div class="col-md-4">
+          <div class="tier-card h-100">
+            <div class="tier-card__header">
+              <h6 class="m-0">Insight Pulse</h6>
+              <span class="price-tag">Free</span>
+            </div>
+            <p class="text-fg-3 small">Generate an executive-ready preview with baseline maturity and persona guidance.</p>
+            <ul class="tier-card__list">
+              <li>Strategic focus wizard</li>
+              <li>Persona briefings</li>
+              <li>Preview maturity radar</li>
+            </ul>
+            <button class="btn btn-primary w-100" data-launch-stage="insight">Start Insight Pulse</button>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="tier-card h-100">
+            <div class="tier-card__header">
+              <h6 class="m-0">Industry Accelerator</h6>
+              <span class="price-tag">$250</span>
+            </div>
+            <p class="text-fg-3 small">Unlock industry heatmaps, investment cases, and vendor interrogation playbooks.</p>
+            <ul class="tier-card__list">
+              <li>Industry-specific maturity map</li>
+              <li>Investment & ROI scenarios</li>
+              <li>Vendor negotiation questions</li>
+            </ul>
+            <button class="btn btn-outline-light w-100" data-launch-stage="strategic">Upgrade to Accelerator</button>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="tier-card h-100">
+            <div class="tier-card__header">
+              <h6 class="m-0">Command Blueprint</h6>
+              <span class="price-tag">$2,500</span>
+            </div>
+            <p class="text-fg-3 small">Commission the full board-ready consultancy with architecture analysis and vendor orchestration.</p>
+            <ul class="tier-card__list">
+              <li>Architecture & resilience directives</li>
+              <li>Vendor orchestration & POC scopes</li>
+              <li>Board-level delivery timeline</li>
+            </ul>
+            <button class="btn btn-outline-light w-100" data-launch-stage="command">Book Command Blueprint</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card glass p-4 mb-4">
       <h5 class="mb-3">Latest activity</h5>
       <div id="reports" class="d-flex flex-column gap-3"></div>
       <div id="emptyState" class="text-fg-3">Run your first assessment to generate a maturity report.</div>
@@ -64,6 +121,13 @@
         container.appendChild(card);
       });
     }
+
+    document.querySelectorAll('[data-launch-stage]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const stage = btn.dataset.launchStage;
+        location.href = `/assessment.html?stage=${stage}`;
+      });
+    });
 
     loadReports();
   </script>
