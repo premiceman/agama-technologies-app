@@ -15,6 +15,17 @@
       <p class="text-fg-3">Extend your assessment with deep operational, people, and governance insights. All responses are prefilled from your initial submission—enhance them to unlock the full executive report.</p>
     </div>
 
+    <div id="projectExecutiveSummary" class="card glass p-4 mb-4 d-none">
+      <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
+        <div>
+          <h2 class="h4 mb-1" id="projectSummaryName"></h2>
+          <p class="text-fg-3 mb-2" id="projectSummaryContext">Project workspace context will load shortly.</p>
+          <div class="small text-fg-3" id="projectSummaryDrivers"></div>
+        </div>
+        <div class="project-analytics" id="projectSummaryMetrics"></div>
+      </div>
+    </div>
+
     <form id="premiumWizard" class="card glass p-4">
       <div class="wizard-progress mb-4">
         <div class="wizard-step active" data-step="1">Pre-check</div>
@@ -92,15 +103,16 @@
         </div>
         <div class="mt-3">
           <label class="form-label">Strategic drivers</label>
-          <div id="premiumStrategicDrivers" class="row g-2"></div>
+          <div id="premiumStrategicDrivers" class="tile-group"></div>
         </div>
         <div class="row g-3 mt-1">
           <div class="col-md-6">
             <label class="form-label">Transformation stage</label>
             <select name="transformationStage" class="form-select" required>
-              <option value="Modernisation programme mobilising">Modernisation programme mobilising</option>
-              <option value="Scaling transformation">Scaling transformation</option>
-              <option value="Optimising for value">Optimising for value</option>
+              <option value="Discovery &amp; Fit">Discovery &amp; Fit · Framing opportunities</option>
+              <option value="Mobilising programme">Mobilising programme · Funding confirmed</option>
+              <option value="Scaling transformation">Scaling transformation · Multi-stream delivery</option>
+              <option value="Optimising value">Optimising value · Embedding guardrails</option>
             </select>
           </div>
           <div class="col-md-6">
@@ -234,7 +246,7 @@
         </div>
         <div class="mt-3">
           <label class="form-label">Personas consuming the premium report</label>
-          <div id="premiumPersonas" class="row g-2"></div>
+          <div id="premiumPersonas" class="tile-group"></div>
         </div>
       </section>
 

@@ -4,6 +4,7 @@ const Schema = mongoose.Schema;
 const ReportSchema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: 'User', index: true, required: true },
   assessmentId: { type: Schema.Types.ObjectId, ref: 'Assessment', required: true },
+  projectId: { type: Schema.Types.ObjectId, ref: 'Project', index: true },
   stage: {
     type: String,
     enum: ['insight', 'strategic', 'command', 'free', 'premium'],
