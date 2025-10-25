@@ -3,140 +3,325 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Enterprise Assessment Wizard — Agama Technologies</title>
+  <title>Assessment Command Centre — Agama Technologies</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="/css/styles.v2.css">
 </head>
 <body class="bg-body">
   <div class="container py-5 report-wrapper">
-    <div class="mb-4 text-center">
-      <span class="eyebrow">Enterprise-grade assessment</span>
-      <h1 class="fw-bold">Design your modernisation blueprint</h1>
-      <p class="text-fg-3">
-        Navigate the four-step wizard to capture strategic focus, company context, technology landscape, and maturity baselines.
-        Your complimentary executive preview will highlight benchmarks, risks, and persona-ready actions.
-      </p>
+    <div class="mb-5 text-center">
+      <span class="eyebrow">Board-ready intelligence</span>
+      <h1 class="fw-bold">Curate your transformation command centre</h1>
+      <p class="text-fg-3 lead">Select a report tier, then progress through animated sections covering strategy, people, technology, and maturity. Each response fuels an OpenAI-powered consultant that tailors industry playbooks, vendor orchestration, and delivery roadmaps.</p>
     </div>
 
-    <form id="assessmentWizard" class="card glass p-4">
-      <div class="wizard-progress mb-4">
-        <div class="wizard-step active" data-step="1">Focus</div>
-        <div class="wizard-step" data-step="2">Company</div>
-        <div class="wizard-step" data-step="3">Technology</div>
-        <div class="wizard-step" data-step="4">Maturity</div>
+    <div class="row g-4">
+      <div class="col-xl-4">
+        <div class="d-flex flex-column gap-3" id="tierSelector">
+          <div class="tier-card" data-stage="insight">
+            <div class="tier-card__header">
+              <h5 class="m-0">Insight Pulse</h5>
+              <span class="price-tag">Free</span>
+            </div>
+            <p class="text-fg-3 small">Executive preview with strategic focus, base maturity scoring, and persona-aligned quick wins.</p>
+            <ul class="tier-card__list">
+              <li>AI-authored executive summary</li>
+              <li>Baseline maturity radar</li>
+              <li>Persona briefings & quick wins</li>
+            </ul>
+            <div class="tier-card__cta">Ideal for teams validating direction.</div>
+          </div>
+          <div class="tier-card" data-stage="strategic">
+            <div class="tier-card__header">
+              <h5 class="m-0">Industry Accelerator</h5>
+              <span class="price-tag">$250</span>
+            </div>
+            <p class="text-fg-3 small">Complete industry maturity map with stakeholder objectives, vendor strategy, and investment cases.</p>
+            <ul class="tier-card__list">
+              <li>Industry heatmap & regulatory cues</li>
+              <li>Vendor strategy interrogation guide</li>
+              <li>Investment & value realisation cases</li>
+            </ul>
+            <div class="tier-card__cta">Built for transformation leaders.</div>
+          </div>
+          <div class="tier-card" data-stage="command">
+            <div class="tier-card__header">
+              <h5 class="m-0">Command Blueprint</h5>
+              <span class="price-tag">$2,500</span>
+            </div>
+            <p class="text-fg-3 small">Enterprise-grade consultancy capturing architecture, vendor orchestration, and board-ready delivery plans.</p>
+            <ul class="tier-card__list">
+              <li>Architecture reviews & resilience directives</li>
+              <li>Vendor POC scopes & negotiation playbooks</li>
+              <li>Board timeline, talking points, & guardrails</li>
+            </ul>
+            <div class="tier-card__cta">For enterprises directing the market.</div>
+          </div>
+        </div>
       </div>
 
-      <section class="wizard-section" data-step="1">
-        <h3 class="h4 mb-3">Choose your primary assessment</h3>
-        <div id="capabilityOptions" class="row g-3"></div>
-        <div class="mt-3">
-          <label class="form-label">Additional capability focus</label>
-          <select id="capabilityFocus" class="form-select" multiple></select>
-          <div class="form-text">Hold Ctrl/Cmd to select multiple focus domains relevant to your transformation.</div>
-        </div>
-        <div class="row g-3 mt-1">
-          <div class="col-md-4">
-            <label class="form-label">Company size</label>
-            <select name="companySize" class="form-select" required>
-              <option value="SMB">1-499 employees</option>
-              <option value="Mid-market">500-4,999 employees</option>
-              <option value="Enterprise">5,000+ employees</option>
-            </select>
+      <div class="col-xl-8">
+        <form id="assessmentWizard" class="card glass p-4 d-none">
+          <div class="d-flex flex-column flex-lg-row gap-3 align-items-lg-center justify-content-lg-between mb-4">
+            <div class="flex-grow-1 w-100">
+              <div class="progress wizard-progress-bar">
+                <div class="progress-bar" id="wizardProgress" role="progressbar" style="width:0%"></div>
+              </div>
+              <div class="d-flex flex-wrap gap-2 mt-2" id="wizardSteps"></div>
+            </div>
+            <div class="value-pulse" id="valuePulse">Select a tier to begin.</div>
           </div>
-          <div class="col-md-4">
-            <label class="form-label">Primary region</label>
-            <select name="region" class="form-select" required>
-              <option value="EMEA">EMEA</option>
-              <option value="AMER">AMER</option>
-              <option value="APAC">APAC</option>
-              <option value="Global">Global footprint</option>
-            </select>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">Industry</label>
-            <select name="industry" id="industry" class="form-select" required></select>
-          </div>
-        </div>
-        <div class="mt-3">
-          <label class="form-label">Strategic drivers</label>
-          <div id="strategicDrivers" class="row g-2"></div>
-        </div>
-        <div class="mt-3">
-          <label class="form-label">Official organisation intelligence</label>
-          <select id="officialOrg" class="form-select">
-            <option value="">Select an official organisation (optional)</option>
-          </select>
-          <div class="form-text">We automatically synthesise guidance from the selected organisation (e.g. Gartner, NIST) using the OpenAI intelligence engine.</div>
-        </div>
-      </section>
 
-      <section class="wizard-section d-none" data-step="2">
-        <h3 class="h4 mb-3">Company profile & personas</h3>
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label">Company name</label>
-            <input type="text" name="companyName" class="form-control" placeholder="e.g. Horizon Cloud" required>
+          <div class="wizard-section" data-step="1">
+            <div class="section-header">
+              <h3 class="h4 mb-1">Strategic focus</h3>
+              <p class="text-fg-3 mb-0">Anchor the assessment to company objectives and market signals.</p>
+            </div>
+            <div id="capabilityOptions" class="row g-3"></div>
+            <div class="mt-3">
+              <label class="form-label">Supporting capabilities</label>
+              <select id="capabilityFocus" class="form-select" multiple></select>
+              <div class="form-text">Highlight the domains that must move within the next 2 quarters.</div>
+            </div>
+            <div class="row g-3 mt-1">
+              <div class="col-md-4">
+                <label class="form-label">Company size</label>
+                <select name="companySize" class="form-select" required>
+                  <option value="SMB">1-499 employees</option>
+                  <option value="Mid-market">500-4,999 employees</option>
+                  <option value="Enterprise">5,000+ employees</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Primary region</label>
+                <select name="region" class="form-select" required>
+                  <option value="EMEA">EMEA</option>
+                  <option value="AMER">AMER</option>
+                  <option value="APAC">APAC</option>
+                  <option value="Global">Global footprint</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Industry</label>
+                <select name="industry" id="industry" class="form-select" required></select>
+              </div>
+            </div>
+            <div class="mt-3">
+              <label class="form-label">Strategic drivers</label>
+              <div id="strategicDrivers" class="row g-2"></div>
+            </div>
+            <div class="mt-3">
+              <label class="form-label">Executive objectives (OKRs, board mandates)</label>
+              <textarea name="executiveObjectives" class="form-control" rows="2" data-tip="Capture what success means to your executive sponsors."></textarea>
+            </div>
+            <div class="mt-3">
+              <label class="form-label">Official organisation intelligence</label>
+              <select id="officialOrg" class="form-select">
+                <option value="">Select an official organisation (optional)</option>
+              </select>
+              <div class="form-text">We align guidance to your chosen organisation (Gartner, NIST, McKinsey) using the OpenAI advisory engine.</div>
+            </div>
           </div>
-          <div class="col-md-3">
-            <label class="form-label">Headcount</label>
-            <input type="number" name="headcount" class="form-control" min="1" placeholder="e.g. 1200" required>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Annual revenue (USD)</label>
-            <input type="number" name="annualRevenue" class="form-control" min="0" step="1000000" placeholder="e.g. 75000000" required>
-          </div>
-        </div>
-        <div class="row g-3 mt-1">
-          <div class="col-md-6">
-            <label class="form-label">Transformation stage</label>
-            <select name="transformationStage" class="form-select" required>
-              <option value="Modernisation programme mobilising">Modernisation programme mobilising</option>
-              <option value="Scaling transformation">Scaling transformation</option>
-              <option value="Optimising for value">Optimising for value</option>
-            </select>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Risk appetite</label>
-            <select name="riskAppetite" class="form-select" required>
-              <option value="Conservative">Conservative</option>
-              <option value="Balanced">Balanced</option>
-              <option value="Bold innovation">Bold innovation</option>
-            </select>
-          </div>
-        </div>
-        <div class="mt-3">
-          <label class="form-label">Key personas involved</label>
-          <div id="personaOptions" class="row g-2"></div>
-          <div class="form-text">Select all personas who will consume the report. We tailor briefings for each stakeholder.</div>
-        </div>
-        <div class="mt-3">
-          <label class="form-label">Narrative context</label>
-          <textarea name="narrativeContext" class="form-control" rows="3" placeholder="Summarise current initiatives, pain points, or board-level priorities."></textarea>
-        </div>
-      </section>
 
-      <section class="wizard-section d-none" data-step="3">
-        <h3 class="h4 mb-3">Technology landscape</h3>
-        <p class="text-fg-3">Document the systems, vendors, or initiatives aligned to each capability area.</p>
-        <div id="techLandscape" class="row g-3"></div>
-      </section>
+          <div class="wizard-section d-none" data-step="2">
+            <div class="section-header">
+              <h3 class="h4 mb-1">Company & personas</h3>
+              <p class="text-fg-3 mb-0">Detail the organisation, primary persona, and transformation stage.</p>
+            </div>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Company name</label>
+                <input type="text" name="companyName" class="form-control" placeholder="e.g. Horizon Cloud" required>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">Headcount</label>
+                <input type="number" name="headcount" class="form-control" min="1" placeholder="e.g. 1200" required>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">Annual revenue (USD)</label>
+                <input type="number" name="annualRevenue" class="form-control" min="0" step="1000000" placeholder="e.g. 75000000" required>
+              </div>
+            </div>
+            <div class="row g-3 mt-1">
+              <div class="col-md-4">
+                <label class="form-label">Transformation stage</label>
+                <select name="transformationStage" class="form-select" required>
+                  <option value="Modernisation programme mobilising">Modernisation programme mobilising</option>
+                  <option value="Scaling transformation">Scaling transformation</option>
+                  <option value="Optimising for value">Optimising for value</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Risk appetite</label>
+                <select name="riskAppetite" class="form-select" required>
+                  <option value="Conservative">Conservative</option>
+                  <option value="Balanced">Balanced</option>
+                  <option value="Bold innovation">Bold innovation</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Strategic budget (USD)</label>
+                <input type="number" name="strategicBudget" class="form-control" min="0" step="100000" placeholder="e.g. 2500000">
+              </div>
+            </div>
+            <div class="mt-3">
+              <label class="form-label">Key personas involved</label>
+              <div id="personaOptions" class="row g-2"></div>
+              <div class="form-text">We tailor recommendations, KPIs, and adoption tactics per persona.</div>
+            </div>
+            <div class="mt-3">
+              <label class="form-label">Narrative context</label>
+              <textarea name="narrativeContext" class="form-control" rows="3" placeholder="Summarise current initiatives, pain points, or board-level priorities."></textarea>
+            </div>
+            <div class="row g-3 mt-1">
+              <div class="col-md-6">
+                <label class="form-label">Primary persona role</label>
+                <input type="text" name="stakeholderRole" class="form-control" placeholder="e.g. VP Platform Engineering" data-tip="We personalise negotiation and adoption playbooks to this role.">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Role objectives & success metrics</label>
+                <textarea name="roleObjectives" class="form-control" rows="2"></textarea>
+              </div>
+            </div>
+          </div>
 
-      <section class="wizard-section d-none" data-step="4">
-        <h3 class="h4 mb-3">Maturity baseline (0-5 scale)</h3>
-        <div id="questionnaire" class="d-flex flex-column gap-4"></div>
-        <div class="notice mt-3">
-          <strong>Executive preview access:</strong> your complimentary report includes maturity summary, persona briefings, core risks, and recommended next steps. Upgrade after viewing to unlock deep-dive analytics and premium questionnaire.
-        </div>
-      </section>
+          <div class="wizard-section d-none" data-step="3">
+            <div class="section-header">
+              <h3 class="h4 mb-1">Teams, data & operating model</h3>
+              <p class="text-fg-3 mb-0">Describe how teams collaborate, make decisions, and leverage data.</p>
+            </div>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Team objectives / OKRs</label>
+                <textarea name="teamObjectives" class="form-control" rows="3" data-tip="Summarise core outcomes and OKRs guiding the team this quarter."></textarea>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Data & analytics practices</label>
+                <textarea name="dataPractices" class="form-control" rows="3" placeholder="Data contracts, governance councils, experimentation cadences..." data-tip="Note how data products are governed, instrumented, and validated."></textarea>
+              </div>
+            </div>
+            <div class="row g-3 mt-1">
+              <div class="col-md-6">
+                <label class="form-label">Process & governance rhythms</label>
+                <textarea name="governanceRhythms" class="form-control" rows="3" data-tip="Describe cadences like CABs, incident reviews, or steering forums."></textarea>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Change management approach</label>
+                <textarea name="changeManagement" class="form-control" rows="3" data-tip="Highlight enablement, communications, and adoption guardrails."></textarea>
+              </div>
+            </div>
+            <div class="row g-3 mt-1">
+              <div class="col-md-4">
+                <label class="form-label">Team structure & capacity</label>
+                <textarea name="teamStructure" class="form-control" rows="3" placeholder="Headcount mix, partner reliance, critical SMEs" data-tip="Clarify the blend of FTEs, contractors, and partners delivering outcomes."></textarea>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">KPIs & decision metrics</label>
+                <textarea name="kpiStack" class="form-control" rows="3" placeholder="e.g. MTTR, uptime, customer NPS, cost to serve" data-tip="List the metrics that define success and trigger leadership decisions."></textarea>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Process bottlenecks</label>
+                <textarea name="processPainPoints" class="form-control" rows="3" placeholder="Where do approvals or tooling slow delivery?" data-tip="Call out talent gaps, manual steps, or governance blockers holding the team back."></textarea>
+              </div>
+            </div>
+          </div>
 
-      <div class="d-flex justify-content-between align-items-center mt-4">
-        <button type="button" class="btn btn-outline-light" id="prevStep" disabled>Back</button>
-        <button type="button" class="btn btn-primary" id="nextStep">Next</button>
-        <button type="submit" class="btn btn-primary d-none" id="submitWizard">Generate my executive preview</button>
+          <div class="wizard-section d-none" data-step="4">
+            <div class="section-header">
+              <h3 class="h4 mb-1">Technology & investments</h3>
+              <p class="text-fg-3 mb-0">Document architecture, investments, and vendor expectations.</p>
+            </div>
+            <div id="techLandscape" class="row g-3"></div>
+            <div class="row g-3 mt-1">
+              <div class="col-md-6">
+                <label class="form-label">Current strategic investments</label>
+                <textarea name="currentInvestments" class="form-control" rows="3" placeholder="Programmes, partners, budget allocations..."></textarea>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Vendor strategy & commercial notes</label>
+                <textarea name="vendorNotes" class="form-control" rows="3" placeholder="Vendor agnosticism, pricing pressures, preferred partners..."></textarea>
+              </div>
+            </div>
+            <div class="row g-3 mt-1">
+              <div class="col-md-6">
+                <label class="form-label">Telemetry standards & instrumentation</label>
+                <textarea name="telemetryStandards" class="form-control" rows="3" placeholder="OTEL coverage, log strategy, golden signals" data-tip="Detail OpenTelemetry adoption, signal fidelity, and integration patterns."></textarea>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Security & resilience watchlist</label>
+                <textarea name="securityWatchlist" class="form-control" rows="3" placeholder="CVE focus areas, compliance deadlines, supply chain gaps" data-tip="Capture regulatory triggers, CVEs, or systemic risks you are tracking."></textarea>
+              </div>
+            </div>
+            <div class="mt-3">
+              <label class="form-label">Recent outages or architectural constraints</label>
+              <textarea name="outageNarratives" class="form-control" rows="3" placeholder="Major incidents, tech debt hotspots, scaling limitations" data-tip="Share incident narratives, architectural risks, or dependencies shaping delivery."></textarea>
+            </div>
+            <div class="row g-3 mt-1">
+              <div class="col-md-6">
+                <label class="form-label">Vendor agnosticism</label>
+                <select name="vendorAgnostic" class="form-select">
+                  <option value="">Select...</option>
+                  <option value="Agnostic">Agnostic — multi-vendor strategy</option>
+                  <option value="Preferred">Preferred vendor stack</option>
+                  <option value="Consolidating">Consolidating towards single platform</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Critical vendor questions</label>
+                <textarea name="vendorQuestions" class="form-control" rows="2" placeholder="What must Splunk, Datadog, CrowdStrike, etc. prove?"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="wizard-section d-none" data-step="5">
+            <div class="section-header">
+              <h3 class="h4 mb-1">Maturity baseline</h3>
+              <p class="text-fg-3 mb-0">Score each prompt 0-5. Higher tiers unlock extended domains.</p>
+            </div>
+            <div id="questionnaire" class="d-flex flex-column gap-4"></div>
+            <div class="notice mt-3">
+              <strong>OpenAI companion:</strong> As you progress, we synthesise benchmarks, risk signals, and vendor playbooks tailored to your answers.
+            </div>
+          </div>
+
+          <div class="wizard-section d-none" data-step="6" data-tier="command">
+            <div class="section-header">
+              <h3 class="h4 mb-1">Architecture & delivery blueprint</h3>
+              <p class="text-fg-3 mb-0">Upload architecture artefacts, map initiatives, and outline desired outcomes.</p>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Architecture diagrams & artefacts</label>
+              <input type="file" id="architectureUploads" class="form-control" multiple accept=".png,.jpg,.jpeg,.pdf,.svg" data-tip="We analyse diagrams to tailor target-state directives.">
+              <div class="form-text">Maximum 5 files. Supported: PNG, JPG, SVG, PDF (up to 2MB each).</div>
+              <div id="architecturePreview" class="d-flex flex-column gap-2 mt-2"></div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Strategic initiatives timeline</label>
+              <div id="timelineList" class="d-flex flex-column gap-2"></div>
+              <button class="btn btn-outline-light btn-sm mt-2" type="button" id="addInitiative">Add initiative</button>
+            </div>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Funding guardrails</label>
+                <textarea name="fundingGuardrails" class="form-control" rows="3"></textarea>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Executive storytelling priorities</label>
+                <textarea name="storytelling" class="form-control" rows="3"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center mt-4">
+            <button type="button" class="btn btn-outline-light" id="prevStep" disabled>Back</button>
+            <button type="button" class="btn btn-primary" id="nextStep">Next</button>
+            <button type="submit" class="btn btn-primary d-none" id="submitWizard">Generate my report</button>
+          </div>
+        </form>
       </div>
-    </form>
+    </div>
   </div>
 
-  <script type="module" src="/js/free-assessment.js"></script>
+  <script type="module" src="/js/assessment-suite.js"></script>
 </body>
 </html>
