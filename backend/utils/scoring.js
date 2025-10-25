@@ -27,6 +27,32 @@ function coerceList(value, { limit = 12 } = {}) {
     .slice(0, limit);
 }
 
+function extractMaturityScore(entry) {
+  if (entry === null || entry === undefined) return null;
+  if (typeof entry === 'number') {
+    const num = Number(entry);
+    return Number.isFinite(num) ? num : null;
+  }
+  if (typeof entry === 'object') {
+    if (entry === null) return null;
+    if (typeof entry.maturity === 'number') {
+      return Number.isFinite(entry.maturity) ? entry.maturity : null;
+    }
+    if (typeof entry.score === 'number') {
+      return Number.isFinite(entry.score) ? entry.score : null;
+    }
+  }
+  const num = Number(entry);
+  return Number.isFinite(num) ? num : null;
+}
+
+function extractUrgency(entry) {
+  if (entry && typeof entry === 'object' && typeof entry.urgency === 'number') {
+    return clamp(entry.urgency, 1, 5);
+  }
+  return null;
+}
+
 function loadBenchmarks(vertical) {
   const base = path.join(__dirname, '..', 'data', 'benchmarks');
   const tryPath = path.join(base, `${vertical}.json`);
@@ -510,6 +536,216 @@ function buildDeliveryTimeline({ roadmap, initiativeTimeline = [] }) {
   return structured;
 }
 
+function buildStructuredSections({
+  assessment,
+  capability,
+  summary,
+  competitorSummary,
+  pillarInsights,
+  personaBriefings,
+  technologyRadar,
+  industryInsights,
+  riskRegister,
+  revenueOpportunities,
+  roadmap,
+  pillarUrgency
+}) {
+  const organisation = assessment.organization?.name || assessment.companyProfile?.companyName || 'Your organisation';
+  const strategicDrivers = assessment.strategicDrivers || [];
+  const capabilityFocus = assessment.capabilityFocus || [];
+  const personaHighlights = (personaBriefings || []).map(brief => ({
+    title: brief.title,
+    focus: brief.actions?.[0],
+    metrics: brief.metrics || []
+  }));
+
+  const maturitySignals = Object.entries(pillarInsights || {}).map(([pillar, insight]) => ({
+    pillar,
+    score: insight.score,
+    percentile: insight.percentile,
+    maturity: insight.maturity,
+    urgency: pillarUrgency[pillar] || null,
+    commentary: insight.commentary,
+    quickWins: insight.quickWins || []
+  }));
+
+  const techLandscape = Object.entries(assessment.techLandscape || {}).map(([key, value]) => ({
+    area: key,
+    tools: coerceList(value)
+  })).filter(item => item.tools.length);
+
+  const vendorSignals = (assessment.organization?.intel?.vendorSignals || []).map(signal => ({
+    theme: signal.theme,
+    vendors: signal.leadingVendors,
+    note: signal.investmentNotes
+  }));
+
+  const architectureSignals = [];
+  const intelSignals = assessment.organization?.intel?.profile?.architectureSignals || [];
+  intelSignals.forEach(sig => {
+    architectureSignals.push({
+      layer: sig.layer || 'Architecture',
+      observation: sig.observation || sig.description || '',
+      implication: sig.implication || ''
+    });
+  });
+  const manualSignals = assessment.architectureSignals || {};
+  Object.entries(manualSignals).forEach(([layer, observation]) => {
+    if (layer === 'organisationIntel' || layer === 'renewalCalendar') return;
+    const details = Array.isArray(observation) ? observation.join(', ') : observation;
+    if (!details) return;
+    architectureSignals.push({ layer, observation: details, implication: '' });
+  });
+
+  const dataPipelines = coerceList(assessment.operatingModel?.dataPipelines, { limit: 6 });
+  const shipperNotes = coerceList(assessment.operatingModel?.dataShippers, { limit: 6 });
+  const insightExpectations = coerceList(assessment.operatingModel?.insightExpectations, { limit: 6 });
+
+  const organisationStructure = coerceList(assessment.companyProfile?.organisationStructure, { limit: 8 });
+  const talentFocus = assessment.operatingModel?.talentFocus || '';
+  const changeManagement = assessment.operatingModel?.changeManagement || '';
+
+  const governanceCadence = assessment.operatingModel?.operatingRhythms || '';
+  const processConstraints = assessment.operatingModel?.processConstraints || '';
+  const procurement = assessment.operatingModel?.procurementProcess || '';
+  const reportingChains = assessment.operatingModel?.reportingChains || assessment.operatingModel?.reportingLines || '';
+  const meanTimeToInnocence = assessment.operatingModel?.meanTimeToInnocence || assessment.operatingModel?.mtti || '';
+
+  const roadmapHighlights = Object.entries(roadmap || {}).map(([phase, actions]) => ({
+    phase,
+    actions: actions.slice(0, 3)
+  }));
+
+  return {
+    overview: {
+      organisation,
+      summary,
+      competitorSummary,
+      strategicDrivers,
+      capabilityFocus,
+      personaHighlights,
+      maturitySignals
+    },
+    technology: {
+      architectureSignals,
+      toolingSnapshot: techLandscape,
+      vendorSignals: vendorSignals.length ? vendorSignals : technologyRadar.slice(0, 5).map(item => ({
+        theme: `${item.pillar} · ${item.category}`,
+        vendors: item.vendors,
+        note: item.rationale
+      })),
+      opportunities: (technologyRadar || []).slice(0, 6),
+      watchlist: industryInsights.watchlist || []
+    },
+    data: {
+      pipelines: dataPipelines,
+      shippers: shipperNotes,
+      insightExpectations,
+      analyticsFocus: industryInsights.maturitySignals || [],
+      valueDrivers: revenueOpportunitiesForSection(revenueOpportunities)
+    },
+    people: {
+      organisationStructure,
+      talentFocus,
+      changeManagement,
+      personas: personaBriefings,
+      timelineExpectations: roadmapHighlights
+    },
+    process: {
+      governanceCadence,
+      processConstraints,
+      procurement,
+      reportingChains,
+      meanTimeToInnocence,
+      riskRegister
+    }
+  };
+}
+
+function revenueOpportunitiesForSection(revenueOpportunities = []) {
+  return (revenueOpportunities || []).slice(0, 4).map(item => ({
+    pillar: item.pillar,
+    score: item.score,
+    narrative: item.narrative
+  }));
+}
+
+function buildValuePathPhases({ assessment, pillarScores, pillarUrgency, capability, roadmap }) {
+  const basePhases = Array.isArray(assessment.operatingModel?.valuePath)
+    ? assessment.operatingModel.valuePath.slice(0, 4)
+    : [];
+
+  const defaultPhases = [
+    { name: 'Phase 1 · Mobilise', duration: '0-30 days', urgency: 5 },
+    { name: 'Phase 2 · Stabilise', duration: '30-90 days', urgency: 4 },
+    { name: 'Phase 3 · Scale', duration: 'Quarter 2', urgency: 3 },
+    { name: 'Phase 4 · Optimise', duration: 'Quarter 3+', urgency: 2 }
+  ];
+
+  const phases = basePhases.length ? basePhases : defaultPhases;
+  const sortedPillars = Object.entries(pillarScores)
+    .sort((a, b) => a[1] - b[1])
+    .map(([pillar]) => pillar);
+
+  return phases.map((phase, idx) => {
+    const focusPillar = sortedPillars[idx % sortedPillars.length] || capability.domains[idx % capability.domains.length] || 'Capability';
+    const currentScore = pillarScores[focusPillar] || 0;
+    const urgency = Number(phase.urgency || pillarUrgency[focusPillar] || 3);
+    const maturityLift = clamp(Math.round(urgency * 8), 5, 30);
+    const targetScore = clamp(currentScore + maturityLift, 0, 100);
+    const roadmapPhase = Object.entries(roadmap || {}).find(([name]) => name.toLowerCase().includes('0-30') && idx === 0)
+      || Object.entries(roadmap || {})[idx]
+      || [];
+
+    return {
+      phase: phase.name || `Phase ${idx + 1}`,
+      duration: phase.duration || (roadmapPhase?.[0] ?? ''),
+      urgency,
+      focusPillar,
+      currentScore,
+      targetScore,
+      maturityLift,
+      outcomes: coerceList(phase.outcomes, { limit: 4 }),
+      coverageFocus: phase.coverageFocus || `Expand ${focusPillar.toLowerCase()} controls across priority estates.`,
+      valueDriver: phase.valueDriver || assessment.operatingModel?.valueDriver || 'Risk'
+    };
+  });
+}
+
+function buildCoverageSummary({ assessment, pillarScores, pillarUrgency, capability, roadmap }) {
+  const focusPillars = Object.entries(pillarScores)
+    .sort((a, b) => a[1] - b[1])
+    .slice(0, 3)
+    .map(([pillar, score]) => ({
+      pillar,
+      score,
+      urgency: pillarUrgency[pillar] || 3,
+      commentary: `Increase ${pillar.toLowerCase()} maturity from ${score} to ${Math.min(100, score + 20)} with executive sponsorship.`
+    }));
+
+  const objectives = coerceList(
+    assessment.operatingModel?.discoveryObjectives || assessment.companyProfile?.discoveryObjectives,
+    { limit: 6 }
+  );
+
+  const roadmapFocus = Object.entries(roadmap || {}).map(([phase, items]) => ({
+    phase,
+    highlights: items.slice(0, 2)
+  }));
+
+  return {
+    capability,
+    focusPillars,
+    objectives,
+    roadmapFocus,
+    valueLenses: {
+      risk: assessment.operatingModel?.riskLens || 'Reduce mean time to innocence and regulatory exposure.',
+      revenue: assessment.operatingModel?.revenueLens || 'Unlock data-driven growth use cases tied to strategic drivers.',
+      cost: assessment.operatingModel?.costLens || 'Optimise tooling and run costs through automation and FinOps guardrails.'
+    }
+  };
+}
+
 async function computeReport({ assessment }) {
   const stageMap = {
     free: 'insight',
@@ -528,11 +764,25 @@ async function computeReport({ assessment }) {
   );
   const pillars = Object.keys(answers);
   const pillarScores = {};
+  const pillarUrgency = {};
 
   for (const pillar of pillars) {
-    const values = Object.values(answers[pillar] || {}).map(Number).filter(v => !isNaN(v));
-    const avg = values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+    const rawEntries = Object.values(answers[pillar] || {});
+    const maturityValues = rawEntries
+      .map(entry => extractMaturityScore(entry))
+      .filter(value => value !== null)
+      .map(value => clamp(value, 0, 5));
+    const urgencyValues = rawEntries
+      .map(entry => extractUrgency(entry))
+      .filter(value => value !== null);
+
+    const avg = maturityValues.length ? maturityValues.reduce((a, b) => a + b, 0) / maturityValues.length : 0;
     pillarScores[pillar] = Math.round(clamp((avg / 5) * 100));
+
+    if (urgencyValues.length) {
+      const urgencyAvg = urgencyValues.reduce((a, b) => a + b, 0) / urgencyValues.length;
+      pillarUrgency[pillar] = Number(urgencyAvg.toFixed(2));
+    }
   }
 
   const headlineScore = Math.round(
@@ -670,6 +920,37 @@ async function computeReport({ assessment }) {
     initiativeTimeline: assessment.initiativeTimeline || []
   });
 
+  const structuredSections = buildStructuredSections({
+    assessment,
+    capability,
+    summary,
+    competitorSummary,
+    pillarInsights,
+    personaBriefings,
+    technologyRadar,
+    industryInsights: industryInsights || {},
+    riskRegister,
+    revenueOpportunities,
+    roadmap,
+    pillarUrgency
+  });
+
+  const valuePath = buildValuePathPhases({
+    assessment,
+    pillarScores,
+    pillarUrgency,
+    capability,
+    roadmap
+  });
+
+  const coverageSummary = buildCoverageSummary({
+    assessment,
+    pillarScores,
+    pillarUrgency,
+    capability: capability.name,
+    roadmap
+  });
+
   const aiNarrative = await generateExecutiveNarrative({ assessment, report: {
     headlineScore,
     pillarScores,
@@ -774,7 +1055,11 @@ async function computeReport({ assessment }) {
       assessment.architectureSignals?.renewalCalendar ||
       assessment.organization?.intel?.profile?.renewalCalendar ||
       [],
-    personaIntelligence: architectureAssets.personaIntelligence || {}
+    personaIntelligence: architectureAssets.personaIntelligence || {},
+    structuredSections,
+    valuePath,
+    coverageSummary,
+    urgencyMap: pillarUrgency
   };
 }
 

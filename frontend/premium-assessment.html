@@ -17,29 +17,35 @@
 
     <form id="premiumWizard" class="card glass p-4">
       <div class="wizard-progress mb-4">
-        <div class="wizard-step active" data-step="1">Focus</div>
-        <div class="wizard-step" data-step="2">Company</div>
-        <div class="wizard-step" data-step="3">Technology</div>
-        <div class="wizard-step" data-step="4">Operating model</div>
-        <div class="wizard-step" data-step="5">Maturity+</div>
+        <div class="wizard-step active" data-step="1">Pre-check</div>
+        <div class="wizard-step" data-step="2">Focus</div>
+        <div class="wizard-step" data-step="3">Company</div>
+        <div class="wizard-step" data-step="4">Tech & Data</div>
+        <div class="wizard-step" data-step="5">People & Process</div>
+        <div class="wizard-step" data-step="6">Value Path</div>
       </div>
 
       <section class="wizard-section" data-step="1">
-        <h3 class="h4 mb-3">Refine your focus & drivers</h3>
-        <div id="premiumCapabilityOptions" class="row g-3"></div>
-        <div class="mt-3">
-          <label class="form-label">Capability priorities</label>
-          <select id="premiumCapabilityFocus" class="form-select" multiple></select>
-          <div class="form-text">Select the domains you must progress over the next two quarters.</div>
+        <h3 class="h4 mb-3">Confirm the organisation we are assessing</h3>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Company name</label>
+            <input type="text" name="companyName" class="form-control" placeholder="e.g. Lunar Industries" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Company domain</label>
+            <input type="text" name="companyDomain" class="form-control" placeholder="lunarindustries.com">
+            <div class="form-text">Used to cross-check public telemetry and hiring signals.</div>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Industry</label>
+            <select name="industry" id="premiumIndustry" class="form-select" required></select>
+          </div>
         </div>
         <div class="row g-3 mt-1">
           <div class="col-md-4">
-            <label class="form-label">Company size</label>
-            <select name="companySize" class="form-select" required>
-              <option value="SMB">1-499 employees</option>
-              <option value="Mid-market">500-4,999 employees</option>
-              <option value="Enterprise">5,000+ employees</option>
-            </select>
+            <label class="form-label">Headcount</label>
+            <input type="number" name="headcount" class="form-control" min="1" required>
           </div>
           <div class="col-md-4">
             <label class="form-label">Primary region</label>
@@ -51,46 +57,45 @@
             </select>
           </div>
           <div class="col-md-4">
-            <label class="form-label">Industry</label>
-            <select name="industry" id="premiumIndustry" class="form-select" required></select>
+            <label class="form-label">Company size</label>
+            <select name="companySize" class="form-select" required>
+              <option value="SMB">1-499 employees</option>
+              <option value="Mid-market">500-4,999 employees</option>
+              <option value="Enterprise">5,000+ employees</option>
+            </select>
           </div>
-        </div>
-        <div class="mt-3">
-          <label class="form-label">Strategic drivers</label>
-          <div id="premiumStrategicDrivers" class="row g-2"></div>
         </div>
         <div class="mt-3">
           <label class="form-label">Official organisation intelligence</label>
           <select id="premiumOrg" class="form-select">
             <option value="">Select an official organisation (optional)</option>
           </select>
-          <div class="form-text">Switch organisations if you would like the report to align to a different analyst or regulatory body.</div>
+          <div class="form-text">Use the analyst profile that best matches the entity you want the report aligned to.</div>
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-3 mt-2">
+          <button type="button" class="btn btn-outline-light btn-sm" id="premiumEnrichOrg">Run pre-check enrichment</button>
+          <div id="premiumEnrichStatus" class="form-text text-fg-3"></div>
+        </div>
+        <div id="premiumOrgMatches" class="mt-2 d-none"></div>
+        <div class="notice mt-3">
+          <strong>Why this matters:</strong> We will tailor every subsequent insight to this organisation’s operating footprint, public technology stack, and hiring signals.
         </div>
       </section>
 
       <section class="wizard-section d-none" data-step="2">
-        <h3 class="h4 mb-3">Executive & financial profile</h3>
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label">Company name</label>
-            <input type="text" name="companyName" class="form-control" required>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Headcount</label>
-            <input type="number" name="headcount" class="form-control" min="1" required>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Annual revenue (USD)</label>
-            <input type="number" name="annualRevenue" class="form-control" min="0" step="1000000" required>
-          </div>
+        <h3 class="h4 mb-3">Refine your focus & strategic drivers</h3>
+        <div id="premiumCapabilityOptions" class="row g-3"></div>
+        <div class="mt-3">
+          <label class="form-label">Capability domains that must move first</label>
+          <select id="premiumCapabilityFocus" class="form-select" multiple></select>
+          <div class="form-text">Hold Cmd/Ctrl to select multiple domains. These inform coverage mapping later in the report.</div>
         </div>
-        <div class="d-flex flex-wrap align-items-center gap-3 mt-2">
-          <button type="button" class="btn btn-outline-light btn-sm" id="premiumEnrichOrg">Enrich with OpenAI intelligence</button>
-          <div id="premiumEnrichStatus" class="form-text text-fg-3"></div>
+        <div class="mt-3">
+          <label class="form-label">Strategic drivers</label>
+          <div id="premiumStrategicDrivers" class="row g-2"></div>
         </div>
-        <div id="premiumOrgMatches" class="mt-2 d-none"></div>
         <div class="row g-3 mt-1">
-          <div class="col-md-4">
+          <div class="col-md-6">
             <label class="form-label">Transformation stage</label>
             <select name="transformationStage" class="form-select" required>
               <option value="Modernisation programme mobilising">Modernisation programme mobilising</option>
@@ -98,7 +103,7 @@
               <option value="Optimising for value">Optimising for value</option>
             </select>
           </div>
-          <div class="col-md-4">
+          <div class="col-md-6">
             <label class="form-label">Risk appetite</label>
             <select name="riskAppetite" class="form-select" required>
               <option value="Conservative">Conservative</option>
@@ -106,34 +111,43 @@
               <option value="Bold innovation">Bold innovation</option>
             </select>
           </div>
+        </div>
+      </section>
+
+      <section class="wizard-section d-none" data-step="3">
+        <h3 class="h4 mb-3">Executive & financial profile</h3>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Annual revenue (USD)</label>
+            <input type="number" name="annualRevenue" class="form-control" min="0" step="1000000" required>
+          </div>
           <div class="col-md-4">
             <label class="form-label">Strategic budget (USD)</label>
             <input type="number" name="strategicBudget" class="form-control" min="0" step="100000" placeholder="e.g. 2500000">
           </div>
-        </div>
-        <div class="row g-3 mt-1">
           <div class="col-md-4">
             <label class="form-label">Annual turnover (USD)</label>
             <input type="number" name="turnover" class="form-control" min="0" step="1000000">
           </div>
-          <div class="col-md-8">
-            <label class="form-label">Investment rounds & major funding</label>
-            <textarea name="investmentRounds" class="form-control" rows="2" placeholder="Series B · $150M · 2023 — Insight Partners"></textarea>
-            <div class="form-text">One per line. Auto-filled when enrichment is available.</div>
-          </div>
-        </div>
-        <div class="mt-3">
-          <label class="form-label">Narrative context</label>
-          <textarea name="narrativeContext" class="form-control" rows="3"></textarea>
         </div>
         <div class="row g-3 mt-1">
           <div class="col-md-6">
             <label class="form-label">Key compliance or regulatory drivers</label>
-            <textarea name="complianceDrivers" class="form-control" rows="2"></textarea>
+            <textarea name="complianceDrivers" class="form-control" rows="2" placeholder="DORA readiness, HIPAA reporting, etc."></textarea>
           </div>
           <div class="col-md-6">
             <label class="form-label">Critical customer or revenue segments</label>
             <textarea name="customerSegments" class="form-control" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="row g-3 mt-1">
+          <div class="col-md-6">
+            <label class="form-label">Investment rounds & major funding</label>
+            <textarea name="investmentRounds" class="form-control" rows="2" placeholder="Series B · $150M · 2023 — Insight Partners"></textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Narrative context</label>
+            <textarea name="narrativeContext" class="form-control" rows="2" placeholder="M&A activity, major outages, analyst notes"></textarea>
           </div>
         </div>
         <div class="row g-3 mt-1">
@@ -148,8 +162,8 @@
         </div>
       </section>
 
-      <section class="wizard-section d-none" data-step="3">
-        <h3 class="h4 mb-3">Technology landscape & vendor strategy</h3>
+      <section class="wizard-section d-none" data-step="4">
+        <h3 class="h4 mb-3">Technology landscape & data flows</h3>
         <div id="premiumTechLandscape" class="row g-3"></div>
         <div class="row g-3 mt-1">
           <div class="col-md-6">
@@ -161,10 +175,20 @@
             <textarea name="integrationChallenges" class="form-control" rows="3"></textarea>
           </div>
         </div>
+        <div class="row g-3 mt-1">
+          <div class="col-md-6">
+            <label class="form-label">Data pipelines & shippers</label>
+            <textarea name="dataPipelines" class="form-control" rows="3" placeholder="Kafka → Snowflake\nCrowdStrike → SIEM\nGitHub audit logs"></textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Insight expectations</label>
+            <textarea name="insightExpectations" class="form-control" rows="3" placeholder="Real-time fraud detection\nCost-to-serve heatmaps\nExecutive reliability dashboard"></textarea>
+          </div>
+        </div>
       </section>
 
-      <section class="wizard-section d-none" data-step="4">
-        <h3 class="h4 mb-3">Operating model, people, and process</h3>
+      <section class="wizard-section d-none" data-step="5">
+        <h3 class="h4 mb-3">People, operating rhythm & process</h3>
         <div class="row g-3">
           <div class="col-md-6">
             <label class="form-label">Operating rhythms & governance forums</label>
@@ -185,6 +209,20 @@
             <textarea name="changeManagement" class="form-control" rows="3"></textarea>
           </div>
         </div>
+        <div class="row g-3 mt-1">
+          <div class="col-md-4">
+            <label class="form-label">Procurement process</label>
+            <textarea name="procurementProcess" class="form-control" rows="2" placeholder="RFP committee, 12 week cycle, cloud-first"></textarea>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Reporting chains</label>
+            <textarea name="reportingChains" class="form-control" rows="2" placeholder="CIO → Board Risk, COO → Audit"></textarea>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Mean time to innocence approach</label>
+            <textarea name="meanTimeToInnocence" class="form-control" rows="2" placeholder="Joint war-room, automated evidence collection"></textarea>
+          </div>
+        </div>
         <div class="mt-3">
           <label class="form-label">Success metrics or value realisation goals</label>
           <textarea name="successMetrics" class="form-control" rows="2"></textarea>
@@ -192,7 +230,7 @@
         <div class="mt-3">
           <label class="form-label">Discovery objectives & executive outcomes <span class="text-danger">*</span></label>
           <textarea name="discoveryObjectives" class="form-control" rows="3" required placeholder="Secure regulatory attestation in Q3\nReduce SOC MTTR below 20 minutes"></textarea>
-          <div class="form-text">List the objectives this roadmap must deliver. Each line will map to the transformation sequencing.</div>
+          <div class="form-text">Each line feeds the phased value path and persona briefings.</div>
         </div>
         <div class="mt-3">
           <label class="form-label">Personas consuming the premium report</label>
@@ -200,20 +238,70 @@
         </div>
       </section>
 
-      <section class="wizard-section d-none" data-step="5">
-        <h3 class="h4 mb-3">Premium maturity questionnaire (0-5 scale)</h3>
+      <section class="wizard-section d-none" data-step="6">
+        <h3 class="h4 mb-3">Maturity scoring & value path</h3>
+        <p class="text-fg-3">Score each question on maturity (0-5) and urgency (1-5). Urgency drives the sequencing of your four-phase value path.</p>
         <div id="premiumQuestionnaire" class="d-flex flex-column gap-4"></div>
-        <div class="notice mt-3">
-          <strong>Next step:</strong> submitting will regenerate your report with comprehensive benchmarks, persona playbooks, risk register, investment scenarios, and AI-authored executive briefings.
+        <div class="mt-4">
+          <label class="form-label">Value path configuration</label>
+          <div id="premiumValuePath" class="d-flex flex-column gap-3"></div>
+          <button type="button" class="btn btn-outline-light btn-sm" id="premiumAddPhase">Add custom phase</button>
+          <div class="form-text">You can rename phases, define duration, urgency and desired outcomes.</div>
+        </div>
+        <div class="notice mt-4">
+          <strong>Final step:</strong> submitting will regenerate your report with organisation-specific overview, technology, data, people, process and value path sections plus the exportable delivery plan.
         </div>
       </section>
+
+      <aside id="premiumFollowUps" class="mt-4 d-none">
+        <div class="followup-card">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="mb-0">Consultant follow-up prompts</h5>
+            <button class="btn btn-link btn-sm" type="button" id="premiumClearFollowUps">Clear</button>
+          </div>
+          <div class="d-flex flex-column gap-3" id="premiumFollowUpList"></div>
+        </div>
+      </aside>
 
       <div class="d-flex justify-content-between align-items-center mt-4">
         <button type="button" class="btn btn-outline-light" id="premiumPrev" disabled>Back</button>
         <button type="button" class="btn btn-primary" id="premiumNext">Next</button>
-        <button type="submit" class="btn btn-primary d-none" id="premiumSubmit">Update my executive report</button>
+        <button type="submit" class="btn btn-primary d-none" id="premiumSubmit">Generate executive report</button>
       </div>
     </form>
+
+    <div id="premiumLoadingOverlay" class="loading-overlay d-none">
+      <div class="loading-card">
+        <div class="spinner-border text-primary" role="status"></div>
+        <h4 class="mt-3">Calibrating your enterprise intelligence</h4>
+        <p class="text-fg-3" id="premiumLoadingStatus">Initiating value path engine...</p>
+      </div>
+    </div>
+
+    <div id="premiumAssistant" class="assistant-widget">
+      <button class="assistant-toggle" type="button" aria-label="Toggle assessment assistant">
+        <span class="material-symbols-outlined">smart_toy</span>
+      </button>
+      <div class="assistant-panel d-none">
+        <div class="assistant-header">
+          <div>
+            <div class="small text-uppercase text-fg-3">Agama assessment copilot</div>
+            <strong>Need help?</strong>
+          </div>
+          <button type="button" class="btn-close btn-close-white" aria-label="Close"></button>
+        </div>
+        <div class="assistant-messages" id="assistantMessages">
+          <div class="assistant-message assistant-message--bot">
+            <div class="assistant-author">Copilot</div>
+            <p>Ask anything about this assessment. I can suggest evidence to capture, highlight missing data, and interpret maturity scoring.</p>
+          </div>
+        </div>
+        <form id="assistantForm" class="assistant-input">
+          <textarea id="assistantPrompt" rows="2" placeholder="How should we evidence MTTR improvements?" required></textarea>
+          <button type="submit" class="btn btn-primary btn-sm">Send</button>
+        </form>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="/js/premium-assessment.js"></script>

@@ -8,6 +8,7 @@ const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const mongoose = require('mongoose');
+const ExcelJS = require('exceljs');
 
 const app = express();
 
@@ -59,7 +60,12 @@ const {
   getQuestionnaire,
   getCapability
 } = require('./data/catalog');
-const { fetchOrganizationIntel, searchOrganizationProfiles } = require('./utils/openai');
+const {
+  fetchOrganizationIntel,
+  searchOrganizationProfiles,
+  generateFollowUpPrompts,
+  generateAssessmentAssistantReply
+} = require('./utils/openai');
 
 // ---- Routes ----
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: Date.now() }));
@@ -171,6 +177,49 @@ app.get('/api/assessments/questions', (req, res) => {
   const safeStage = allowed.includes(requested) ? requested : 'insight';
   const questions = getQuestionnaire(safeStage);
   res.json({ ok: true, stage: safeStage, questions });
+});
+
+app.post('/api/assessments/follow-up', requireAuth, async (req, res) => {
+  try {
+    const {
+      step,
+      capabilityId = 'security',
+      answers = {},
+      organization = {},
+      industry = ''
+    } = req.body || {};
+    const capability = getCapability(capabilityId) || CAPABILITY_CATALOG[0];
+    const prompts = await generateFollowUpPrompts({
+      step,
+      capability: capability.name,
+      answers,
+      organization,
+      industry
+    });
+    res.json({ ok: true, ...prompts });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to generate follow-up prompts' });
+  }
+});
+
+app.post('/api/assessments/assistant', requireAuth, async (req, res) => {
+  try {
+    const { message, capabilityId = 'security', draft = {} } = req.body || {};
+    if (!message || String(message).trim().length === 0) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+    const capability = getCapability(capabilityId) || CAPABILITY_CATALOG[0];
+    const reply = await generateAssessmentAssistantReply({
+      message: String(message).slice(0, 800),
+      assessmentDraft: draft,
+      capability: capability.name
+    });
+    res.json({ ok: true, ...reply });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Assistant unavailable' });
+  }
 });
 
 // Create assessment -> compute report (partial by default)
@@ -372,7 +421,10 @@ app.put('/api/assessments/:id/premium', requireAuth, async (req, res) => {
       answers = {},
       premiumAnswers = {},
       architectureSignals = {},
-      nextAssessmentType
+      nextAssessmentType,
+      industry: industryInput,
+      companySize: companySizeInput,
+      region: regionInput
     } = req.body || {};
 
     const targetType = nextAssessmentType || assessment.assessmentType;
@@ -391,6 +443,9 @@ app.put('/api/assessments/:id/premium', requireAuth, async (req, res) => {
     }
 
     assessment.stage = 'strategic';
+    if (industryInput) assessment.industry = industryInput;
+    if (companySizeInput) assessment.companySize = companySizeInput;
+    if (regionInput) assessment.region = regionInput;
     assessment.strategicDrivers = strategicDrivers.length ? strategicDrivers : assessment.strategicDrivers;
     const orgName = organization?.name || '';
     assessment.organization = {
@@ -527,6 +582,71 @@ app.get('/api/reports/:id', requireAuth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.get('/api/reports/:id/export', requireAuth, async (req, res) => {
+  try {
+    const rep = await Report.findOne({ _id: req.params.id, userId: req.auth.uid });
+    if (!rep) return res.status(404).json({ error: 'Not found' });
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Value Path');
+    sheet.columns = [
+      { header: 'Section', key: 'section', width: 28 },
+      { header: 'Details', key: 'details', width: 90 }
+    ];
+
+    sheet.addRow({ section: 'Organisation', details: rep.structuredSections?.overview?.organisation || 'N/A' });
+    sheet.addRow({ section: 'Summary', details: rep.summary || '' });
+    sheet.addRow({ section: 'Strategic Drivers', details: (rep.structuredSections?.overview?.strategicDrivers || []).join('; ') });
+    sheet.addRow({ section: 'Capability Focus', details: (rep.structuredSections?.overview?.capabilityFocus || []).join('; ') });
+    sheet.addRow({ section: 'Headline Score', details: `${rep.headlineScore} (Percentile ${rep.competitorSummary?.percentile || '--'})` });
+
+    sheet.addRow({ section: '---', details: 'Technology' });
+    (rep.structuredSections?.technology?.toolingSnapshot || []).forEach(item => {
+      sheet.addRow({ section: `Tech · ${item.area}`, details: item.tools.join(', ') });
+    });
+    (rep.structuredSections?.technology?.vendorSignals || []).forEach(item => {
+      sheet.addRow({ section: `Vendor · ${item.theme}`, details: `${(item.vendors || []).join(', ')} — ${item.note || ''}` });
+    });
+
+    sheet.addRow({ section: '---', details: 'Data & Analytics' });
+    (rep.structuredSections?.data?.pipelines || []).forEach(entry => {
+      sheet.addRow({ section: 'Pipeline', details: entry });
+    });
+    (rep.structuredSections?.data?.insightExpectations || []).forEach(entry => {
+      sheet.addRow({ section: 'Insights', details: entry });
+    });
+
+    sheet.addRow({ section: '---', details: 'People & Process' });
+    (rep.structuredSections?.people?.organisationStructure || []).forEach(entry => {
+      sheet.addRow({ section: 'Org Structure', details: entry });
+    });
+    sheet.addRow({ section: 'Talent Focus', details: rep.structuredSections?.people?.talentFocus || '' });
+    sheet.addRow({ section: 'Change Management', details: rep.structuredSections?.people?.changeManagement || '' });
+    sheet.addRow({ section: 'Governance', details: rep.structuredSections?.process?.governanceCadence || '' });
+    sheet.addRow({ section: 'Procurement', details: rep.structuredSections?.process?.procurement || '' });
+    sheet.addRow({ section: 'Reporting Chains', details: rep.structuredSections?.process?.reportingChains || '' });
+    sheet.addRow({ section: 'MTTI Strategy', details: rep.structuredSections?.process?.meanTimeToInnocence || '' });
+
+    sheet.addRow({ section: '---', details: 'Value Path Phases' });
+    (rep.valuePath || []).forEach(phase => {
+      sheet.addRow({
+        section: phase.phase,
+        details: `Duration: ${phase.duration || 'n/a'} | Focus: ${phase.focusPillar} | Target: ${phase.targetScore} | Coverage: ${phase.coverageFocus}`
+      });
+    });
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `${(rep.structuredSections?.overview?.organisation || 'agama-plan')}-${timestamp}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to export report' });
   }
 });
 
