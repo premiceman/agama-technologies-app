@@ -96,14 +96,20 @@ function renderCapabilities() {
 
 function renderStrategicDrivers() {
   strategicDriversWrap.innerHTML = '';
-  catalog.strategicDrivers.forEach(driver => {
+  catalog.strategicDrivers.forEach((driver, index) => {
     const col = document.createElement('div');
     col.className = 'col-md-6';
+    const driverSlug = driver
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+    const driverId = `driver-${driverSlug || index}`;
     col.innerHTML = `
-      <div class="form-check">
-        <input class="form-check-input" type="checkbox" value="${driver}" id="driver-${driver}" name="strategicDrivers">
-        <label class="form-check-label" for="driver-${driver}">${driver}</label>
-      </div>`;
+      <label class="driver-card" for="${driverId}">
+        <input class="driver-card-input" type="checkbox" value="${driver}" id="${driverId}" name="strategicDrivers">
+        <span class="driver-card-content">${driver}</span>
+      </label>`;
     strategicDriversWrap.appendChild(col);
   });
 }

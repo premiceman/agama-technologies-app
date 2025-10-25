@@ -285,6 +285,42 @@ input::placeholder,textarea::placeholder{color:var(--fg-muted)!important;}
 .wizard-section .form-check-input:focus{box-shadow:0 0 0 .25rem rgba(0,229,193,.25);border-color:var(--brand-2);}
 .wizard-section .form-check-input:checked{background:linear-gradient(120deg,var(--brand-strong),var(--brand-2-strong));border-color:var(--brand-2);}
 .wizard-section .form-check-label{flex:1;}
+
+.driver-card{
+  display:block;
+  position:relative;
+  cursor:pointer;
+}
+.driver-card-input{
+  position:absolute;
+  opacity:0;
+  pointer-events:none;
+}
+.driver-card-content{
+  display:block;
+  padding:.75rem 1rem;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:.85rem;
+  background:rgba(255,255,255,.03);
+  color:var(--fg-2);
+  font-weight:600;
+  letter-spacing:.2px;
+  transition:border-color .2s ease, background .2s ease, box-shadow .2s ease, color .2s ease;
+}
+.driver-card-content:hover{
+  border-color:rgba(124,156,255,.35);
+  background:rgba(124,156,255,.08);
+}
+.driver-card-input:focus-visible + .driver-card-content{
+  outline:3px solid rgba(0,229,193,.35);
+  outline-offset:3px;
+}
+.driver-card-input:checked + .driver-card-content{
+  border-color:var(--brand-2);
+  background:linear-gradient(120deg,rgba(124,156,255,.18),rgba(0,229,193,.16));
+  box-shadow:0 12px 30px rgba(0,229,193,.15);
+  color:var(--fg);
+}
 .tech-tile{border:1px solid rgba(255,255,255,.08);border-radius:1rem;padding:1rem;background:rgba(255,255,255,.03);height:100%;}
 .tech-tile label{font-weight:600;display:block;margin-bottom:.35rem;}
 .question-pillar{border:1px solid rgba(255,255,255,.08);border-radius:1rem;padding:1rem;background:rgba(255,255,255,.03);}
