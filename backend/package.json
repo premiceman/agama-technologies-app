@@ -6,6 +6,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "prestart": "node scripts/copy-frontend.js",
     "dev": "nodemon index.js",
     "build-frontend": "node scripts/copy-frontend.js",
     "postinstall": "npm run build-frontend"
