@@ -4,11 +4,27 @@ const { getCapability, PERSONA_BLUEPRINTS } = require('../data/catalog');
 const {
   generateExecutiveNarrative,
   generateStrategicIntelligence,
-  generateCommandBlueprint
+  generateCommandBlueprint,
+  generateArchitectureAssets
 } = require('./openai');
 
 function clamp(v, min = 0, max = 100) {
   return Math.max(min, Math.min(max, v));
+}
+
+function coerceList(value, { limit = 12 } = {}) {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value
+      .map(item => (typeof item === 'string' ? item.trim() : item))
+      .filter(Boolean)
+      .slice(0, limit);
+  }
+  return String(value)
+    .split(/\n|;|\u2022|\r/g)
+    .map(item => item.trim())
+    .filter(Boolean)
+    .slice(0, limit);
 }
 
 function loadBenchmarks(vertical) {
@@ -321,9 +337,13 @@ function buildPersonaBriefings({ capability, assessment, pillarScores }) {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 2)
     .map(([pillar]) => pillar);
+  const personaKpis = assessment.companyProfile?.personaKpis || {};
 
   return personas.map(persona => {
     const maturityLens = focusPillars.includes(capability.domains[0]) ? 'Stabilise foundations' : 'Accelerate differentiation';
+    const lowerTitle = typeof persona.title === 'string' ? persona.title.toLowerCase() : undefined;
+    const kpiSource = personaKpis[persona.id] || personaKpis[persona.title] || (lowerTitle ? personaKpis[lowerTitle] : []) || [];
+    const metrics = coerceList(kpiSource, { limit: 4 });
     return {
       id: persona.id,
       title: persona.title,
@@ -335,10 +355,12 @@ function buildPersonaBriefings({ capability, assessment, pillarScores }) {
         `Prioritise ${focusPillars.join(' & ')} initiatives to unlock ${persona.outcomes[0]}.`,
         `Leverage ${strengthPillars.join(' & ')} strengths to showcase quick wins to stakeholders.`
       ],
-      metrics: [
-        'Leading indicator: MTTR / time-to-detect trend',
-        'Lagging indicator: Customer trust / revenue at risk'
-      ]
+      metrics: metrics.length
+        ? metrics
+        : [
+            'Leading indicator: MTTR / time-to-detect trend',
+            'Lagging indicator: Customer trust / revenue at risk'
+          ]
     };
   });
 }
@@ -585,6 +607,20 @@ async function computeReport({ assessment }) {
     ]
   };
 
+  const discoveryObjectives = coerceList(
+    assessment.operatingModel?.discoveryObjectives || assessment.companyProfile?.discoveryObjectives
+  );
+  discoveryObjectives.slice(0, 3).forEach((objective, idx) => {
+    const phase = idx === 0 ? '0-30 days' : idx === 1 ? '30-90 days' : 'Quarter 2+';
+    roadmap[phase].push(`Discovery objective: ${objective}`);
+  });
+
+  const keyInitiatives = coerceList(assessment.companyProfile?.keyInitiatives).slice(0, 4);
+  keyInitiatives.forEach((initiative, idx) => {
+    const phase = idx === 0 ? '0-30 days' : idx === 1 ? '30-90 days' : 'Quarter 2+';
+    roadmap[phase].push(`Strategic initiative: ${initiative}`);
+  });
+
   const pillarAllocations = {};
   for (const [pillar, score] of Object.entries(pillarScores)) {
     const spend = bm.spend?.[pillar] || { median: 0.07, leaders: 0.11 };
@@ -601,6 +637,10 @@ async function computeReport({ assessment }) {
     savingsNarrative: `Target up to ${savingsPotential}% reduction in run costs by shifting toil to automation and optimising compute/observability spend.`,
     pillarAllocations
   };
+  const investmentHighlights = coerceList(assessment.companyProfile?.investmentRounds).slice(0, 5);
+  if (investmentHighlights.length) {
+    investmentOutlook.investmentHighlights = investmentHighlights;
+  }
 
   const technologyRadar = [];
   for (const [pillar, recs] of Object.entries(TECH_RECS)) {
@@ -681,6 +721,25 @@ async function computeReport({ assessment }) {
     });
   }
 
+  let architectureAssets = {};
+  if (stage !== 'insight') {
+    architectureAssets = await generateArchitectureAssets({
+      assessment,
+      capability,
+      report: {
+        headlineScore,
+        pillarScores,
+        roadmap,
+        investmentOutlook,
+        technologyRadar,
+        riskRegister,
+        personaBriefings,
+        industryInsights,
+        vendorEngagements
+      }
+    });
+  }
+
   return {
     stage,
     vertical: verticalKey,
@@ -707,7 +766,15 @@ async function computeReport({ assessment }) {
     strategicIntelligence,
     commandAdvisory,
     architectureUploads: assessment.architectureUploads || [],
-    architectureSignals: assessment.architectureSignals || {}
+    architectureSignals: assessment.architectureSignals || {},
+    architectureBlueprint: architectureAssets.architectureBlueprint || {},
+    roiMap: architectureAssets.roiMap || [],
+    renewalCalendar:
+      architectureAssets.renewalCalendar ||
+      assessment.architectureSignals?.renewalCalendar ||
+      assessment.organization?.intel?.profile?.renewalCalendar ||
+      [],
+    personaIntelligence: architectureAssets.personaIntelligence || {}
   };
 }
 

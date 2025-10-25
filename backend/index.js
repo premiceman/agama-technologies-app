@@ -59,7 +59,7 @@ const {
   getQuestionnaire,
   getCapability
 } = require('./data/catalog');
-const { fetchOrganizationIntel } = require('./utils/openai');
+const { fetchOrganizationIntel, searchOrganizationProfiles } = require('./utils/openai');
 
 // ---- Routes ----
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: Date.now() }));
@@ -119,6 +119,50 @@ app.get('/api/assessments/catalog', (req, res) => {
   });
 });
 
+app.post('/api/organizations/enrich', requireAuth, async (req, res) => {
+  try {
+    const {
+      query,
+      capability: capabilityId = 'security',
+      industry,
+      fetchDetailsFor
+    } = req.body || {};
+
+    const safeQuery = String(query || '').trim();
+    if (!safeQuery && !fetchDetailsFor) {
+      return res.status(400).json({ error: 'Organisation name required' });
+    }
+
+    const capability = getCapability(capabilityId) || CAPABILITY_CATALOG[0];
+    const matches = safeQuery
+      ? await searchOrganizationProfiles({
+          query: safeQuery,
+          capability: capability.name,
+          industry
+        })
+      : { matches: [] };
+
+    const detailTarget = String(fetchDetailsFor || safeQuery).trim();
+    const intel = detailTarget
+      ? await fetchOrganizationIntel({
+          organization: detailTarget,
+          assessmentType: capability.name,
+          industry
+        })
+      : null;
+
+    res.json({
+      ok: true,
+      matches: matches.matches,
+      confidenceNote: matches.confidenceNote,
+      intel
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to enrich organisation intelligence' });
+  }
+});
+
 app.get('/api/assessments/questions', (req, res) => {
   const { stage = 'insight' } = req.query;
   const stageMap = { free: 'insight', premium: 'strategic' };
@@ -175,6 +219,36 @@ app.post('/api/assessments', requireAuth, async (req, res) => {
       });
     }
 
+    const profileIntel = organizationIntel?.profile || {};
+
+    const normaliseList = (value) => {
+      if (Array.isArray(value)) return value;
+      if (!value) return [];
+      return String(value)
+        .split(/\n|;|\r|\u2022/g)
+        .map(item => item.trim())
+        .filter(Boolean)
+        .slice(0, 12);
+    };
+
+    const enrichedCompanyProfile = {
+      ...companyProfile,
+      headcount: companyProfile.headcount || profileIntel.headcountEstimate || profileIntel.employeeRange,
+      annualRevenue: companyProfile.annualRevenue || profileIntel.annualRevenueEstimate,
+      turnover: companyProfile.turnover || profileIntel.turnover,
+      investmentRounds: normaliseList(companyProfile.investmentRounds || profileIntel.investmentHighlights),
+      keyInitiatives: normaliseList(
+        companyProfile.keyInitiatives || (profileIntel.keyInitiatives || []).map(k => `${k.name}: ${k.objective || k.description || ''}`)
+      ),
+      organisationStructure: normaliseList(
+        companyProfile.organisationStructure || (profileIntel.organisationStructure || []).map(o => `${o.function || o.leader}: ${o.remit || ''}`)
+      ),
+      personaKpis: companyProfile.personaKpis || profileIntel.personaKpis || {},
+      discoveryObjectives: normaliseList(
+        companyProfile.discoveryObjectives || (profileIntel.discoveryObjectives || []).map(d => `${d.objective || ''}${d.linkedKpis ? ` · KPIs: ${Array.isArray(d.linkedKpis) ? d.linkedKpis.join(', ') : d.linkedKpis}` : ''}${d.timeframe ? ` · ${d.timeframe}` : ''}`)
+      )
+    };
+
     const normalizedTimeline = Array.isArray(initiativeTimeline)
       ? initiativeTimeline.slice(0, 10).map(item => ({
           title: String(item?.title || '').slice(0, 160),
@@ -196,6 +270,12 @@ app.post('/api/assessments', requireAuth, async (req, res) => {
     const sanitizedSignals = Object.fromEntries(
       Object.entries(architectureSignals || {}).map(([key, value]) => [key, String(value || '').slice(0, 1000)])
     );
+    if (Array.isArray(profileIntel.architectureSignals)) {
+      sanitizedSignals.organisationIntel = profileIntel.architectureSignals.slice(0, 10);
+    }
+    if (Array.isArray(profileIntel.renewalCalendar)) {
+      sanitizedSignals.renewalCalendar = profileIntel.renewalCalendar.slice(0, 10);
+    }
 
     const storedExtendedAnswers =
       safeStage === 'insight'
@@ -227,11 +307,14 @@ app.post('/api/assessments', requireAuth, async (req, res) => {
         extract: organizationIntel.summary || organization?.extract || '',
         intel: organizationIntel
       },
-      companyProfile,
+      companyProfile: enrichedCompanyProfile,
       capabilityFocus: capabilityFocus.length ? capabilityFocus : capability.domains,
       techLandscape,
       vendorStrategy,
-      operatingModel,
+      operatingModel: {
+        ...operatingModel,
+        discoveryObjectives: operatingModel.discoveryObjectives || enrichedCompanyProfile.discoveryObjectives
+      },
       stakeholderProfile,
       investmentProfile,
       initiativeTimeline: normalizedTimeline,
@@ -288,7 +371,8 @@ app.put('/api/assessments/:id/premium', requireAuth, async (req, res) => {
       personas = [],
       answers = {},
       premiumAnswers = {},
-      architectureSignals = {}
+      architectureSignals = {},
+      nextAssessmentType
     } = req.body || {};
 
     const targetType = nextAssessmentType || assessment.assessmentType;
@@ -314,17 +398,71 @@ app.put('/api/assessments/:id/premium', requireAuth, async (req, res) => {
       extract: orgName ? (organizationIntel.summary || organization?.extract || assessment.organization?.extract || '') : '',
       intel: orgName ? organizationIntel : {}
     };
-    assessment.companyProfile = { ...(assessment.companyProfile || {}), ...companyProfile };
+    const profileIntel = organizationIntel?.profile || {};
+    const normaliseList = (value) => {
+      if (Array.isArray(value)) return value;
+      if (!value) return [];
+      return String(value)
+        .split(/\n|;|\r|\u2022/g)
+        .map(item => item.trim())
+        .filter(Boolean)
+        .slice(0, 12);
+    };
+
+    const mergedCompanyProfile = {
+      ...(assessment.companyProfile || {}),
+      ...companyProfile
+    };
+
+    if (!mergedCompanyProfile.headcount && profileIntel.headcountEstimate) {
+      mergedCompanyProfile.headcount = profileIntel.headcountEstimate;
+    }
+    if (!mergedCompanyProfile.annualRevenue && profileIntel.annualRevenueEstimate) {
+      mergedCompanyProfile.annualRevenue = profileIntel.annualRevenueEstimate;
+    }
+    if (!mergedCompanyProfile.turnover && profileIntel.turnover) {
+      mergedCompanyProfile.turnover = profileIntel.turnover;
+    }
+    mergedCompanyProfile.investmentRounds = normaliseList(
+      mergedCompanyProfile.investmentRounds || profileIntel.investmentHighlights
+    );
+    mergedCompanyProfile.keyInitiatives = normaliseList(
+      mergedCompanyProfile.keyInitiatives || (profileIntel.keyInitiatives || []).map(k => `${k.name}: ${k.objective || k.description || ''}`)
+    );
+    mergedCompanyProfile.organisationStructure = normaliseList(
+      mergedCompanyProfile.organisationStructure || (profileIntel.organisationStructure || []).map(o => `${o.function || o.leader}: ${o.remit || ''}`)
+    );
+    mergedCompanyProfile.discoveryObjectives = normaliseList(
+      mergedCompanyProfile.discoveryObjectives || (profileIntel.discoveryObjectives || []).map(d => `${d.objective || ''}${d.linkedKpis ? ` · KPIs: ${Array.isArray(d.linkedKpis) ? d.linkedKpis.join(', ') : d.linkedKpis}` : ''}${d.timeframe ? ` · ${d.timeframe}` : ''}`)
+    );
+    if (!mergedCompanyProfile.personaKpis && profileIntel.personaKpis) {
+      mergedCompanyProfile.personaKpis = profileIntel.personaKpis;
+    }
+
+    assessment.companyProfile = mergedCompanyProfile;
     assessment.capabilityFocus = capabilityFocus.length ? capabilityFocus : (assessment.capabilityFocus || capability.domains);
     assessment.techLandscape = { ...(assessment.techLandscape || {}), ...techLandscape };
     assessment.vendorStrategy = { ...(assessment.vendorStrategy || {}), ...vendorStrategy };
-    assessment.operatingModel = { ...(assessment.operatingModel || {}), ...operatingModel };
+    assessment.operatingModel = {
+      ...(assessment.operatingModel || {}),
+      ...operatingModel,
+      discoveryObjectives: operatingModel.discoveryObjectives || mergedCompanyProfile.discoveryObjectives
+    };
     assessment.personas = personas.length ? personas : (assessment.personas?.length ? assessment.personas : capability.personas);
     assessment.answers = { ...(assessment.answers || {}), ...answers };
     assessment.premiumAnswers = { ...(assessment.premiumAnswers || {}), ...premiumAnswers };
+    const newArchitectureSignals = Object.fromEntries(
+      Object.entries(architectureSignals || {}).map(([key, value]) => [key, String(value || '').slice(0, 1000)])
+    );
+    if (Array.isArray(profileIntel.architectureSignals)) {
+      newArchitectureSignals.organisationIntel = profileIntel.architectureSignals.slice(0, 10);
+    }
+    if (Array.isArray(profileIntel.renewalCalendar)) {
+      newArchitectureSignals.renewalCalendar = profileIntel.renewalCalendar.slice(0, 10);
+    }
     assessment.architectureSignals = {
       ...(assessment.architectureSignals || {}),
-      ...Object.fromEntries(Object.entries(architectureSignals || {}).map(([key, value]) => [key, String(value || '').slice(0, 1000)]))
+      ...newArchitectureSignals
     };
 
     await assessment.save();
@@ -378,6 +516,10 @@ app.get('/api/reports/:id', requireAuth, async (req, res) => {
       operationalPlan: Object.fromEntries(Object.entries(rep.operationalPlan || {}).slice(0, 1)),
       aiNarrative: rep.aiNarrative && rep.aiNarrative.executiveSummary ? { executiveSummary: rep.aiNarrative.executiveSummary } : {},
       architectureSignals: rep.architectureSignals || {},
+      architectureBlueprint: {},
+      roiMap: [],
+      renewalCalendar: [],
+      personaIntelligence: {},
       paid: rep.paid,
       partial: !rep.paid
     };

@@ -84,6 +84,11 @@
             <input type="number" name="annualRevenue" class="form-control" min="0" step="1000000" required>
           </div>
         </div>
+        <div class="d-flex flex-wrap align-items-center gap-3 mt-2">
+          <button type="button" class="btn btn-outline-light btn-sm" id="premiumEnrichOrg">Enrich with OpenAI intelligence</button>
+          <div id="premiumEnrichStatus" class="form-text text-fg-3"></div>
+        </div>
+        <div id="premiumOrgMatches" class="mt-2 d-none"></div>
         <div class="row g-3 mt-1">
           <div class="col-md-4">
             <label class="form-label">Transformation stage</label>
@@ -106,6 +111,17 @@
             <input type="number" name="strategicBudget" class="form-control" min="0" step="100000" placeholder="e.g. 2500000">
           </div>
         </div>
+        <div class="row g-3 mt-1">
+          <div class="col-md-4">
+            <label class="form-label">Annual turnover (USD)</label>
+            <input type="number" name="turnover" class="form-control" min="0" step="1000000">
+          </div>
+          <div class="col-md-8">
+            <label class="form-label">Investment rounds & major funding</label>
+            <textarea name="investmentRounds" class="form-control" rows="2" placeholder="Series B · $150M · 2023 — Insight Partners"></textarea>
+            <div class="form-text">One per line. Auto-filled when enrichment is available.</div>
+          </div>
+        </div>
         <div class="mt-3">
           <label class="form-label">Narrative context</label>
           <textarea name="narrativeContext" class="form-control" rows="3"></textarea>
@@ -118,6 +134,16 @@
           <div class="col-md-6">
             <label class="form-label">Critical customer or revenue segments</label>
             <textarea name="customerSegments" class="form-control" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="row g-3 mt-1">
+          <div class="col-md-6">
+            <label class="form-label">Key initiatives in-flight</label>
+            <textarea name="keyInitiatives" class="form-control" rows="3" placeholder="Zero Trust rollout · APAC\nObservability consolidation · Global"></textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Organisation structure highlights</label>
+            <textarea name="organisationStructure" class="form-control" rows="3" placeholder="CISO → Security Engineering & GRC\nCTO → Platform Engineering"></textarea>
           </div>
         </div>
       </section>
@@ -162,6 +188,11 @@
         <div class="mt-3">
           <label class="form-label">Success metrics or value realisation goals</label>
           <textarea name="successMetrics" class="form-control" rows="2"></textarea>
+        </div>
+        <div class="mt-3">
+          <label class="form-label">Discovery objectives & executive outcomes <span class="text-danger">*</span></label>
+          <textarea name="discoveryObjectives" class="form-control" rows="3" required placeholder="Secure regulatory attestation in Q3\nReduce SOC MTTR below 20 minutes"></textarea>
+          <div class="form-text">List the objectives this roadmap must deliver. Each line will map to the transformation sequencing.</div>
         </div>
         <div class="mt-3">
           <label class="form-label">Personas consuming the premium report</label>
