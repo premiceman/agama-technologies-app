@@ -6,21 +6,24 @@ async function callOpenAI({ system, user, responseFormat = { type: 'json_object'
     return null;
   }
   try {
+    const body = {
+      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      temperature: 0.4,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user }
+      ]
+    };
+    if (responseFormat) {
+      body.response_format = responseFormat;
+    }
     const res = await fetch(OPENAI_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${OPENAI_API_KEY}`
       },
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-        temperature: 0.4,
-        response_format: responseFormat,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user }
-        ]
-      })
+      body: JSON.stringify(body)
     });
     if (!res.ok) {
       const text = await res.text();
@@ -229,6 +232,48 @@ Ground responses in the provided assessment, organisation intel, and roadmap.`;
   return resp || {};
 }
 
+async function generateFollowUpPrompts({ step, capability, answers, organization, industry }) {
+  if (!OPENAI_API_KEY) {
+    return { prompts: [] };
+  }
+  const system = `You are a senior transformation consultant embedded in Agama's assessment wizard. Suggest clarifying follow-up questions to gather deeper context. Respond in JSON {prompts: [{question, rationale, suggestedOptions?}]}. Keep it grounded in provided answers.`;
+  const payload = {
+    step,
+    capability,
+    organization,
+    industry,
+    answers
+  };
+  const user = `Based on this intake step, craft up to 3 targeted follow-up prompts to remove ambiguity. Answers so far: ${JSON.stringify(payload)}`;
+  const resp = await callOpenAI({ system, user });
+  if (!resp || !Array.isArray(resp.prompts)) {
+    return { prompts: [] };
+  }
+  resp.prompts = resp.prompts.slice(0, 3).map(prompt => ({
+    question: prompt.question || 'Provide additional context for this step.',
+    rationale: prompt.rationale || 'Clarify this area to strengthen the tailored recommendations.',
+    suggestedOptions: Array.isArray(prompt.suggestedOptions) ? prompt.suggestedOptions.slice(0, 5) : []
+  }));
+  return resp;
+}
+
+async function generateAssessmentAssistantReply({ message, assessmentDraft, capability }) {
+  if (!OPENAI_API_KEY) {
+    return {
+      answer:
+        'The assessment assistant is offline. Configure OPENAI_API_KEY to unlock contextual guidance and live Q&A.'
+    };
+  }
+  const system = `You are Agama Technologies' assessment copilot. Answer with concise, actionable guidance grounded only in the provided assessment draft. Use markdown bullet lists where useful. If information is missing, state assumptions and invite the user to capture it in the relevant step.`;
+  const payload = {
+    capability,
+    assessmentDraft
+  };
+  const user = `User question: ${message}\n\nContext JSON:${JSON.stringify(payload)}`;
+  const content = await callOpenAI({ system, user, responseFormat: null });
+  return { answer: content || 'No response available right now.' };
+}
+
 module.exports = {
   callOpenAI,
   generateExecutiveNarrative,
@@ -236,5 +281,7 @@ module.exports = {
   generateCommandBlueprint,
   fetchOrganizationIntel,
   searchOrganizationProfiles,
-  generateArchitectureAssets
+  generateArchitectureAssets,
+  generateFollowUpPrompts,
+  generateAssessmentAssistantReply
 };

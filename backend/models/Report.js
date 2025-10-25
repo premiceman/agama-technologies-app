@@ -38,6 +38,10 @@ const ReportSchema = new Schema({
   roiMap: { type: [Schema.Types.Mixed], default: [] },
   renewalCalendar: { type: [Schema.Types.Mixed], default: [] },
   personaIntelligence: { type: Schema.Types.Mixed, default: {} },
+  structuredSections: { type: Schema.Types.Mixed, default: {} },
+  valuePath: { type: [Schema.Types.Mixed], default: [] },
+  coverageSummary: { type: Schema.Types.Mixed, default: {} },
+  urgencyMap: { type: Schema.Types.Mixed, default: {} },
   paid: { type: Boolean, default: false }
 }, { timestamps: true });
 
