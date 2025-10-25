@@ -107,6 +107,47 @@
         </div>
       </div>
 
+      <div class="row g-4 mb-4">
+        <div class="col-lg-6">
+          <div class="card glass p-4 h-100" data-lockable="true" id="roiCard">
+            <div class="position-relative">
+              <h5 class="section-heading">Business case & ROI map</h5>
+              <div id="roiMap" class="d-flex flex-column gap-2"></div>
+              <div class="locked-overlay d-none" data-lock-overlay>
+                <div class="h5">ROI modelling locked</div>
+                <p class="text-fg-3">Upgrade to access quantified value levers, sponsors, and payback timelines for each initiative.</p>
+                <button class="btn btn-primary" data-lock-unlock>Unlock full report</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card glass p-4 h-100" data-lockable="true" id="renewalCard">
+            <div class="position-relative">
+              <h5 class="section-heading">Renewal & contract calendar</h5>
+              <div id="renewalCalendar" class="d-flex flex-column gap-2"></div>
+              <div class="locked-overlay d-none" data-lock-overlay>
+                <div class="h5">Renewal intelligence locked</div>
+                <p class="text-fg-3">Unlock renewal windows, risk ratings, and negotiation guidance per vendor.</p>
+                <button class="btn btn-primary" data-lock-unlock>Unlock full report</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card glass p-4 mb-4" data-lockable="true" id="architectureBlueprintCard">
+        <div class="position-relative">
+          <h5 class="section-heading">Architecture blueprint overlays</h5>
+          <div id="architectureBlueprint" class="d-flex flex-column gap-2"></div>
+          <div class="locked-overlay d-none" data-lock-overlay>
+            <div class="h5">Architecture overlays locked</div>
+            <p class="text-fg-3">Unlock executive-ready diagrams with ownership, guardrails, and automation opportunities.</p>
+            <button class="btn btn-primary" data-lock-unlock>Unlock full report</button>
+          </div>
+        </div>
+      </div>
+
       <div class="card glass p-4 mb-4" data-lockable="true" id="personaCard">
         <div class="position-relative">
           <h5 class="section-heading">Persona briefings</h5>
@@ -114,6 +155,21 @@
           <div class="locked-overlay d-none" data-lock-overlay>
             <div class="h5">Persona playbooks locked</div>
             <p class="text-fg-3">Upgrade for full CxO briefings, analyst guidance, and talent recommendations.</p>
+            <button class="btn btn-primary" data-lock-unlock>Unlock full report</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card glass p-4 mb-4" data-lockable="true" id="personaLensCard">
+        <div class="position-relative">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <h5 class="section-heading mb-0">Persona lens generator</h5>
+            <select id="personaLensSelect" class="form-select form-select-sm" style="max-width: 240px;"></select>
+          </div>
+          <div id="personaLensContent" class="d-flex flex-column gap-2 mt-3"></div>
+          <div class="locked-overlay d-none" data-lock-overlay>
+            <div class="h5">Persona-specific narratives locked</div>
+            <p class="text-fg-3">Upgrade to craft on-demand executive briefings for CISO, CTO, CFO and operational leaders.</p>
             <button class="btn btn-primary" data-lock-unlock>Unlock full report</button>
           </div>
         </div>
@@ -321,6 +377,79 @@
         tech.appendChild(col);
       });
 
+      const roiMapEl = document.getElementById('roiMap');
+      if (roiMapEl) {
+        roiMapEl.innerHTML = '';
+        const roiEntries = r.roiMap || [];
+        if (roiEntries.length) {
+          roiEntries.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'value-item';
+            const valueDrivers = Array.isArray(item.valueDrivers) ? item.valueDrivers.join(' · ') : item.valueDrivers || '';
+            const stakeholders = Array.isArray(item.stakeholders) ? item.stakeholders.join(', ') : item.stakeholders || '';
+            div.innerHTML = `
+              <strong>${item.initiative || 'Strategic initiative'}</strong>
+              <div class="small text-fg-3">${valueDrivers}</div>
+              <div class="small text-fg-3">Cost to implement: ${item.costToImplement || 'n/a'} · Payback: ${item.paybackWindow || 'n/a'}</div>
+              ${stakeholders ? `<div class="small text-fg-3">Stakeholders: ${stakeholders}</div>` : ''}
+            `;
+            roiMapEl.appendChild(div);
+          });
+        } else {
+          roiMapEl.innerHTML = '<div class="text-fg-3">ROI modelling becomes available with premium enrichment.</div>';
+        }
+      }
+
+      const renewalEl = document.getElementById('renewalCalendar');
+      if (renewalEl) {
+        renewalEl.innerHTML = '';
+        const renewals = r.renewalCalendar || [];
+        if (renewals.length) {
+          renewals.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'notice';
+            div.innerHTML = `
+              <div><strong>${item.vendor || 'Vendor'}</strong> — ${item.renewalWindow || 'window tbc'}</div>
+              <div class="small text-fg-3">Risk: ${item.riskLevel || 'n/a'}</div>
+              ${item.recommendedAction ? `<div class="small">${item.recommendedAction}</div>` : ''}
+            `;
+            renewalEl.appendChild(div);
+          });
+        } else {
+          renewalEl.innerHTML = '<div class="text-fg-3">Add vendor insights to unlock renewal orchestration.</div>';
+        }
+      }
+
+      const blueprintEl = document.getElementById('architectureBlueprint');
+      if (blueprintEl) {
+        blueprintEl.innerHTML = '';
+        const blueprint = r.architectureBlueprint || {};
+        const layers = Array.isArray(blueprint.layers) ? blueprint.layers : [];
+        layers.forEach(layer => {
+          const card = document.createElement('div');
+          card.className = 'notice';
+          const components = Array.isArray(layer.components) ? layer.components : [];
+          const componentList = components.map(component => {
+            const owners = Array.isArray(component.owners) ? component.owners.join(', ') : component.owners || '';
+            return `<li>${component.label || 'Component'}${owners ? ` — <span class="text-fg-3">Owners: ${owners}</span>` : ''}${component.description ? `<div class="small text-fg-3">${component.description}</div>` : ''}</li>`;
+          }).join('');
+          card.innerHTML = `
+            <div><strong>${layer.name || 'Layer'}</strong></div>
+            <ul class="mb-0">${componentList}</ul>
+          `;
+          blueprintEl.appendChild(card);
+        });
+        if (blueprint.commentary) {
+          const commentary = document.createElement('div');
+          commentary.className = 'text-fg-3 mt-2';
+          commentary.textContent = blueprint.commentary;
+          blueprintEl.appendChild(commentary);
+        }
+        if (!blueprintEl.children.length) {
+          blueprintEl.innerHTML = '<div class="text-fg-3">Architecture overlays will appear once enrichment data is provided.</div>';
+        }
+      }
+
       const personaBriefings = document.getElementById('personaBriefings');
       personaBriefings.innerHTML = '';
       (r.personaBriefings || []).forEach(persona => {
@@ -336,6 +465,67 @@
           </div>`;
         personaBriefings.appendChild(col);
       });
+
+      const personaLensSelect = document.getElementById('personaLensSelect');
+      const personaLensContent = document.getElementById('personaLensContent');
+      if (personaLensSelect && personaLensContent) {
+        const personaIntelligence = r.personaIntelligence || {};
+        const entries = Object.entries(personaIntelligence);
+        if (!entries.length) {
+          personaLensSelect.classList.add('d-none');
+          personaLensContent.innerHTML = '<div class="text-fg-3">Persona-specific briefings are unlocked with the premium report.</div>';
+        } else {
+          personaLensSelect.classList.remove('d-none');
+          personaLensSelect.innerHTML = entries
+            .map(([key, detail]) => `<option value="${key}">${detail?.title || detail?.name || key}</option>`)
+            .join('');
+          const renderPersonaLens = () => {
+            const selected = personaLensSelect.value || entries[0][0];
+            personaLensSelect.value = selected;
+            const detail = personaIntelligence[selected] || {};
+            personaLensContent.innerHTML = '';
+            if (detail.summary) {
+              const summary = document.createElement('p');
+              summary.className = 'text-fg-2';
+              summary.textContent = detail.summary;
+              personaLensContent.appendChild(summary);
+            }
+            if (detail.priorities) {
+              const list = document.createElement('ul');
+              list.className = 'mb-0';
+              (Array.isArray(detail.priorities) ? detail.priorities : [detail.priorities]).forEach(item => {
+                const li = document.createElement('li');
+                li.textContent = item;
+                list.appendChild(li);
+              });
+              personaLensContent.appendChild(list);
+            }
+            if (detail.kpis) {
+              const kpis = document.createElement('div');
+              kpis.className = 'small text-fg-3';
+              kpis.textContent = `KPIs: ${(Array.isArray(detail.kpis) ? detail.kpis : [detail.kpis]).join(', ')}`;
+              personaLensContent.appendChild(kpis);
+            }
+            if (detail.questions) {
+              const questions = document.createElement('div');
+              questions.className = 'small text-fg-3';
+              questions.textContent = `Critical questions: ${(Array.isArray(detail.questions) ? detail.questions : [detail.questions]).join(' · ')}`;
+              personaLensContent.appendChild(questions);
+            }
+            if (detail.visualNarrative) {
+              const narrative = document.createElement('p');
+              narrative.className = 'text-fg-3';
+              narrative.textContent = detail.visualNarrative;
+              personaLensContent.appendChild(narrative);
+            }
+            if (!personaLensContent.children.length) {
+              personaLensContent.innerHTML = '<div class="text-fg-3">Persona narrative available with premium enrichment.</div>';
+            }
+          };
+          personaLensSelect.addEventListener('change', renderPersonaLens);
+          renderPersonaLens();
+        }
+      }
 
       const riskRegister = document.getElementById('riskRegister');
       riskRegister.innerHTML = '';

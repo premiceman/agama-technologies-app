@@ -21,6 +21,9 @@ const orgSelect = document.getElementById('premiumOrg');
 const techLandscapeWrap = document.getElementById('premiumTechLandscape');
 const personaWrap = document.getElementById('premiumPersonas');
 const questionnaireWrap = document.getElementById('premiumQuestionnaire');
+const enrichBtn = document.getElementById('premiumEnrichOrg');
+const enrichStatus = document.getElementById('premiumEnrichStatus');
+const enrichMatches = document.getElementById('premiumOrgMatches');
 
 let currentStep = 1;
 let catalog;
@@ -29,6 +32,8 @@ let selectedCapability;
 let personaBlueprint = [];
 let questionsPremium;
 let basePillars = new Set();
+let orgMatchLookup = [];
+let organizationIntelProfile = null;
 
 function showStep(step) {
   currentStep = step;
@@ -68,6 +73,11 @@ function validateStep(step) {
     const personasSelected = personaWrap.querySelectorAll('input[name="personaSelection"]:checked');
     if (personasSelected.length === 0) {
       alert('Select at least one persona to tailor the report.');
+      return false;
+    }
+    if (!form.discoveryObjectives.value.trim()) {
+      alert('Capture the discovery objectives to tie the roadmap to executive goals.');
+      form.discoveryObjectives.focus();
       return false;
     }
   }
@@ -138,6 +148,152 @@ function renderOrganisations() {
   });
 }
 
+function setEnrichmentStatus(message, tone = 'neutral') {
+  if (!enrichStatus) return;
+  enrichStatus.textContent = message || '';
+  enrichStatus.classList.remove('text-success', 'text-warning');
+  if (tone === 'success') enrichStatus.classList.add('text-success');
+  if (tone === 'warning') enrichStatus.classList.add('text-warning');
+}
+
+function renderOrgMatchList(matches = [], confidenceNote) {
+  if (!enrichMatches) return;
+  orgMatchLookup = Array.isArray(matches) ? matches : [];
+  if (!orgMatchLookup.length) {
+    enrichMatches.classList.add('d-none');
+    enrichMatches.innerHTML = '';
+    if (confidenceNote) setEnrichmentStatus(confidenceNote, 'warning');
+    return;
+  }
+  const fragments = document.createDocumentFragment();
+  orgMatchLookup.forEach((match, index) => {
+    const card = document.createElement('div');
+    card.className = 'notice d-flex flex-column gap-1';
+    const meta = [match.employeeRange || match.headcountEstimate, match.annualRevenueEstimate, match.hqRegion]
+      .filter(Boolean)
+      .join(' · ');
+    card.innerHTML = `
+      <div><strong>${match.name}</strong>${match.classification ? ` · ${match.classification}` : ''}</div>
+      ${meta ? `<div class="small text-fg-3">${meta}</div>` : ''}
+      ${match.description ? `<div class="small">${match.description}</div>` : ''}
+      <button type="button" class="btn btn-outline-light btn-sm align-self-start" data-match-index="${index}">Use this profile</button>
+    `;
+    fragments.appendChild(card);
+  });
+  if (confidenceNote) {
+    const note = document.createElement('div');
+    note.className = 'form-text text-fg-3 mt-2';
+    note.textContent = confidenceNote;
+    fragments.appendChild(note);
+  }
+  enrichMatches.innerHTML = '';
+  enrichMatches.appendChild(fragments);
+  enrichMatches.classList.remove('d-none');
+}
+
+async function requestOrganisationIntel({ query, fetchDetailsFor }) {
+  try {
+    const capabilityId = selectedCapability?.id || assessment.assessmentType;
+    const industry = industrySelect?.value || assessment.industry;
+    const body = {
+      capability: capabilityId,
+      industry
+    };
+    if (query) body.query = query;
+    if (fetchDetailsFor) body.fetchDetailsFor = fetchDetailsFor;
+    const res = await fetch('/api/organizations/enrich', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(body)
+    });
+    if (res.status === 401) {
+      alert('Session expired. Please sign in again.');
+      location.href = '/login.html';
+      return null;
+    }
+    if (!res.ok) {
+      setEnrichmentStatus('Unable to enrich organisation intelligence at this time.', 'warning');
+      return null;
+    }
+    const json = await res.json();
+    if (!json.ok) {
+      setEnrichmentStatus(json.error || 'Enrichment failed.', 'warning');
+      return null;
+    }
+    if (query && query.trim()) {
+      renderOrgMatchList(json.matches || [], json.confidenceNote);
+    }
+    if (json.intel) {
+      applyOrgIntel(json.intel);
+    }
+    return json;
+  } catch (err) {
+    console.error(err);
+    setEnrichmentStatus('Enrichment failed. Check your network connection.', 'warning');
+    return null;
+  }
+}
+
+function applyOrgIntel(intel) {
+  if (!intel) return;
+  const profile = intel.profile || {};
+  organizationIntelProfile = profile;
+  if (profile.canonicalName && !form.companyName.value.trim()) {
+    form.companyName.value = profile.canonicalName;
+  }
+  if (profile.headcountEstimate && !Number(form.headcount.value)) {
+    form.headcount.value = profile.headcountEstimate;
+  }
+  if (profile.annualRevenueEstimate && !Number(form.annualRevenue.value)) {
+    form.annualRevenue.value = profile.annualRevenueEstimate;
+  }
+  if (profile.turnover && !Number(form.turnover.value)) {
+    form.turnover.value = profile.turnover;
+  }
+  if (profile.investmentHighlights?.length && !form.investmentRounds.value.trim()) {
+    form.investmentRounds.value = profile.investmentHighlights.join('\n');
+  }
+  if (profile.keyInitiatives?.length && !form.keyInitiatives.value.trim()) {
+    form.keyInitiatives.value = profile.keyInitiatives
+      .map(item => {
+        if (typeof item === 'string') return item;
+        const base = item.name || '';
+        const objective = item.objective ? ` · ${item.objective}` : '';
+        return `${base}${objective}`.trim();
+      })
+      .filter(Boolean)
+      .join('\n');
+  }
+  if (profile.organisationStructure?.length && !form.organisationStructure.value.trim()) {
+    form.organisationStructure.value = profile.organisationStructure
+      .map(item => {
+        if (typeof item === 'string') return item;
+        const base = item.function || item.leader || '';
+        const remit = item.remit ? ` → ${item.remit}` : '';
+        return `${base}${remit}`.trim();
+      })
+      .filter(Boolean)
+      .join('\n');
+  }
+  if (profile.discoveryObjectives?.length && !form.discoveryObjectives.value.trim()) {
+    form.discoveryObjectives.value = profile.discoveryObjectives
+      .map(item => {
+        if (typeof item === 'string') return item;
+        const objective = item.objective || '';
+        const kpis = item.linkedKpis ? ` · KPIs: ${Array.isArray(item.linkedKpis) ? item.linkedKpis.join(', ') : item.linkedKpis}` : '';
+        const timeframe = item.timeframe ? ` · ${item.timeframe}` : '';
+        return `${objective}${kpis}${timeframe}`.trim();
+      })
+      .filter(Boolean)
+      .join('\n');
+  }
+  if (intel.summary && !form.narrativeContext.value.trim()) {
+    form.narrativeContext.value = intel.summary;
+  }
+  setEnrichmentStatus(`Loaded intelligence for ${profile.canonicalName || assessment.organization?.name || 'organisation'}.`, 'success');
+}
+
 function renderCapabilityFocusOptions() {
   capabilityFocusSelect.innerHTML = '';
   const uniqueDomains = new Set();
@@ -199,15 +355,36 @@ function renderTechLandscape() {
 
 function prefillCompanyProfile() {
   const profile = assessment.companyProfile || {};
-  form.companyName.value = profile.name || '';
-  form.headcount.value = profile.headcount || '';
-  form.annualRevenue.value = profile.annualRevenue || '';
+  const intelProfile = assessment.organization?.intel?.profile || {};
+  organizationIntelProfile = intelProfile;
+  form.companyName.value = profile.name || intelProfile.canonicalName || '';
+  form.headcount.value = profile.headcount || intelProfile.headcountEstimate || '';
+  form.annualRevenue.value = profile.annualRevenue || intelProfile.annualRevenueEstimate || '';
+  form.turnover.value = profile.turnover || intelProfile.turnover || '';
   form.transformationStage.value = profile.transformationStage || 'Modernisation programme mobilising';
   form.riskAppetite.value = profile.riskAppetite || 'Balanced';
   form.strategicBudget.value = profile.strategicBudget || '';
   form.narrativeContext.value = profile.narrativeContext || '';
   form.complianceDrivers.value = profile.complianceDrivers || '';
   form.customerSegments.value = profile.customerSegments || '';
+  const investmentRounds = Array.isArray(profile.investmentRounds)
+    ? profile.investmentRounds
+    : Array.isArray(intelProfile.investmentHighlights)
+      ? intelProfile.investmentHighlights
+      : [];
+  form.investmentRounds.value = investmentRounds.join('\n');
+  const initiatives = Array.isArray(profile.keyInitiatives)
+    ? profile.keyInitiatives
+    : Array.isArray(intelProfile.keyInitiatives)
+      ? intelProfile.keyInitiatives.map(item => `${item.name || ''}${item.objective ? ` · ${item.objective}` : ''}`.trim())
+      : [];
+  form.keyInitiatives.value = initiatives.join('\n');
+  const orgStructure = Array.isArray(profile.organisationStructure)
+    ? profile.organisationStructure
+    : Array.isArray(intelProfile.organisationStructure)
+      ? intelProfile.organisationStructure.map(item => `${item.function || item.leader || ''}${item.remit ? ` → ${item.remit}` : ''}`.trim())
+      : [];
+  form.organisationStructure.value = orgStructure.join('\n');
   form.preferredVendors.value = assessment.vendorStrategy?.preferredVendors || '';
   form.integrationChallenges.value = assessment.vendorStrategy?.integrationChallenges || '';
   form.operatingRhythms.value = assessment.operatingModel?.operatingRhythms || '';
@@ -215,6 +392,22 @@ function prefillCompanyProfile() {
   form.processConstraints.value = assessment.operatingModel?.processConstraints || '';
   form.changeManagement.value = assessment.operatingModel?.changeManagement || '';
   form.successMetrics.value = assessment.operatingModel?.successMetrics || '';
+  const discoveryObjectives = Array.isArray(assessment.operatingModel?.discoveryObjectives)
+    ? assessment.operatingModel.discoveryObjectives
+    : Array.isArray(profile.discoveryObjectives)
+      ? profile.discoveryObjectives
+      : Array.isArray(intelProfile.discoveryObjectives)
+        ? intelProfile.discoveryObjectives.map(item =>
+            typeof item === 'string'
+              ? item
+              : `${item.objective || ''}${item.linkedKpis ? ` · KPIs: ${Array.isArray(item.linkedKpis) ? item.linkedKpis.join(', ') : item.linkedKpis}` : ''}${item.timeframe ? ` · ${item.timeframe}` : ''}`.trim()
+          )
+        : [];
+  form.discoveryObjectives.value = discoveryObjectives.join('\n');
+  if (intelProfile.dataConfidence) {
+    const tone = intelProfile.dataConfidence.toLowerCase().includes('low') ? 'warning' : 'success';
+    setEnrichmentStatus(intelProfile.dataConfidence, tone);
+  }
 }
 
 function renderQuestionnaire() {
@@ -238,6 +431,33 @@ function renderQuestionnaire() {
       section.appendChild(row);
     });
     questionnaireWrap.appendChild(section);
+  });
+}
+
+if (enrichBtn) {
+  enrichBtn.addEventListener('click', async () => {
+    const company = form.companyName.value.trim();
+    if (!company) {
+      alert('Enter a company name before enriching.');
+      form.companyName.focus();
+      return;
+    }
+    enrichBtn.disabled = true;
+    setEnrichmentStatus('Sourcing organisation intelligence...');
+    await requestOrganisationIntel({ query: company });
+    enrichBtn.disabled = false;
+  });
+}
+
+if (enrichMatches) {
+  enrichMatches.addEventListener('click', async (event) => {
+    const btn = event.target.closest('[data-match-index]');
+    if (!btn) return;
+    const index = Number(btn.dataset.matchIndex);
+    const match = orgMatchLookup[index];
+    if (!match?.name) return;
+    setEnrichmentStatus(`Loading detailed profile for ${match.name}...`);
+    await requestOrganisationIntel({ fetchDetailsFor: match.name });
   });
 }
 
@@ -279,20 +499,35 @@ form.addEventListener('submit', async (event) => {
       bucket[pillar][input.dataset.question] = Number(input.value || 0);
     });
 
+    const parseList = (value) =>
+      String(value || '')
+        .split(/\n+/)
+        .map(item => item.trim())
+        .filter(Boolean);
+
+    const discoveryObjectives = parseList(form.discoveryObjectives.value);
+
+    const capabilityId = selectedCapability?.id || assessment.assessmentType;
+
     const payload = {
-      assessmentType: selectedCapability.id,
+      assessmentType: capabilityId,
       strategicDrivers,
       organization: { name: orgSelect.value },
       companyProfile: {
         name: form.companyName.value.trim(),
         headcount: Number(form.headcount.value || 0),
         annualRevenue: Number(form.annualRevenue.value || 0),
+        turnover: Number(form.turnover.value || 0),
         transformationStage: form.transformationStage.value,
         riskAppetite: form.riskAppetite.value,
         narrativeContext: form.narrativeContext.value.trim(),
         strategicBudget: Number(form.strategicBudget.value || 0),
         complianceDrivers: form.complianceDrivers.value.trim(),
-        customerSegments: form.customerSegments.value.trim()
+        customerSegments: form.customerSegments.value.trim(),
+        investmentRounds: parseList(form.investmentRounds.value),
+        keyInitiatives: parseList(form.keyInitiatives.value),
+        organisationStructure: parseList(form.organisationStructure.value),
+        discoveryObjectives
       },
       capabilityFocus,
       techLandscape,
@@ -305,12 +540,31 @@ form.addEventListener('submit', async (event) => {
         talentFocus: form.talentFocus.value.trim(),
         processConstraints: form.processConstraints.value.trim(),
         changeManagement: form.changeManagement.value.trim(),
-        successMetrics: form.successMetrics.value.trim()
+        successMetrics: form.successMetrics.value.trim(),
+        discoveryObjectives
       },
       personas,
       answers,
       premiumAnswers
     };
+
+    if (organizationIntelProfile?.personaKpis) {
+      payload.companyProfile.personaKpis = organizationIntelProfile.personaKpis;
+    }
+    if (organizationIntelProfile?.classification && !payload.companyProfile.classification) {
+      payload.companyProfile.classification = organizationIntelProfile.classification;
+    }
+
+    const architectureSignalsPayload = {};
+    if (organizationIntelProfile?.architectureSignals) {
+      architectureSignalsPayload.organisationIntel = JSON.stringify(organizationIntelProfile.architectureSignals);
+    }
+    if (organizationIntelProfile?.renewalCalendar) {
+      architectureSignalsPayload.renewalCalendar = JSON.stringify(organizationIntelProfile.renewalCalendar);
+    }
+    if (Object.keys(architectureSignalsPayload).length) {
+      payload.architectureSignals = architectureSignalsPayload;
+    }
 
     const res = await fetch(`/api/assessments/${assessmentId}/premium`, {
       method: 'PUT',

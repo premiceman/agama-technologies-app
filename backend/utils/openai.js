@@ -132,22 +132,101 @@ async function generateCommandBlueprint({ assessment, capability, vendorEngageme
   return resp || {};
 }
 
+async function searchOrganizationProfiles({ query, capability, industry }) {
+  if (!OPENAI_API_KEY) {
+    return { matches: [] };
+  }
+  const system = `You are an enterprise intelligence analyst. Return JSON {matches: [{name, ticker, hqRegion, description, classification, industryTags, employeeRange, headcountEstimate, annualRevenueEstimate, turnover, fundingRounds, investmentHighlights, keyInitiatives, organisationStructure, discoveryObjectives, personaKpis, sources}], confidenceNote}. Provide factual, recent public data (<= 2024). If unsure, include null values and note low confidence. Limit matches to 4.`;
+  const user = `Organisation lookup request.
+Query: ${query}
+Relevant capability: ${capability || 'enterprise transformation'}
+Industry context: ${industry || 'general'}
+Return best-matching publicly known organisations.`;
+  const resp = await callOpenAI({ system, user });
+  if (!resp) {
+    return {
+      matches: [],
+      confidenceNote: 'Organisation enrichment disabled. Configure OPENAI_API_KEY to unlock auto-complete.'
+    };
+  }
+  resp.matches = Array.isArray(resp.matches) ? resp.matches : [];
+  return resp;
+}
+
 async function fetchOrganizationIntel({ organization, assessmentType, industry }) {
-  const system = `You synthesise official maturity frameworks into concise intelligence. Output JSON with keys summary, dominantFrameworks, vendorSignals.`;
-  const user = `Summarise official perspectives from ${organization} relevant to ${assessmentType} initiatives in the ${industry} industry. Provide:
-  - summary: 2 sentence overview
-  - dominantFrameworks: array of {name, guidance}
-  - vendorSignals: array of {theme, leadingVendors, investmentNotes}
-Use publicly documented knowledge from the organisation. If information is limited, state that explicitly.`;
+  const system = `You synthesise analyst, regulatory, and funding intelligence for enterprise technology initiatives. Respond in JSON with keys summary, dominantFrameworks, vendorSignals, profile.
+- summary: string (2 sentences)
+- dominantFrameworks: array of {name, guidance}
+- vendorSignals: array of {theme, leadingVendors, investmentNotes}
+- profile: {
+    canonicalName,
+    classification,
+    industryTags,
+    headcountEstimate,
+    employeeRange,
+    annualRevenueEstimate,
+    turnover,
+    fundingRounds: array of {round, amount, date, leadInvestors},
+    investmentHighlights: array of strings,
+    keyInitiatives: array of {name, objective, horizon, description},
+    organisationStructure: array of {function, leader, remit, primaryKpis},
+    discoveryObjectives: array of {objective, linkedKpis, timeframe},
+    personaKpis: object map of persona -> array of KPIs,
+    renewalCalendar: array of {vendor, renewalWindow, action},
+    architectureSignals: array of {layer, observation, implication},
+    dataConfidence,
+    sources
+  }
+Return only substantiated insights (<= 2024). If confidence is low, populate dataConfidence with explanation and leave uncertain fields null.`;
+  const user = `Provide official perspectives and organisational intelligence for ${organization} focusing on ${assessmentType} programmes in the ${industry || 'cross-industry'} domain.`;
   const resp = await callOpenAI({ system, user });
   if (!resp) {
     return {
       summary: `External research for ${organization} unavailable. Configure OPENAI_API_KEY to enable automatic enrichment.`,
       dominantFrameworks: [],
-      vendorSignals: []
+      vendorSignals: [],
+      profile: {
+        canonicalName: organization,
+        classification: 'Unknown',
+        industryTags: [industry].filter(Boolean),
+        dataConfidence: 'OpenAI enrichment disabled.',
+        sources: []
+      }
     };
   }
+  if (resp.profile && !Array.isArray(resp.profile.industryTags) && resp.profile.industryTags) {
+    resp.profile.industryTags = String(resp.profile.industryTags).split(/,|;|\n/).map(s => s.trim()).filter(Boolean);
+  }
   return resp;
+}
+
+async function generateArchitectureAssets({ assessment, report, capability }) {
+  if (!OPENAI_API_KEY) {
+    return {};
+  }
+  const system = `You are an enterprise architect producing board-ready blueprints. Respond in JSON with keys:
+- architectureBlueprint: {layers: [{name, components: [{label, description, owners}]}], commentary}
+- roiMap: array of {initiative, valueDrivers, costToImplement, paybackWindow, stakeholders}
+- renewalCalendar: array of {vendor, renewalWindow, riskLevel, recommendedAction}
+- personaIntelligence: object where key is persona id or title and value is {summary, priorities, kpis, questions, visualNarrative}
+Ground responses in the provided assessment, organisation intel, and roadmap.`;
+  const payload = {
+    organisation: assessment.organization?.name,
+    organisationIntel: assessment.organization?.intel || {},
+    companyProfile: assessment.companyProfile || {},
+    strategicDrivers: assessment.strategicDrivers || [],
+    roadmap: report.roadmap,
+    investmentOutlook: report.investmentOutlook,
+    personas: assessment.personas || [],
+    capability: capability.name,
+    pillarScores: report.pillarScores,
+    pillarInsights: report.pillarInsights,
+    technologyRadar: report.technologyRadar,
+    riskRegister: report.riskRegister
+  };
+  const user = `Create architecture visuals, ROI mapping, and renewal priorities for this engagement:${JSON.stringify(payload)}`;
+  const resp = await callOpenAI({ system, user });
+  return resp || {};
 }
 
 module.exports = {
@@ -155,5 +234,7 @@ module.exports = {
   generateExecutiveNarrative,
   generateStrategicIntelligence,
   generateCommandBlueprint,
-  fetchOrganizationIntel
+  fetchOrganizationIntel,
+  searchOrganizationProfiles,
+  generateArchitectureAssets
 };

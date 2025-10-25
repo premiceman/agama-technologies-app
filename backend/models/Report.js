@@ -34,6 +34,10 @@ const ReportSchema = new Schema({
   commandAdvisory: { type: Schema.Types.Mixed, default: {} },
   architectureUploads: { type: [Schema.Types.Mixed], default: [] },
   architectureSignals: { type: Schema.Types.Mixed, default: {} },
+  architectureBlueprint: { type: Schema.Types.Mixed, default: {} },
+  roiMap: { type: [Schema.Types.Mixed], default: [] },
+  renewalCalendar: { type: [Schema.Types.Mixed], default: [] },
+  personaIntelligence: { type: Schema.Types.Mixed, default: {} },
   paid: { type: Boolean, default: false }
 }, { timestamps: true });
 
