@@ -20,6 +20,9 @@
   --border:rgba(124,156,255,.24);
   --border-soft:rgba(255,255,255,.08);
   --shadow:0 16px 45px rgba(9,17,35,.45);
+
+  --bs-body-color:var(--fg);
+  --bs-heading-color:var(--fg);
 }
 /* =========================
    THEME DOCS – Agama UI
@@ -202,7 +205,9 @@ footer a{color:var(--fg-2);}
 .notice strong,
 .table-like .row strong{color:var(--fg-strong);}
 
-.pad-md { padding: var(--space-6) !important; }
+.pad-md {
+  padding: var(--space-6) var(--space-7) var(--space-6) calc(var(--space-7) + var(--space-3)) !important;
+}
 .pad-lg { padding: var(--space-7) !important; }
 
 .panel-title-strong {
