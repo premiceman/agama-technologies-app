@@ -301,3 +301,13 @@ input::placeholder,textarea::placeholder{color:var(--fg-muted)!important;}
 .ai-block h6{font-size:1rem;font-weight:600;margin-bottom:.5rem;}
 
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+/* Ensure light text on dark backgrounds */
+.text-fg   { color: var(--text-primary); }
+:root      { --text-primary: var(--fg); }
+
+/* Failsafe in case older CSS is cached */
+p.text-fg,
+div.text-fg,
+small.text-fg { color: var(--fg) !important; }
+
