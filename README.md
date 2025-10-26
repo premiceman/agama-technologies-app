@@ -146,3 +146,33 @@ code <repo-name>
 3. You’ll see a **partial** report. Click **Unlock full report** to simulate payment and reveal everything.
 
 > This project intentionally avoids any third‑party auth or storage services—only MongoDB and a single Render Web Service are required.
+
+---
+
+## 7) Security baseline
+
+The backend enables hardened HTTP defaults out of the box:
+
+- `helmet` with HSTS (production), frame protection, and `no-referrer` policy.
+- `express-rate-limit` applied to authentication, project, and assessment routes.
+- Strict CORS allow‑list controlled by `ALLOWED_ORIGINS`.
+- Request validation with [Zod](https://github.com/colinhacks/zod) for every POST/PUT endpoint to fail fast on malformed payloads.
+
+These protections are automatically active after installing dependencies—no extra configuration required beyond setting environment variables.
+
+---
+
+## 8) Data migration helper
+
+Older databases may contain assessments without a `projectId`. Use the bundled migration to backfill projects per user.
+
+```bash
+cd backend
+# Inspect actions without writing changes
+node scripts/migrate-assessments-into-projects.js --dry-run
+
+# Apply the migration
+node scripts/migrate-assessments-into-projects.js
+```
+
+The script is idempotent. It creates (or reuses) an "Auto-imported Project" per user and links orphaned assessments to it, updating the embedded project snapshot in the process.

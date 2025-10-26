@@ -19,7 +19,14 @@ const ProjectSchema = new Schema({
   operatingModel: { type: Schema.Types.Mixed, default: {} },
   techLandscape: { type: Schema.Types.Mixed, default: {} },
   personas: { type: [Schema.Types.Mixed], default: [] },
-  analytics: { type: Schema.Types.Mixed, default: {} }
+  analytics: {
+    maturity: {
+      overall: { type: Number, default: 0 },
+      pillars: { type: Schema.Types.Mixed, default: {} },
+      lastUpdated: { type: Date }
+    },
+    timeseriesId: { type: Schema.Types.ObjectId, ref: 'ProjectAnalyticsSeries' }
+  }
 }, { timestamps: true });
 
 ProjectSchema.pre('save', function(next) {
@@ -50,7 +57,14 @@ ProjectSchema.methods.public = function() {
     operatingModel: this.operatingModel || {},
     techLandscape: this.techLandscape || {},
     personas: this.personas || [],
-    analytics: this.analytics || {},
+    analytics: {
+      maturity: {
+        overall: this.analytics?.maturity?.overall ?? 0,
+        pillars: this.analytics?.maturity?.pillars || {},
+        lastUpdated: this.analytics?.maturity?.lastUpdated || null
+      },
+      timeseriesId: this.analytics?.timeseriesId || null
+    },
     createdAt: this.createdAt,
     updatedAt: this.updatedAt
   };
