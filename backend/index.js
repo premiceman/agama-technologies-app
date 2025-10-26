@@ -8,8 +8,11 @@ const morgan = require('morgan');
 const mongoose = require('mongoose');
 const ExcelJS = require('exceljs');
 const rateLimit = require('express-rate-limit');
+const csrf = require('csurf');
+const multer = require('multer');
 const { z } = require('zod');
 
+const { Readable } = require('stream');
 const { getStripe, isStripeConfigured, isStripeStub } = require('./utils/stripe');
 
 const app = express();
@@ -44,6 +47,29 @@ app.use(
 app.use(express.urlencoded({ extended: true }));
 const csvTextParser = express.text({ type: ['text/csv', 'application/csv', 'text/plain'], limit: '200kb' });
 app.use(cookieParser());
+
+const csrfProtection = csrf({
+  cookie: {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: isProduction
+  }
+});
+const csrfExemptPaths = ['/api/payments/webhook'];
+app.use((req, res, next) => {
+  if (csrfExemptPaths.some(prefix => req.originalUrl.startsWith(prefix))) {
+    return next();
+  }
+  return csrfProtection(req, res, next);
+});
+
+app.get('/api/csrf-token', (req, res) => {
+  try {
+    res.json({ token: req.csrfToken() });
+  } catch (err) {
+    res.status(500).json({ error: 'Unable to issue CSRF token' });
+  }
+});
 
 const allowedOrigins = new Set(
   (process.env.ALLOWED_ORIGINS || '')
@@ -84,6 +110,16 @@ const vendorSearchLimiter = rateLimit({ ...limiterDefaults, max: 40 });
 const paymentsLimiter = rateLimit({ ...limiterDefaults, max: 20 });
 const paymentsWebhookLimiter = rateLimit({ ...limiterDefaults, max: 400 });
 const adminLimiter = rateLimit({ ...limiterDefaults, max: 30 });
+const fileRouteLimiter = rateLimit({
+  ...limiterDefaults,
+  max: 60,
+  keyGenerator: req => (req.auth?.uid ? `user:${req.auth.uid}` : req.ip)
+});
+const jobRouteLimiter = rateLimit({
+  ...limiterDefaults,
+  max: 40,
+  keyGenerator: req => (req.auth?.uid ? `user:${req.auth.uid}` : req.ip)
+});
 
 app.use('/api/auth', authLimiter);
 app.use('/api/projects', projectLimiter);
@@ -125,6 +161,34 @@ if (process.env.NODE_ENV !== 'test') {
   });
 }
 
+let gridFsBucket;
+function getGridFsBucket() {
+  if (!gridFsBucket && mongoose.connection.readyState === 1 && mongoose.connection.db) {
+    gridFsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'projectFiles' });
+  }
+  if (!gridFsBucket) {
+    throw new Error('File storage unavailable');
+  }
+  return gridFsBucket;
+}
+
+mongoose.connection.on('connected', () => {
+  try {
+    getGridFsBucket();
+  } catch (err) {
+    console.error('Failed to initialise GridFS bucket', err);
+  }
+});
+
+function streamToBuffer(stream) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    stream.on('data', chunk => chunks.push(chunk));
+    stream.once('error', reject);
+    stream.once('end', () => resolve(Buffer.concat(chunks)));
+  });
+}
+
 const User = require('./models/User');
 const Assessment = require('./models/Assessment');
 const Project = require('./models/Project');
@@ -136,6 +200,9 @@ const Initiative = require('./models/Initiative');
 const Vendor = require('./models/Vendor');
 const RfpTemplate = require('./models/RfpTemplate');
 const RfpDraft = require('./models/RfpDraft');
+const File = require('./models/File');
+const Job = require('./models/Job');
+const AuditLog = require('./models/AuditLog');
 
 const { requireAuth, issueTokenCookie, clearTokenCookie } = require('./middleware/auth');
 const { requireProjectOwnership } = require('./middleware/project');
@@ -163,7 +230,12 @@ const {
   searchOrganizationProfiles,
   generateFollowUpPrompts,
   generateAssessmentAssistantReply,
-  generateRfpDraft
+  generateRfpDraft,
+  uploadFileToOpenAI,
+  createVectorStore,
+  attachFileToVectorStore,
+  detachFileFromVectorStore,
+  deleteOpenAIFile
 } = require('./utils/openai');
 const { vendorMatch } = require('./utils/llm-tools');
 const {
@@ -175,6 +247,26 @@ const {
   tierAllowsStrategic,
   tierRank
 } = require('./utils/entitlements');
+
+const MAX_FILE_UPLOAD_BYTES = parseInt(process.env.FILE_UPLOAD_MAX_BYTES || '20971520', 10);
+const fileUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_FILE_UPLOAD_BYTES }
+});
+const allowedFileTypes = new Set(
+  (process.env.FILE_ALLOWED_MIME ||
+    'application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown')
+    .split(',')
+    .map(type => type.trim())
+    .filter(Boolean)
+);
+
+function isAllowedFileType(mime) {
+  if (!mime) return false;
+  if (allowedFileTypes.has(mime)) return true;
+  if (mime.startsWith('text/')) return allowedFileTypes.has('text/plain') || allowedFileTypes.has('text/*');
+  return false;
+}
 
 const signupSchema = z.object({
   name: z.string().trim().max(120).optional(),
@@ -216,6 +308,44 @@ const projectCreateSchema = z.object({
 });
 
 const projectUpdateSchema = projectCreateSchema.partial();
+
+const fileScanSchema = z.object({
+  status: z.enum(['clean', 'quarantined']),
+  reason: z.string().trim().max(200).optional()
+});
+
+const ragIndexSchema = z.object({
+  fileIds: z
+    .array(
+      z
+        .string()
+        .trim()
+        .regex(/^[a-fA-F0-9]{24}$/, 'Invalid file id')
+    )
+    .min(1)
+    .max(20)
+});
+
+const jobCreateSchema = z.object({
+  type: z.enum(['persona-briefs', 'exec-narrative']),
+  payload: z.record(z.any()).default({})
+});
+
+function serializeJob(job) {
+  if (!job) return null;
+  return {
+    id: job._id?.toString(),
+    type: job.type,
+    status: job.status,
+    payload: job.payload || {},
+    result: job.result || null,
+    attempts: job.attempts || 0,
+    workerId: job.workerId || null,
+    error: job.error || null,
+    createdAt: job.createdAt || null,
+    updatedAt: job.updatedAt || null
+  };
+}
 
 const organizationEnrichSchema = z.object({
   query: z.string().max(200).optional(),
@@ -425,6 +555,23 @@ async function isAdminUser(userId) {
   const user = await User.findById(userId);
   if (!user) return false;
   return ADMIN_EMAILS.has(String(user.email || '').toLowerCase());
+}
+
+async function recordAuditLog(req, action, targetType, targetId, metadata = {}) {
+  try {
+    await AuditLog.create({
+      actorId: req.auth?.uid || null,
+      action,
+      targetType,
+      targetId,
+      metadata,
+      ip: req.ip,
+      ua: req.headers['user-agent'] || '',
+      ts: new Date()
+    });
+  } catch (err) {
+    console.error('Failed to record audit log', err);
+  }
 }
 
 const optionalMoney = z
@@ -703,6 +850,254 @@ app.put('/api/projects/:id', requireAuth, validateBody(projectUpdateSchema), asy
     res.status(500).json({ error: 'Unable to update project' });
   }
 });
+
+app.post(
+  '/api/projects/:id/files',
+  requireAuth,
+  fileRouteLimiter,
+  requireProjectOwnership('id'),
+  fileUpload.single('file'),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'File is required' });
+      }
+      if (!isAllowedFileType(req.file.mimetype)) {
+        return res.status(415).json({ error: 'Unsupported file type' });
+      }
+      const bucket = getGridFsBucket();
+      const uploadStream = bucket.openUploadStream(req.file.originalname, {
+        contentType: req.file.mimetype,
+        metadata: {
+          projectId: req.project._id.toString(),
+          ownerId: req.auth.uid
+        }
+      });
+      await new Promise((resolve, reject) => {
+        Readable.from(req.file.buffer)
+          .on('error', reject)
+          .pipe(uploadStream)
+          .on('error', reject)
+          .on('finish', resolve);
+      });
+      const storedFile = await bucket.find({ _id: uploadStream.id }).next();
+      if (!storedFile) {
+        return res.status(500).json({ error: 'File storage failed' });
+      }
+      const fileDoc = await File.create({
+        projectId: req.project._id,
+        ownerId: req.auth.uid,
+        storageId: storedFile._id,
+        filename: storedFile.filename,
+        length: storedFile.length,
+        chunkSize: storedFile.chunkSize,
+        uploadDate: storedFile.uploadDate,
+        md5: storedFile.md5,
+        mime: storedFile.contentType || req.file.mimetype,
+        status: 'pending'
+      });
+      res.status(201).json({ file: fileDoc.toJSON() });
+    } catch (err) {
+      console.error('File upload failed', err);
+      res.status(500).json({ error: 'Unable to upload file' });
+    }
+  }
+);
+
+app.get(
+  '/api/projects/:id/files',
+  requireAuth,
+  fileRouteLimiter,
+  requireProjectOwnership('id'),
+  async (req, res) => {
+    try {
+      const files = await File.find({ projectId: req.project._id }).sort({ createdAt: -1 });
+      res.json({ files: files.map(file => file.toJSON()) });
+    } catch (err) {
+      console.error('File list failed', err);
+      res.status(500).json({ error: 'Unable to list files' });
+    }
+  }
+);
+
+app.get('/api/files/:fileId/download', requireAuth, fileRouteLimiter, async (req, res) => {
+  try {
+    const { fileId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(fileId)) {
+      return res.status(400).json({ error: 'Invalid file id' });
+    }
+    const file = await File.findById(fileId);
+    if (!file) return res.status(404).json({ error: 'File not found' });
+    const isOwner = String(file.ownerId) === req.auth.uid;
+    const isAdmin = await isAdminUser(req.auth.uid);
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    if (file.status === 'quarantined') {
+      return res.status(423).json({ error: 'File is quarantined' });
+    }
+    const bucket = getGridFsBucket();
+    await recordAuditLog(req, 'file.download', 'File', fileId, { filename: file.filename });
+    res.setHeader('Content-Type', file.mime || 'application/octet-stream');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${encodeURIComponent(file.filename)}"`
+    );
+    const downloadStream = bucket.openDownloadStream(file.storageId);
+    downloadStream.on('error', err => {
+      console.error('File download stream error', err);
+      if (!res.headersSent) {
+        res.status(404).json({ error: 'File not found' });
+      } else {
+        res.end();
+      }
+    });
+    downloadStream.pipe(res);
+  } catch (err) {
+    console.error('File download failed', err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Unable to download file' });
+    }
+  }
+});
+
+app.delete('/api/files/:fileId', requireAuth, fileRouteLimiter, async (req, res) => {
+  try {
+    const { fileId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(fileId)) {
+      return res.status(400).json({ error: 'Invalid file id' });
+    }
+    const file = await File.findById(fileId);
+    if (!file) return res.status(404).json({ error: 'File not found' });
+    const isOwner = String(file.ownerId) === req.auth.uid;
+    const isAdmin = await isAdminUser(req.auth.uid);
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const bucket = getGridFsBucket();
+    try {
+      await bucket.delete(file.storageId);
+    } catch (err) {
+      console.error('Failed to delete GridFS file', err);
+    }
+    if (file.openaiVectorStoreId && file.openaiFileId) {
+      await detachFileFromVectorStore({
+        vectorStoreId: file.openaiVectorStoreId,
+        fileId: file.openaiFileId
+      });
+    }
+    if (file.openaiFileId) {
+      await deleteOpenAIFile(file.openaiFileId);
+    }
+    await File.deleteOne({ _id: file._id });
+    await recordAuditLog(req, 'file.delete', 'File', fileId, { filename: file.filename });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('File delete failed', err);
+    res.status(500).json({ error: 'Unable to delete file' });
+  }
+});
+
+app.post(
+  '/api/files/:fileId/scan',
+  requireAuth,
+  fileRouteLimiter,
+  validateBody(fileScanSchema),
+  async (req, res) => {
+    try {
+      if (!(await isAdminUser(req.auth.uid))) {
+        return res.status(403).json({ error: 'Admin required' });
+      }
+      const { fileId } = req.params;
+      if (!mongoose.Types.ObjectId.isValid(fileId)) {
+        return res.status(400).json({ error: 'Invalid file id' });
+      }
+      const file = await File.findById(fileId);
+      if (!file) return res.status(404).json({ error: 'File not found' });
+      file.status = req.validatedBody.status;
+      if (file.status === 'quarantined') {
+        file.quarantineReason = req.validatedBody.reason || null;
+        file.indexedAt = null;
+      } else {
+        file.quarantineReason = null;
+      }
+      await file.save();
+      res.json({ file: file.toJSON() });
+    } catch (err) {
+      console.error('File scan update failed', err);
+      res.status(500).json({ error: 'Unable to update file status' });
+    }
+  }
+);
+
+app.post(
+  '/api/projects/:id/rag/index',
+  requireAuth,
+  fileRouteLimiter,
+  requireProjectOwnership('id'),
+  validateBody(ragIndexSchema),
+  async (req, res) => {
+    try {
+      const { fileIds } = req.validatedBody;
+      const objectIds = fileIds.map(id => new mongoose.Types.ObjectId(id));
+      const query = {
+        _id: { $in: objectIds },
+        projectId: req.project._id
+      };
+      if (!(await isAdminUser(req.auth.uid))) {
+        query.ownerId = req.auth.uid;
+      }
+      const files = await File.find(query);
+      if (!files.length) {
+        return res.status(404).json({ error: 'Files not found for project' });
+      }
+      if (files.some(file => file.status !== 'clean')) {
+        return res.status(400).json({ error: 'Files must be marked clean before indexing' });
+      }
+
+      let vectorStoreId = req.project.ragVectorStoreId;
+      if (!vectorStoreId) {
+        vectorStoreId = await createVectorStore({ name: `project-${req.project._id}` });
+        if (!vectorStoreId) {
+          return res.status(502).json({ error: 'Unable to provision retrieval index' });
+        }
+        req.project.ragVectorStoreId = vectorStoreId;
+        await req.project.save();
+      }
+
+      const bucket = getGridFsBucket();
+      const updatedFiles = [];
+      for (const file of files) {
+        try {
+          const downloadStream = bucket.openDownloadStream(file.storageId);
+          const buffer = await streamToBuffer(downloadStream);
+          const remote = await uploadFileToOpenAI({
+            buffer,
+            filename: file.filename,
+            mime: file.mime
+          });
+          if (!remote?.id) {
+            throw new Error('OpenAI upload failed');
+          }
+          await attachFileToVectorStore({ vectorStoreId, fileId: remote.id });
+          file.openaiFileId = remote.id;
+          file.openaiVectorStoreId = vectorStoreId;
+          file.indexedAt = new Date();
+          await file.save();
+          updatedFiles.push(file.toJSON());
+        } catch (err) {
+          console.error('File indexing failed', err);
+          return res.status(502).json({ error: 'Unable to index files' });
+        }
+      }
+
+      res.json({ files: updatedFiles });
+    } catch (err) {
+      console.error('RAG indexing failed', err);
+      res.status(500).json({ error: 'Unable to index retrieval files' });
+    }
+  }
+);
 
 app.get(
   '/api/projects/:id/analytics/summary',
@@ -1199,6 +1594,10 @@ app.get('/api/rfp/:id/export', requireAuth, async (req, res) => {
       });
     }
 
+    await recordAuditLog(req, 'rfp.export', 'RfpDraft', draft._id.toString(), {
+      projectId: draft.projectId ? draft.projectId.toString() : null
+    });
+
     const buffer = createDocx({ title: titleText, sections });
     const filename = `rfp-${draft._id}.docx`;
     res.setHeader(
@@ -1616,6 +2015,38 @@ app.put('/api/assessments/:id/premium', requireAuth, validateBody(assessmentUpda
   }
 });
 
+app.post('/api/jobs', requireAuth, jobRouteLimiter, validateBody(jobCreateSchema), async (req, res) => {
+  try {
+    const { type, payload } = req.validatedBody;
+    const jobPayload = { ...(payload || {}), userId: req.auth.uid };
+    const job = await Job.create({ type, status: 'pending', payload: jobPayload, attempts: 0 });
+    res.status(202).json({ job: serializeJob(job) });
+  } catch (err) {
+    console.error('Job creation failed', err);
+    res.status(500).json({ error: 'Unable to create job' });
+  }
+});
+
+app.get('/api/jobs/:id', requireAuth, jobRouteLimiter, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid job id' });
+    }
+    const job = await Job.findById(id);
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    const ownerId = job.payload?.userId ? String(job.payload.userId) : null;
+    const isAdmin = await isAdminUser(req.auth.uid);
+    if (ownerId && ownerId !== req.auth.uid && !isAdmin) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    res.json({ job: serializeJob(job) });
+  } catch (err) {
+    console.error('Job fetch failed', err);
+    res.status(500).json({ error: 'Unable to load job' });
+  }
+});
+
 app.get('/api/reports/:id', requireAuth, async (req, res) => {
   try {
     const rep = await Report.findOne({ _id: req.params.id, userId: req.auth.uid });
@@ -1642,6 +2073,11 @@ app.get('/api/reports/:id/export', requireAuth, async (req, res) => {
     if (!tierAllowsStrategic(info.tier)) {
       return res.status(403).json({ error: 'Upgrade required' });
     }
+
+    await recordAuditLog(req, 'report.export', 'Report', report._id.toString(), {
+      stage: report.stage,
+      projectId: report.projectId ? report.projectId.toString() : null
+    });
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Assessment Summary');
@@ -1937,6 +2373,119 @@ app.post(
     }
   }
 );
+
+const JOB_WORKER_INTERVAL_MS = parseInt(process.env.JOB_WORKER_INTERVAL_MS || '10000', 10);
+const JOB_WORKER_CONCURRENCY = Math.min(
+  Math.max(parseInt(process.env.JOB_WORKER_CONCURRENCY || '1', 10) || 1, 1),
+  2
+);
+const JOB_MAX_ATTEMPTS = parseInt(process.env.JOB_MAX_ATTEMPTS || '3', 10);
+const WORKER_ID = `worker-${process.pid}`;
+let activeJobCount = 0;
+
+async function processPersonaBriefsJob(job) {
+  const { assessmentId, reportId, userId } = job.payload || {};
+  if (!assessmentId) throw new Error('assessmentId is required');
+  const query = { _id: assessmentId };
+  if (userId) query.userId = userId;
+  const assessment = await Assessment.findOne(query);
+  if (!assessment) throw new Error('Assessment not found');
+  const reportData = await computeReport({ assessment });
+  if (reportId) {
+    await Report.findOneAndUpdate(
+      { _id: reportId, userId: userId || assessment.userId },
+      { personaBriefings: reportData.personaBriefings },
+      { new: false }
+    );
+  }
+  return { personaBriefings: reportData.personaBriefings || [] };
+}
+
+async function processExecNarrativeJob(job) {
+  const { reportId, assessmentId, userId } = job.payload || {};
+  let report = null;
+  if (reportId) {
+    const reportQuery = { _id: reportId };
+    if (userId) reportQuery.userId = userId;
+    report = await Report.findOne(reportQuery);
+  }
+  let assessment;
+  if (report) {
+    assessment = await Assessment.findById(report.assessmentId);
+  } else if (assessmentId) {
+    const query = { _id: assessmentId };
+    if (userId) query.userId = userId;
+    assessment = await Assessment.findOne(query);
+  }
+  if (!assessment) throw new Error('Assessment not found');
+  const reportData = await computeReport({ assessment });
+  if (report) {
+    report.aiNarrative = reportData.aiNarrative;
+    report.evidence = reportData.evidence || report.evidence;
+    await report.save();
+  }
+  return { aiNarrative: reportData.aiNarrative || {} };
+}
+
+async function runJob(job) {
+  switch (job.type) {
+    case 'persona-briefs':
+      return processPersonaBriefsJob(job);
+    case 'exec-narrative':
+      return processExecNarrativeJob(job);
+    default:
+      throw new Error(`Unsupported job type: ${job.type}`);
+  }
+}
+
+async function runJobWorkerTick() {
+  if (activeJobCount >= JOB_WORKER_CONCURRENCY) return;
+  const job = await Job.findOneAndUpdate(
+    { status: 'pending' },
+    { $set: { status: 'running', workerId: WORKER_ID }, $inc: { attempts: 1 } },
+    { sort: { createdAt: 1 }, new: true }
+  );
+  if (!job) return;
+  activeJobCount += 1;
+  try {
+    const result = await runJob(job);
+    await Job.findByIdAndUpdate(job._id, {
+      status: 'done',
+      result,
+      workerId: WORKER_ID,
+      error: null
+    });
+  } catch (err) {
+    console.error('Job execution failed', err);
+    const attempts = job.attempts || 0;
+    const status = attempts >= JOB_MAX_ATTEMPTS ? 'error' : 'pending';
+    await Job.findByIdAndUpdate(job._id, {
+      status,
+      error: err.message || 'Job failed',
+      workerId: WORKER_ID
+    });
+  } finally {
+    activeJobCount -= 1;
+  }
+}
+
+if (String(process.env.RUN_WORKER || '').toLowerCase() === 'true') {
+  setInterval(runJobWorkerTick, JOB_WORKER_INTERVAL_MS);
+  runJobWorkerTick();
+}
+
+app.use((err, req, res, next) => {
+  if (err && err.code === 'EBADCSRFTOKEN') {
+    return res.status(403).json({ error: 'Invalid CSRF token' });
+  }
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'File too large' });
+    }
+    return res.status(400).json({ error: 'File upload error', details: err.message });
+  }
+  return next(err);
+});
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
 app.use(express.static(PUBLIC_DIR));

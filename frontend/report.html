@@ -29,6 +29,9 @@
           <button class="nav-link active" data-tab-target="overview">Overview</button>
         </li>
         <li class="nav-item">
+          <button class="nav-link" data-tab-target="evidence">Evidence</button>
+        </li>
+        <li class="nav-item">
           <button class="nav-link" data-tab-target="vendors">Vendors</button>
         </li>
         <li class="nav-item">
@@ -96,7 +99,7 @@
         </section>
 
         <section class="card glass p-4 mb-4">
-          <h5 class="section-heading mb-3">Technology</h5>
+          <h5 class="section-heading mb-3" id="technologyHeading">Technology</h5>
         <div class="row g-4">
           <div class="col-lg-6">
             <div class="summary-panel h-100">
@@ -239,6 +242,22 @@
         </section>
       </div>
 
+      <div class="tab-panel d-none" data-tab="evidence">
+        <section class="card glass p-4 mb-4">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <h5 class="section-heading mb-1">Evidence</h5>
+              <p class="text-fg-3 small mb-0">Supporting snippets sourced from your indexed project files.</p>
+            </div>
+            <div class="text-fg-3 small" id="evidenceMeta"></div>
+          </div>
+          <div id="evidenceEmpty" class="text-fg-3 small">No evidence captured yet.</div>
+          <div id="evidenceList" class="d-none">
+            <div class="d-flex flex-column gap-3" id="evidenceEntries"></div>
+          </div>
+        </section>
+      </div>
+
       <div class="tab-panel d-none" data-tab="vendors">
         <section class="card glass p-4 mb-4">
           <div class="d-flex justify-content-between align-items-center mb-3">
@@ -300,6 +319,7 @@
     </div>
   </div>
 
+  <script src="/js/csrf.js"></script>
   <script>
     const params = new URLSearchParams(location.search);
     const reportId = params.get('id');
@@ -313,8 +333,27 @@
     const exportRfpBtn = document.getElementById('exportRfp');
     const unlockBtn = document.getElementById('unlock');
     const premiumIntake = document.getElementById('premiumIntake');
+    const technologyHeading = document.getElementById('technologyHeading');
     const tabButtons = document.querySelectorAll('#reportTabs [data-tab-target]');
     const tabPanels = document.querySelectorAll('.tab-panel');
+
+    const activateTab = target => {
+      tabButtons.forEach(btn => {
+        const isActive = btn.dataset.tabTarget === target;
+        btn.classList.toggle('active', isActive);
+      });
+      tabPanels.forEach(panel => {
+        const isActive = panel.dataset.tab === target;
+        panel.classList.toggle('d-none', !isActive);
+      });
+    };
+
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', event => {
+        event.preventDefault();
+        activateTab(btn.dataset.tabTarget);
+      });
+    });
 
     let currentRfpDraftId = null;
     const tierLabels = {
@@ -322,6 +361,8 @@
       strategic: 'Strategic',
       command: 'Command'
     };
+
+    let evidenceFootnoteNumbers = new Map();
 
     if (unlockBtn) {
       unlockBtn.addEventListener('click', () => handleUnlock());
@@ -965,6 +1006,144 @@
       renderValueDrivers('overviewMetrics', metrics);
     };
 
+    const evidenceSectionLabels = {
+      strategicIntelligence: 'Strategic intelligence',
+      commandBlueprint: 'Command blueprint'
+    };
+
+    const makeEvidenceKey = entry => {
+      if (!entry) return '';
+      const snippet = (entry.text || '').slice(0, 120);
+      return `${entry.section || ''}|${entry.fileId || ''}|${entry.page ?? ''}|${snippet}`;
+    };
+
+    const attachFootnoteMarkers = (element, entries) => {
+      if (!element) return;
+      element.querySelectorAll('.footnote-marker').forEach(marker => marker.remove());
+      if (!entries.length) return;
+      const numbers = entries
+        .map(item => evidenceFootnoteNumbers.get(makeEvidenceKey(item)))
+        .filter(num => typeof num === 'number');
+      const uniqueNumbers = Array.from(new Set(numbers)).sort((a, b) => a - b);
+      if (!uniqueNumbers.length) return;
+      const sup = document.createElement('sup');
+      sup.className = 'footnote-marker ms-1 text-primary';
+      sup.textContent = uniqueNumbers.map(num => `[${num}]`).join(' ');
+      sup.setAttribute('aria-label', `Supporting evidence ${uniqueNumbers.join(', ')}`);
+      element.appendChild(sup);
+    };
+
+    const applyEvidenceFootnotes = (entries = []) => {
+      const strategicEntries = entries.filter(item => item.section === 'strategicIntelligence');
+      const commandEntries = entries.filter(item => item.section === 'commandBlueprint');
+      const summaryEl = document.getElementById('reportSummary');
+      attachFootnoteMarkers(summaryEl, strategicEntries);
+      attachFootnoteMarkers(technologyHeading, commandEntries);
+    };
+
+    const renderEvidenceEntries = (entries = []) => {
+      const emptyEl = document.getElementById('evidenceEmpty');
+      const listWrap = document.getElementById('evidenceList');
+      const container = document.getElementById('evidenceEntries');
+      const metaEl = document.getElementById('evidenceMeta');
+      if (!emptyEl || !listWrap || !container) return;
+
+      const records = Array.isArray(entries) ? entries.filter(Boolean) : [];
+      evidenceFootnoteNumbers = new Map();
+      container.innerHTML = '';
+
+      if (!records.length) {
+        emptyEl.textContent = 'No evidence captured yet.';
+        emptyEl.classList.remove('d-none');
+        listWrap.classList.add('d-none');
+        if (metaEl) metaEl.textContent = '';
+        applyEvidenceFootnotes([]);
+        return;
+      }
+
+      emptyEl.classList.add('d-none');
+      listWrap.classList.remove('d-none');
+
+      const uniqueFiles = new Set();
+      records.forEach(record => {
+        if (record.fileId) {
+          uniqueFiles.add(record.fileId);
+        }
+        const key = makeEvidenceKey(record);
+        if (!evidenceFootnoteNumbers.has(key)) {
+          evidenceFootnoteNumbers.set(key, evidenceFootnoteNumbers.size + 1);
+        }
+        const number = evidenceFootnoteNumbers.get(key);
+        const entryEl = document.createElement('div');
+        entryEl.className = 'summary-panel';
+
+        const header = document.createElement('div');
+        header.className = 'd-flex justify-content-between align-items-start gap-3 mb-2';
+
+        const headingWrap = document.createElement('div');
+        headingWrap.className = 'd-flex flex-column';
+        const label = document.createElement('div');
+        label.className = 'small text-fg-3 fw-semibold';
+        const sectionLabel = evidenceSectionLabels[record.section] || 'Evidence';
+        label.textContent = `[${number}] ${sectionLabel}`;
+        headingWrap.appendChild(label);
+        header.appendChild(headingWrap);
+
+        const metaBox = document.createElement('div');
+        metaBox.className = 'text-end small text-fg-3';
+        if (record.filename) {
+          const nameLine = document.createElement('div');
+          nameLine.textContent = record.filename;
+          metaBox.appendChild(nameLine);
+        }
+        if (record.page !== null && record.page !== undefined) {
+          const pageLine = document.createElement('div');
+          pageLine.textContent = `Page ${record.page}`;
+          metaBox.appendChild(pageLine);
+        }
+        if (typeof record.score === 'number') {
+          const scoreLine = document.createElement('div');
+          scoreLine.textContent = `Score ${record.score.toFixed(2)}`;
+          metaBox.appendChild(scoreLine);
+        }
+        if (record.fileId) {
+          const link = document.createElement('a');
+          link.className = 'btn btn-sm btn-outline-light mt-2';
+          link.href = `/api/files/${encodeURIComponent(record.fileId)}/download`;
+          link.target = '_blank';
+          link.rel = 'noopener';
+          link.textContent = 'Download file';
+          metaBox.appendChild(link);
+        }
+        header.appendChild(metaBox);
+        entryEl.appendChild(header);
+
+        const snippet = document.createElement('p');
+        snippet.className = 'mb-0';
+        snippet.textContent = record.text || '—';
+        entryEl.appendChild(snippet);
+
+        if (record.query) {
+          const queryLine = document.createElement('div');
+          queryLine.className = 'small text-fg-3 mt-2';
+          queryLine.textContent = `Query: ${record.query}`;
+          entryEl.appendChild(queryLine);
+        }
+
+        container.appendChild(entryEl);
+      });
+
+      if (metaEl) {
+        const fileCount = uniqueFiles.size;
+        const snippetCount = records.length;
+        const snippetLabel = snippetCount === 1 ? 'snippet' : 'snippets';
+        const fileLabel = fileCount === 1 ? 'file' : 'files';
+        metaEl.textContent = `${snippetCount} ${snippetLabel} · ${fileCount} ${fileLabel}`;
+      }
+
+      applyEvidenceFootnotes(records);
+    };
+
     const renderReport = (report) => {
       const overview = report.structuredSections?.overview || {};
       const technology = report.structuredSections?.technology || {};
@@ -1018,6 +1197,7 @@
 
       renderValuePath(report.valuePath || []);
       renderCoverage(report.coverageSummary || {});
+      renderEvidenceEntries(report.evidence || []);
     };
 
     const loadVendorData = async report => {
@@ -1225,20 +1405,3 @@
   </script>
 </body>
 </html>
-    const activateTab = target => {
-      tabButtons.forEach(btn => {
-        const isActive = btn.dataset.tabTarget === target;
-        btn.classList.toggle('active', isActive);
-      });
-      tabPanels.forEach(panel => {
-        const isActive = panel.dataset.tab === target;
-        panel.classList.toggle('d-none', !isActive);
-      });
-    };
-
-    tabButtons.forEach(btn => {
-      btn.addEventListener('click', event => {
-        event.preventDefault();
-        activateTab(btn.dataset.tabTarget);
-      });
-    });

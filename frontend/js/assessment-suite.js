@@ -45,6 +45,18 @@ const projectSummaryInsight = document.getElementById('projectSummaryInsight');
 const projectReadinessScore = document.getElementById('projectReadinessScore');
 const projectClarityScore = document.getElementById('projectClarityScore');
 const projectSentiment = document.getElementById('projectSentiment');
+const projectDetailTabs = document.getElementById('projectDetailTabs');
+const projectDetailTabButtons = projectDetailTabs ? projectDetailTabs.querySelectorAll('[data-tab-target]') : [];
+const projectDetailPanels = document.querySelectorAll('.project-tab-panel');
+const projectSummaryEmpty = document.getElementById('projectSummaryEmpty');
+const projectSummaryContent = document.getElementById('projectSummaryContent');
+const projectSummaryList = document.getElementById('projectSummaryList');
+const projectSummaryPersonas = document.getElementById('projectSummaryPersonas');
+const projectFilesEmpty = document.getElementById('projectFilesEmpty');
+const projectFilesTableWrap = document.getElementById('projectFilesTableWrap');
+const projectFilesTable = document.getElementById('projectFilesTable');
+const projectFileForm = document.getElementById('projectFileForm');
+const projectFileInput = document.getElementById('projectFileInput');
 const projectIndustrySelect = document.getElementById('projectIndustry');
 const projectRegionTiles = document.getElementById('projectRegionTiles');
 const projectSizeTiles = document.getElementById('projectSizeTiles');
@@ -150,6 +162,23 @@ function formatNumber(value) {
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
   return Math.round(value).toString();
+}
+
+function formatFileSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes < 0) return '--';
+  if (bytes === 0) return '0 bytes';
+  const units = ['bytes', 'KB', 'MB', 'GB'];
+  let size = bytes;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  if (unitIndex === 0) {
+    return `${Math.round(size)} ${units[unitIndex]}`;
+  }
+  const precision = size >= 10 ? 1 : 2;
+  return `${size.toFixed(precision)} ${units[unitIndex]}`;
 }
 
 function computeYoYPercent(series = []) {
@@ -1105,6 +1134,352 @@ function applyProjectContext(project) {
   updateProjectWizardInsights();
 }
 
+function setProjectDetailTab(panelId) {
+  if (!panelId) return;
+  activeProjectDetailPanel = panelId;
+  projectDetailTabButtons?.forEach?.(btn => {
+    const target = btn.dataset.tabTarget;
+    const isActive = target === panelId;
+    btn.classList.toggle('active', isActive);
+    if (isActive) {
+      btn.setAttribute('aria-pressed', 'true');
+    } else {
+      btn.removeAttribute('aria-pressed');
+    }
+  });
+  projectDetailPanels.forEach(panel => {
+    panel.classList.toggle('d-none', panel.id !== panelId);
+  });
+}
+
+function renderProjectSummary(project) {
+  if (!projectSummaryEmpty || !projectSummaryContent || !projectSummaryList) return;
+  if (!project) {
+    projectSummaryEmpty.textContent = 'Create or select a project to see its summary.';
+    projectSummaryEmpty.classList.remove('d-none');
+    projectSummaryContent.classList.add('d-none');
+    if (projectSummaryPersonas) projectSummaryPersonas.innerHTML = '';
+    return;
+  }
+
+  const summaryItems = [];
+  if (project.industry) summaryItems.push({ label: 'Industry', value: project.industry });
+  if (project.region) summaryItems.push({ label: 'Region', value: project.region });
+  if (project.companyDomain) summaryItems.push({ label: 'Domain', value: project.companyDomain });
+  if (project.companySize) summaryItems.push({ label: 'Company size', value: project.companySize });
+  if (project.stage || project.analytics?.stage) {
+    summaryItems.push({ label: 'Transformation stage', value: project.stage || project.analytics?.stage });
+  }
+  if (project.riskAppetite || project.analytics?.riskAppetite) {
+    summaryItems.push({ label: 'Risk appetite', value: project.riskAppetite || project.analytics?.riskAppetite });
+  }
+  if (Array.isArray(project.capabilityFocus) && project.capabilityFocus.length) {
+    summaryItems.push({ label: 'Focus domains', value: project.capabilityFocus.join(', ') });
+  }
+  if (Array.isArray(project.strategicDrivers) && project.strategicDrivers.length) {
+    summaryItems.push({ label: 'Strategic drivers', value: project.strategicDrivers.join(', ') });
+  }
+  if (Number.isFinite(project.headcount) && project.headcount > 0) {
+    summaryItems.push({ label: 'Headcount', value: formatNumber(project.headcount) });
+  } else if (Number.isFinite(project.companyProfile?.headcount) && project.companyProfile.headcount > 0) {
+    summaryItems.push({ label: 'Headcount', value: formatNumber(project.companyProfile.headcount) });
+  }
+  const revenue = project.companyProfile?.annualRevenue;
+  if (Number.isFinite(revenue) && revenue > 0) {
+    summaryItems.push({ label: 'Annual revenue', value: formatCurrency(revenue) });
+  }
+
+  projectSummaryList.innerHTML = '';
+  summaryItems.forEach(item => {
+    const dt = document.createElement('dt');
+    dt.className = 'col-sm-5 text-fg-3 small';
+    dt.textContent = item.label;
+    const dd = document.createElement('dd');
+    dd.className = 'col-sm-7 fw-semibold';
+    dd.textContent = item.value;
+    projectSummaryList.appendChild(dt);
+    projectSummaryList.appendChild(dd);
+  });
+
+  if (projectSummaryPersonas) {
+    projectSummaryPersonas.innerHTML = '';
+    const personaNames = Array.isArray(project.personas)
+      ? project.personas
+          .map(persona => {
+            if (!persona) return null;
+            if (typeof persona === 'string') return persona;
+            return persona.title || persona.name || null;
+          })
+          .filter(Boolean)
+      : [];
+    if (personaNames.length) {
+      personaNames.forEach(name => {
+        const badge = document.createElement('span');
+        badge.className = 'badge-soft';
+        badge.textContent = name;
+        projectSummaryPersonas.appendChild(badge);
+      });
+    } else {
+      const empty = document.createElement('div');
+      empty.className = 'text-fg-3 small';
+      empty.textContent = 'Add personas in the project wizard to brief stakeholders.';
+      projectSummaryPersonas.appendChild(empty);
+    }
+  }
+
+  if (!summaryItems.length && (!projectSummaryPersonas || projectSummaryPersonas.childElementCount === 0)) {
+    projectSummaryEmpty.textContent = 'Populate project foundations to unlock this summary.';
+    projectSummaryEmpty.classList.remove('d-none');
+    projectSummaryContent.classList.add('d-none');
+  } else {
+    projectSummaryEmpty.classList.add('d-none');
+    projectSummaryContent.classList.remove('d-none');
+  }
+}
+
+function renderProjectFiles() {
+  if (!projectFilesEmpty || !projectFilesTableWrap || !projectFilesTable) return;
+  const hasProject = Boolean(activeProject);
+  if (projectFileForm) {
+    projectFileForm.classList.toggle('d-none', !hasProject);
+  }
+  if (projectFileInput) {
+    projectFileInput.disabled = !hasProject;
+    if (!hasProject) {
+      projectFileInput.value = '';
+    }
+  }
+  const projectFileSubmit = projectFileForm ? projectFileForm.querySelector('button[type="submit"]') : null;
+  if (projectFileSubmit) {
+    projectFileSubmit.disabled = !hasProject || projectFileSubmit.dataset.loading === 'true';
+  }
+
+  if (!hasProject) {
+    projectFilesEmpty.textContent = 'Select a project to manage evidence files.';
+    projectFilesEmpty.classList.remove('d-none');
+    projectFilesTableWrap.classList.add('d-none');
+    projectFilesTable.innerHTML = '';
+    return;
+  }
+
+  if (projectFilesLoading) {
+    projectFilesEmpty.textContent = 'Loading project files…';
+    projectFilesEmpty.classList.remove('d-none');
+    projectFilesTableWrap.classList.add('d-none');
+    projectFilesTable.innerHTML = '';
+    return;
+  }
+
+  if (projectFilesError) {
+    projectFilesEmpty.textContent = projectFilesError;
+    projectFilesEmpty.classList.remove('d-none');
+    projectFilesTableWrap.classList.add('d-none');
+    projectFilesTable.innerHTML = '';
+    return;
+  }
+
+  if (!projectFiles.length) {
+    projectFilesEmpty.textContent = 'No evidence uploaded yet. Add files to unlock retrieval-assisted insights.';
+    projectFilesEmpty.classList.remove('d-none');
+    projectFilesTableWrap.classList.add('d-none');
+    projectFilesTable.innerHTML = '';
+    return;
+  }
+
+  projectFilesEmpty.classList.add('d-none');
+  projectFilesTableWrap.classList.remove('d-none');
+  projectFilesTable.innerHTML = '';
+
+  const statusLabels = {
+    pending: 'Pending scan',
+    clean: 'Ready',
+    quarantined: 'Quarantined'
+  };
+
+  projectFiles.forEach(file => {
+    const row = document.createElement('tr');
+
+    const nameCell = document.createElement('td');
+    const name = document.createElement('div');
+    name.className = 'fw-semibold';
+    name.textContent = file.filename || 'Unnamed file';
+    const meta = document.createElement('div');
+    meta.className = 'small text-fg-3';
+    const sizeText = formatFileSize(file.length);
+    const mime = file.mime || 'application/octet-stream';
+    meta.textContent = `${sizeText} · ${mime}`;
+    nameCell.appendChild(name);
+    nameCell.appendChild(meta);
+    row.appendChild(nameCell);
+
+    const statusCell = document.createElement('td');
+    statusCell.textContent = statusLabels[file.status] || file.status || 'Unknown';
+    if (file.status === 'quarantined' && file.quarantineReason) {
+      const reason = document.createElement('div');
+      reason.className = 'small text-fg-3';
+      reason.textContent = file.quarantineReason;
+      statusCell.appendChild(reason);
+    }
+    row.appendChild(statusCell);
+
+    const indexedCell = document.createElement('td');
+    if (file.openaiFileId) {
+      const indexedAt = file.indexedAt ? new Date(file.indexedAt) : null;
+      indexedCell.textContent = indexedAt ? `Indexed ${indexedAt.toLocaleString()}` : 'Indexed';
+    } else {
+      indexedCell.textContent = 'Not indexed';
+    }
+    row.appendChild(indexedCell);
+
+    const uploadedCell = document.createElement('td');
+    const uploadedAt = file.uploadDate ? new Date(file.uploadDate) : null;
+    uploadedCell.textContent = uploadedAt ? uploadedAt.toLocaleString() : '--';
+    row.appendChild(uploadedCell);
+
+    const actionsCell = document.createElement('td');
+    actionsCell.className = 'text-end';
+    const actions = document.createElement('div');
+    actions.className = 'd-flex flex-column align-items-end gap-2';
+
+    if (file.status !== 'quarantined' && file.id) {
+      const download = document.createElement('a');
+      download.className = 'btn btn-sm btn-outline-light';
+      download.href = `/api/files/${encodeURIComponent(file.id)}/download`;
+      download.textContent = 'Download';
+      download.target = '_blank';
+      download.rel = 'noopener';
+      actions.appendChild(download);
+    } else if (file.id) {
+      const unavailable = document.createElement('div');
+      unavailable.className = 'small text-fg-3';
+      unavailable.textContent = 'Download blocked while quarantined.';
+      actions.appendChild(unavailable);
+    }
+
+    if (file.status === 'clean' && !file.openaiFileId && file.id) {
+      const indexBtn = document.createElement('button');
+      indexBtn.type = 'button';
+      indexBtn.className = 'btn btn-sm btn-primary';
+      indexBtn.dataset.indexFile = file.id;
+      const indexing = indexingFileIds.has(file.id);
+      if (indexing) {
+        indexBtn.disabled = true;
+        indexBtn.textContent = 'Indexing…';
+      } else {
+        indexBtn.textContent = 'Index to retrieval';
+      }
+      actions.appendChild(indexBtn);
+    } else if (file.openaiFileId) {
+      const indexedNote = document.createElement('div');
+      indexedNote.className = 'small text-fg-3';
+      indexedNote.textContent = 'Synced to retrieval index';
+      actions.appendChild(indexedNote);
+    }
+
+    actionsCell.appendChild(actions);
+    row.appendChild(actionsCell);
+
+    projectFilesTable.appendChild(row);
+  });
+
+  projectFilesTable.querySelectorAll('button[data-index-file]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const fileId = btn.dataset.indexFile;
+      if (!fileId) return;
+      indexProjectFiles([fileId]);
+    });
+  });
+}
+
+async function loadProjectFiles(project) {
+  projectFilesRequestId += 1;
+  const requestId = projectFilesRequestId;
+  if (!project) {
+    projectFiles = [];
+    projectFilesLoading = false;
+    projectFilesError = null;
+    renderProjectFiles();
+    return;
+  }
+
+  projectFilesLoading = true;
+  projectFilesError = null;
+  renderProjectFiles();
+
+  try {
+    const res = await fetch(`/api/projects/${project.id}/files`, { credentials: 'include' });
+    let json = {};
+    try {
+      json = await res.json();
+    } catch (err) {
+      json = {};
+    }
+    if (requestId !== projectFilesRequestId) return;
+    if (res.status === 401) {
+      projectFilesError = 'Sign in again to load files.';
+      projectFiles = [];
+      return;
+    }
+    if (res.status === 403) {
+      projectFilesError = 'You do not have permission to view these files.';
+      projectFiles = [];
+      return;
+    }
+    if (!res.ok) {
+      throw new Error(json.error || 'Unable to load files');
+    }
+    projectFiles = Array.isArray(json.files) ? json.files : [];
+  } catch (err) {
+    console.error(err);
+    if (requestId === projectFilesRequestId) {
+      projectFilesError = 'Unable to load files right now. Please try again later.';
+      projectFiles = [];
+    }
+  } finally {
+    if (requestId === projectFilesRequestId) {
+      projectFilesLoading = false;
+      renderProjectFiles();
+    }
+  }
+}
+
+async function indexProjectFiles(fileIds = []) {
+  if (!activeProject || !Array.isArray(fileIds) || fileIds.length === 0) {
+    return;
+  }
+  fileIds.forEach(id => indexingFileIds.add(id));
+  renderProjectFiles();
+
+  try {
+    const res = await fetch(`/api/projects/${activeProject.id}/rag/index`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileIds })
+    });
+    let json = {};
+    try {
+      json = await res.json();
+    } catch (err) {
+      json = {};
+    }
+    if (!res.ok) {
+      throw new Error(json.error || 'Unable to index files');
+    }
+    if (Array.isArray(json.files)) {
+      projectFiles = projectFiles.map(file => {
+        const updated = json.files.find(entry => entry.id === file.id);
+        return updated ? { ...file, ...updated } : file;
+      });
+    }
+  } catch (err) {
+    console.error(err);
+    alert(err.message || 'Unable to index files right now. Try again later.');
+  } finally {
+    fileIds.forEach(id => indexingFileIds.delete(id));
+    renderProjectFiles();
+  }
+}
+
 function setActiveProject(projectOrId) {
   let project = projectOrId;
   if (!project && typeof projectOrId === 'string') {
@@ -1114,6 +1489,11 @@ function setActiveProject(projectOrId) {
     activeProject = null;
     updateProjectAnalyticsPreview(null);
     showAnalyticsMessage('Select a project to load analytics.');
+    renderProjectSummary(null);
+    projectFiles = [];
+    projectFilesError = null;
+    projectFilesLoading = false;
+    renderProjectFiles();
     return;
   }
   activeProject = project;
@@ -1122,7 +1502,14 @@ function setActiveProject(projectOrId) {
   }
   updateProjectAnalyticsPreview(project);
   applyProjectContext(project);
+  renderProjectSummary(project);
+  projectFiles = [];
+  projectFilesError = null;
+  projectFilesLoading = true;
+  renderProjectFiles();
   loadProjectAnalytics(project);
+  loadProjectFiles(project);
+  setProjectDetailTab(activeProjectDetailPanel || 'projectSummaryPanel');
 }
 
 async function loadProjects() {
@@ -1238,6 +1625,9 @@ let pulseTimeout = null;
 let pulseLocked = false;
 let me = null;
 let projects = [];
+let projectFiles = [];
+let projectFilesLoading = false;
+let projectFilesError = null;
 let activeProject = null;
 let projectWizardStep = 1;
 let strategicDriverSelection = new Set();
@@ -1245,6 +1635,10 @@ let selectedPersonaIds = new Set();
 let projectCapabilitySelection = new Set();
 let projectDriverSelection = new Set();
 let analyticsAbortController = null;
+let activeProjectDetailPanel = 'projectSummaryPanel';
+let projectFilesRequestId = 0;
+
+const indexingFileIds = new Set();
 
 let strategicDriverGroup;
 let personaGroup;
@@ -1694,6 +2088,16 @@ if (projectSelect) {
   });
 }
 
+if (projectDetailTabButtons.length) {
+  projectDetailTabButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.tabTarget || 'projectSummaryPanel';
+      setProjectDetailTab(target);
+    });
+  });
+  setProjectDetailTab(activeProjectDetailPanel || 'projectSummaryPanel');
+}
+
 if (launchProjectWizardBtn) {
   launchProjectWizardBtn.addEventListener('click', () => openProjectWizard({ startAt: 1 }));
 }
@@ -1722,6 +2126,72 @@ if (projectSkipBtn) {
       closeProjectWizard(true);
     } else {
       alert('Capture the project foundations to continue.');
+    }
+  });
+}
+
+if (projectFileForm) {
+  projectFileForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!activeProject) {
+      alert('Select a project before uploading evidence.');
+      return;
+    }
+    if (!projectFileInput || !projectFileInput.files || !projectFileInput.files.length) {
+      alert('Choose a file to upload.');
+      return;
+    }
+    const submitBtn = projectFileForm.querySelector('button[type="submit"]');
+    const file = projectFileInput.files[0];
+    const formData = new FormData();
+    formData.append('file', file);
+    projectFilesError = null;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.dataset.loading = 'true';
+      submitBtn.textContent = 'Uploading…';
+    }
+    if (projectFileInput) {
+      projectFileInput.disabled = true;
+    }
+    try {
+      const res = await fetch(`/api/projects/${activeProject.id}/files`, {
+        method: 'POST',
+        body: formData
+      });
+      let json = {};
+      try {
+        json = await res.json();
+      } catch (err) {
+        json = {};
+      }
+      if (res.status === 415) {
+        throw new Error(json.error || 'Unsupported file type.');
+      }
+      if (res.status === 413) {
+        throw new Error(json.error || 'File exceeds maximum size.');
+      }
+      if (!res.ok) {
+        throw new Error(json.error || 'Unable to upload file.');
+      }
+      if (json.file) {
+        projectFiles = [json.file, ...projectFiles];
+        projectFilesError = null;
+        projectFileInput.value = '';
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Unable to upload file.');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = !activeProject;
+        submitBtn.dataset.loading = 'false';
+        submitBtn.textContent = 'Upload file';
+      }
+      if (projectFileInput) {
+        projectFileInput.disabled = !activeProject;
+      }
+      renderProjectFiles();
     }
   });
 }
