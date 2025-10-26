@@ -63,6 +63,7 @@ const authLimiter = rateLimit({ ...limiterDefaults, max: 30 });
 const projectLimiter = rateLimit({ ...limiterDefaults, max: 200 });
 const assessmentLimiter = rateLimit({ ...limiterDefaults, max: 120 });
 const analyticsLimiter = rateLimit({ ...limiterDefaults, max: 60 });
+const vendorSearchLimiter = rateLimit({ ...limiterDefaults, max: 40 });
 
 app.use('/api/auth', authLimiter);
 app.use('/api/projects', projectLimiter);
@@ -86,12 +87,16 @@ const Report = require('./models/Report');
 const Payment = require('./models/Payment');
 const BusinessMetric = require('./models/BusinessMetric');
 const Initiative = require('./models/Initiative');
+const Vendor = require('./models/Vendor');
+const RfpTemplate = require('./models/RfpTemplate');
+const RfpDraft = require('./models/RfpDraft');
 
 const { requireAuth, issueTokenCookie, clearTokenCookie } = require('./middleware/auth');
 const { requireProjectOwnership } = require('./middleware/project');
 const { validateBody } = require('./middleware/validation');
 const { computeReport } = require('./utils/scoring');
 const { computeProjectAnalyticsSnapshot } = require('./utils/analytics');
+const { createDocx } = require('./utils/docx');
 const {
   recordMaturityTimepoint,
   queueProjectAnalyticsRecompute,
@@ -111,8 +116,10 @@ const {
   fetchOrganizationIntel,
   searchOrganizationProfiles,
   generateFollowUpPrompts,
-  generateAssessmentAssistantReply
+  generateAssessmentAssistantReply,
+  generateRfpDraft
 } = require('./utils/openai');
+const { vendorMatch } = require('./utils/llm-tools');
 
 const signupSchema = z.object({
   name: z.string().trim().max(120).optional(),
@@ -202,6 +209,82 @@ const followUpSchema = z.object({
   answers: z.record(z.any()).optional(),
   organization: z.record(z.any()).optional(),
   industry: z.string().optional()
+});
+
+const vendorSearchSchema = z.object({
+  projectId: z.string(),
+  capability: z.string().trim().max(160).optional(),
+  query: z.string().trim().max(200).optional(),
+  categories: z.array(z.string().trim()).max(10).optional(),
+  strengths: z.array(z.string().trim()).max(10).optional(),
+  constraints: z
+    .object({
+      pricing: z.string().trim().max(160).optional(),
+      integrationNeeds: z.array(z.string().trim()).max(10).optional(),
+      avoidTerms: z.array(z.string().trim()).max(10).optional()
+    })
+    .optional()
+});
+
+const rfpPhaseSchema = z.object({
+  name: z.string().trim().min(1),
+  durationWeeks: z.number().int().positive().max(52).optional(),
+  activities: z.array(z.string().trim()).max(12).optional()
+});
+
+const rfpMaterializeSchema = z.object({
+  projectId: z.string(),
+  templateId: z.string().optional(),
+  templateSlug: z.string().optional(),
+  capability: z.string().trim().max(160).optional(),
+  industry: z.string().trim().max(160).optional(),
+  criteria: z
+    .array(
+      z.object({
+        title: z.string().trim().min(1),
+        weight: z.number().min(0).max(100).optional(),
+        description: z.string().trim().max(500).optional()
+      })
+    )
+    .max(20)
+    .optional(),
+  sections: z
+    .array(
+      z.object({
+        title: z.string().trim().min(1),
+        prompts: z.array(z.string().trim()).max(10).optional(),
+        guidance: z.string().trim().max(500).optional()
+      })
+    )
+    .max(12)
+    .optional(),
+  questions: z
+    .array(
+      z.object({
+        section: z.string().trim().max(160).optional(),
+        prompt: z.string().trim().min(1),
+        guidance: z.string().trim().max(500).optional()
+      })
+    )
+    .max(30)
+    .optional(),
+  scoringRubric: z.record(z.any()).optional(),
+  timeline: z
+    .object({
+      phases: z.array(rfpPhaseSchema).max(12).optional(),
+      targetLaunch: z.string().trim().max(160).optional()
+    })
+    .optional(),
+  stakeholders: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1),
+        role: z.string().trim().max(160).optional()
+      })
+    )
+    .max(10)
+    .optional(),
+  assessmentId: z.string().optional()
 });
 
 const assistantSchema = z.object({
@@ -749,6 +832,218 @@ app.post('/api/assessments/follow-up', requireAuth, validateBody(followUpSchema)
   }
 });
 
+app.post(
+  '/api/vendors/search',
+  requireAuth,
+  vendorSearchLimiter,
+  validateBody(vendorSearchSchema),
+  requireProjectOwnership('projectId'),
+  async (req, res) => {
+    try {
+      const filters = req.validatedBody;
+      const shortlist = await vendorMatch({
+        projectId: filters.projectId,
+        capability: filters.capability || req.project?.capabilityFocus?.[0],
+        categories: filters.categories,
+        strengths: filters.strengths,
+        query: filters.query,
+        constraints: filters.constraints
+      });
+      res.json({ ok: true, matches: shortlist.matches || [] });
+    } catch (err) {
+      console.error('Vendor search failed', err);
+      res.status(500).json({ error: 'Unable to search vendors' });
+    }
+  }
+);
+
+app.post(
+  '/api/rfp/templates/materialize',
+  requireAuth,
+  validateBody(rfpMaterializeSchema),
+  requireProjectOwnership('projectId'),
+  async (req, res) => {
+    try {
+      const {
+        projectId,
+        templateId,
+        templateSlug,
+        capability,
+        industry,
+        criteria,
+        sections,
+        questions,
+        scoringRubric,
+        timeline,
+        stakeholders,
+        assessmentId
+      } = req.validatedBody;
+
+      let template = null;
+      if (templateId || templateSlug) {
+        template = await RfpTemplate.findOne(
+          templateId ? { _id: templateId } : { slug: templateSlug }
+        ).lean();
+        if ((templateId || templateSlug) && !template) {
+          return res.status(404).json({ error: 'Template not found' });
+        }
+      }
+
+      let assessment = null;
+      if (assessmentId) {
+        assessment = await Assessment.findOne({
+          _id: assessmentId,
+          projectId,
+          userId: req.auth.uid
+        }).lean();
+        if (!assessment) {
+          return res.status(404).json({ error: 'Assessment not found' });
+        }
+      }
+
+      const overrides = {
+        capability,
+        industry,
+        criteria,
+        sections,
+        questions,
+        scoringRubric,
+        timeline,
+        stakeholders
+      };
+
+      const draftPayload = await generateRfpDraft({
+        project: req.project ? req.project.toObject() : null,
+        template,
+        overrides,
+        assessment
+      });
+
+      const timelinePayload = draftPayload.timeline || timeline || { phases: [] };
+      if (!Array.isArray(timelinePayload.phases)) {
+        timelinePayload.phases = [];
+      }
+
+      const finalCapability =
+        draftPayload.capability ||
+        capability ||
+        template?.capability ||
+        req.project?.capabilityFocus?.[0] ||
+        'Capability';
+      const finalIndustry = draftPayload.industry || industry || template?.industry || req.project?.industry;
+      const finalCriteria = draftPayload.criteria || criteria || template?.criteria || [];
+      const finalQuestions = draftPayload.questions || questions || [];
+      const finalRubric = draftPayload.scoringRubric || scoringRubric || {};
+      const finalStakeholders = draftPayload.stakeholders || stakeholders || [];
+
+      const storedDraft = await RfpDraft.findOneAndUpdate(
+        { projectId, capability: finalCapability },
+        {
+          projectId,
+          assessmentId: assessment ? assessment._id : undefined,
+          capability: finalCapability,
+          industry: finalIndustry,
+          criteria: finalCriteria,
+          questions: finalQuestions,
+          scoringRubric: finalRubric,
+          timeline: timelinePayload,
+          stakeholders: finalStakeholders
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+
+      const responseDraft = storedDraft.toObject();
+      responseDraft.sections = draftPayload.sections || sections || template?.sections || [];
+
+      res.json({ ok: true, draft: responseDraft });
+    } catch (err) {
+      console.error('RFP materialization failed', err);
+      res.status(500).json({ error: 'Unable to materialize RFP draft' });
+    }
+  }
+);
+
+app.get('/api/rfp/:id/export', requireAuth, async (req, res) => {
+  try {
+    const draft = await RfpDraft.findById(req.params.id).lean();
+    if (!draft) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    const project = await Project.findOne({ _id: draft.projectId, userId: req.auth.uid }).lean();
+    if (!project) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const titleText = `${project.name || 'Project'} RFP Draft`;
+    const sections = [
+      {
+        heading: 'Summary',
+        lines: [
+          `Capability: ${draft.capability}`,
+          `Industry: ${draft.industry || '—'}`
+        ]
+      }
+    ];
+
+    if (Array.isArray(draft.criteria) && draft.criteria.length) {
+      sections.push({
+        heading: 'Evaluation criteria',
+        lines: draft.criteria.map(item => {
+          const weight = typeof item.weight === 'number' ? ` (weight ${item.weight}%)` : '';
+          const desc = item.description ? ` — ${item.description}` : '';
+          return `${item.title}${weight}${desc}`;
+        })
+      });
+    }
+
+    if (Array.isArray(draft.questions) && draft.questions.length) {
+      sections.push({
+        heading: 'Key questions',
+        lines: draft.questions.map(item => {
+          const prefix = item.section ? `[${item.section}] ` : '';
+          const guidance = item.guidance ? ` — Guidance: ${item.guidance}` : '';
+          return `${prefix}${item.prompt}${guidance}`;
+        })
+      });
+    }
+
+    if (draft.timeline?.phases?.length) {
+      const lines = draft.timeline.phases.map(phase => {
+        const duration = phase.durationWeeks ? ` (${phase.durationWeeks} weeks)` : '';
+        const activities = Array.isArray(phase.activities) && phase.activities.length ? ` — ${phase.activities.join('; ')}` : '';
+        return `${phase.name}${duration}${activities}`;
+      });
+      if (draft.timeline.targetLaunch) {
+        lines.push(`Target launch: ${draft.timeline.targetLaunch}`);
+      }
+      sections.push({ heading: 'Timeline', lines });
+    }
+
+    if (Array.isArray(draft.stakeholders) && draft.stakeholders.length) {
+      sections.push({
+        heading: 'Stakeholders',
+        lines: draft.stakeholders.map(person => {
+          const role = person.role ? ` — ${person.role}` : '';
+          return `${person.name}${role}`;
+        })
+      });
+    }
+
+    const buffer = createDocx({ title: titleText, sections });
+    const filename = `rfp-${draft._id}.docx`;
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    );
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (err) {
+    console.error('RFP export failed', err);
+    res.status(500).json({ error: 'Unable to export RFP draft' });
+  }
+});
+
 app.post('/api/assessments/assistant', requireAuth, validateBody(assistantSchema), async (req, res) => {
   try {
     const { message, capabilityId = 'security', draft = {} } = req.validatedBody;
@@ -1158,6 +1453,7 @@ app.get('/api/reports/:id', requireAuth, async (req, res) => {
     if (!rep) return res.status(404).json({ error: 'Not found' });
     const partial = {
       _id: rep._id,
+      projectId: rep.projectId,
       createdAt: rep.createdAt,
       vertical: rep.vertical,
       assessmentType: rep.assessmentType,

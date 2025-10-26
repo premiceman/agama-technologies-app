@@ -1,22 +1,29 @@
+const { z } = require('zod');
+const { zodToJsonSchema } = require('zod-to-json-schema');
+const { toolRegistry } = require('./llm-tools');
+
+let computeScoreSummaryRef;
+function getComputeScoreSummary() {
+  if (!computeScoreSummaryRef) {
+    ({ computeScoreSummary: computeScoreSummaryRef } = require('./scoring'));
+  }
+  return computeScoreSummaryRef;
+}
+
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+const DEFAULT_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const DEFAULT_TOOLS = ['scoring.compute', 'vendor.match', 'calc.financials', 'rag.query'];
 
-async function callOpenAI({ system, user, responseFormat = { type: 'json_object' } }) {
-  if (!OPENAI_API_KEY) {
-    return null;
-  }
+function toJsonSchema(schema, name = 'AgamaSchema') {
+  const jsonSchema = zodToJsonSchema(schema, name);
+  const { $schema, ...rest } = jsonSchema;
+  return rest;
+}
+
+async function openAIRequest(body) {
+  if (!OPENAI_API_KEY) return null;
   try {
-    const body = {
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-      temperature: 0.4,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user }
-      ]
-    };
-    if (responseFormat) {
-      body.response_format = responseFormat;
-    }
     const res = await fetch(OPENAI_API_URL, {
       method: 'POST',
       headers: {
@@ -26,29 +33,577 @@ async function callOpenAI({ system, user, responseFormat = { type: 'json_object'
       body: JSON.stringify(body)
     });
     if (!res.ok) {
-      const text = await res.text();
-      console.error('OpenAI API error', text);
+      const errorText = await res.text();
+      console.error('OpenAI API error', errorText);
       return null;
     }
-    const json = await res.json();
-    const content = json.choices?.[0]?.message?.content || '';
-    if (responseFormat?.type === 'json_object') {
-      try {
-        return JSON.parse(content);
-      } catch (err) {
-        console.warn('Failed to parse OpenAI JSON content', err);
-        return null;
-      }
-    }
-    return content;
+    return res.json();
   } catch (err) {
     console.error('OpenAI API call failed', err);
     return null;
   }
 }
 
+function extractMessageContent(message) {
+  if (!message) return '';
+  if (typeof message.content === 'string') {
+    return message.content;
+  }
+  if (Array.isArray(message.content)) {
+    return message.content
+      .map(part => (typeof part === 'string' ? part : part?.text || ''))
+      .join('');
+  }
+  return '';
+}
+
+async function structuredOutput({ messages, schema, system }) {
+  if (!OPENAI_API_KEY) return null;
+  const jsonSchema = toJsonSchema(schema, 'StructuredOutput');
+  let correction;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const convo = [];
+    if (system) {
+      convo.push({ role: 'system', content: system });
+    }
+    (messages || []).forEach(msg => {
+      if (msg && msg.role && typeof msg.content === 'string') {
+        convo.push(msg);
+      }
+    });
+    if (correction) {
+      convo.push({ role: 'system', content: correction });
+    }
+
+    const data = await openAIRequest({
+      model: DEFAULT_MODEL,
+      temperature: 0.3,
+      messages: convo,
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'AgamaStructuredOutput',
+          schema: jsonSchema
+        }
+      }
+    });
+
+    if (!data) {
+      return null;
+    }
+
+    const content = extractMessageContent(data.choices?.[0]?.message);
+    if (!content) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(content);
+      const validation = schema.safeParse(parsed);
+      if (validation.success) {
+        return validation.data;
+      }
+      const issues = validation.error.issues
+        .map(issue => `${issue.path.join('.') || 'root'} ${issue.message}`)
+        .join('; ');
+      correction = `Your previous response did not match the schema (${issues}). Reply with valid JSON that matches the schema exactly.`;
+    } catch (err) {
+      correction = `The previous response was not valid JSON (${err.message}). Return only JSON.`;
+    }
+  }
+  return null;
+}
+
+function resolveTools(tools = []) {
+  return tools
+    .map(tool => {
+      if (typeof tool === 'string') return toolRegistry[tool];
+      if (tool && tool.name && tool.schema && tool.handler) return tool;
+      return null;
+    })
+    .filter(Boolean);
+}
+
+async function toolCalling({ messages, tools = [], system, maxIterations = 6 }) {
+  if (!OPENAI_API_KEY) {
+    return { response: null, messages: messages || [] };
+  }
+  const resolved = resolveTools(tools);
+  if (!resolved.length) {
+    return { response: null, messages: messages || [] };
+  }
+  const apiTools = resolved.map(tool => ({
+    type: 'function',
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: toJsonSchema(tool.schema, `${tool.name.replace(/[^a-z0-9]/gi, '_')}Params`)
+    }
+  }));
+
+  const convo = Array.isArray(messages) ? [...messages] : [];
+  for (let turn = 0; turn < maxIterations; turn += 1) {
+    const attemptMessages = [];
+    if (system) {
+      attemptMessages.push({ role: 'system', content: system });
+    }
+    attemptMessages.push(...convo);
+
+    const data = await openAIRequest({
+      model: DEFAULT_MODEL,
+      temperature: 0,
+      messages: attemptMessages,
+      tools: apiTools,
+      tool_choice: 'auto'
+    });
+
+    if (!data) {
+      return { response: null, messages: convo };
+    }
+
+    const message = data.choices?.[0]?.message;
+    if (!message) {
+      return { response: null, messages: convo };
+    }
+
+    const assistantContent = extractMessageContent(message);
+    const assistantMsg = {
+      role: 'assistant',
+      content: assistantContent || '',
+      tool_calls: message.tool_calls || undefined
+    };
+    convo.push(assistantMsg);
+
+    if (message.tool_calls?.length) {
+      for (const toolCall of message.tool_calls) {
+        const definition = resolved.find(tool => tool.name === toolCall.function.name);
+        if (!definition) {
+          convo.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            name: toolCall.function.name,
+            content: JSON.stringify({ error: 'UNKNOWN_TOOL' })
+          });
+          continue;
+        }
+
+        let parsedArgs;
+        try {
+          parsedArgs = toolCall.function.arguments ? JSON.parse(toolCall.function.arguments) : {};
+        } catch (err) {
+          parsedArgs = { error: 'INVALID_JSON', message: err.message };
+        }
+
+        let result;
+        if (parsedArgs.error) {
+          result = parsedArgs;
+        } else {
+          const validation = definition.schema.safeParse(parsedArgs);
+          if (!validation.success) {
+            result = { error: 'VALIDATION_ERROR', issues: validation.error.issues };
+          } else {
+            try {
+              result = await definition.handler(validation.data);
+            } catch (err) {
+              result = { error: 'TOOL_EXECUTION_ERROR', message: err.message };
+            }
+          }
+        }
+
+        convo.push({
+          role: 'tool',
+          tool_call_id: toolCall.id,
+          name: definition.name,
+          content: JSON.stringify(result ?? null)
+        });
+      }
+      continue;
+    }
+
+    return { response: message, messages: convo };
+  }
+
+  return { response: null, messages: convo };
+}
+
+function safeParseJSON(text, fallback = {}) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return fallback;
+  }
+}
+
+async function runToolPlanner({ system, payload }) {
+  const planningMessages = [
+    {
+      role: 'user',
+      content: `Context JSON: ${JSON.stringify(payload)}\n\nUse the available tools to gather supporting data. Respond with JSON {scoring?, vendors?, financials?, notes?}.`
+    }
+  ];
+  const { response } = await toolCalling({ messages: planningMessages, tools: DEFAULT_TOOLS, system });
+  if (!response) return {};
+  const content = extractMessageContent(response);
+  return safeParseJSON(content, {});
+}
+
+const ExecutiveNarrativeSchema = z.object({
+  executiveSummary: z.array(z.string()).max(6),
+  strategicRisks: z
+    .array(
+      z.object({
+        risk: z.string(),
+        impact: z.string().optional(),
+        mitigation: z.string().optional(),
+        timeframe: z.string().optional()
+      })
+    )
+    .max(6),
+  valueRealisation: z.array(z.string()).max(6),
+  personaGuidance: z.record(
+    z.object({
+      focus: z.array(z.string()).max(4).optional(),
+      guidance: z.array(z.string()).max(6)
+    })
+  ),
+  operatingModel: z.object({
+    phases: z
+      .array(
+        z.object({
+          phase: z.string(),
+          highlights: z.array(z.string()).max(5)
+        })
+      )
+      .max(5)
+  })
+});
+
+const StrategicIntelligenceSchema = z.object({
+  industryHeatmap: z
+    .array(
+      z.object({
+        dimension: z.string(),
+        rating: z.string(),
+        commentary: z.string().optional()
+      })
+    )
+    .max(8),
+  maturityNarrative: z.string().optional(),
+  investmentCases: z
+    .array(
+      z.object({
+        title: z.string(),
+        outcome: z.string().optional(),
+        payback: z.string().optional(),
+        sponsors: z.array(z.string()).max(4).optional()
+      })
+    )
+    .max(6),
+  riskSignals: z
+    .array(
+      z.object({
+        title: z.string(),
+        trigger: z.string().optional(),
+        mitigation: z.string().optional(),
+        timeframe: z.string().optional()
+      })
+    )
+    .max(6)
+});
+
+const CommandBlueprintSchema = z.object({
+  vendorOrchestration: z
+    .array(
+      z.object({
+        vendor: z.string(),
+        pocFocus: z.array(z.string()).max(5).optional(),
+        negotiationMoves: z.array(z.string()).max(5).optional(),
+        pricingWatchouts: z.array(z.string()).max(5).optional()
+      })
+    )
+    .max(6),
+  architectureDirectives: z.array(z.string()).max(8),
+  executiveTimeline: z
+    .array(
+      z.object({
+        phase: z.string(),
+        leader: z.string().optional(),
+        actions: z.array(z.string()).max(6)
+      })
+    )
+    .max(6),
+  boardTalkingPoints: z.array(z.string()).max(8)
+});
+
+const ArchitectureAssetsSchema = z.object({
+  architectureBlueprint: z.object({
+    layers: z
+      .array(
+        z.object({
+          name: z.string(),
+          components: z
+            .array(
+              z.object({
+                label: z.string(),
+                description: z.string().optional(),
+                owners: z.array(z.string()).max(4).optional()
+              })
+            )
+            .max(8)
+        })
+      )
+      .max(6),
+    commentary: z.string().optional()
+  }),
+  roiMap: z
+    .array(
+      z.object({
+        initiative: z.string(),
+        valueDrivers: z.array(z.string()).max(5).optional(),
+        costToImplement: z.string().optional(),
+        paybackWindow: z.string().optional(),
+        stakeholders: z.array(z.string()).max(5).optional()
+      })
+    )
+    .max(6),
+  renewalCalendar: z
+    .array(
+      z.object({
+        vendor: z.string(),
+        renewalWindow: z.string().optional(),
+        riskLevel: z.string().optional(),
+        recommendedAction: z.string().optional()
+      })
+    )
+    .max(8),
+  personaIntelligence: z.record(
+    z.object({
+      summary: z.string().optional(),
+      priorities: z.array(z.string()).max(6).optional(),
+      kpis: z.array(z.string()).max(6).optional(),
+      questions: z.array(z.string()).max(6).optional(),
+      visualNarrative: z.string().optional()
+    })
+  )
+});
+
+const FollowUpSchema = z.object({
+  prompts: z
+    .array(
+      z.object({
+        question: z.string(),
+        rationale: z.string().optional(),
+        suggestedOptions: z.array(z.string()).max(5).optional()
+      })
+    )
+    .max(3)
+});
+
+const OrganizationMatchSchema = z.object({
+  matches: z
+    .array(
+      z.object({
+        name: z.string().optional(),
+        ticker: z.string().optional(),
+        hqRegion: z.string().optional(),
+        description: z.string().optional(),
+        classification: z.string().optional(),
+        industryTags: z.array(z.string()).optional(),
+        employeeRange: z.string().optional(),
+        headcountEstimate: z.string().optional(),
+        annualRevenueEstimate: z.string().optional(),
+        turnover: z.string().optional(),
+        fundingRounds: z
+          .array(
+            z.object({
+              round: z.string().optional(),
+              amount: z.string().optional(),
+              date: z.string().optional(),
+              leadInvestors: z.array(z.string()).optional()
+            })
+          )
+          .optional(),
+        investmentHighlights: z.array(z.string()).optional(),
+        keyInitiatives: z
+          .array(
+            z.object({
+              name: z.string().optional(),
+              objective: z.string().optional(),
+              horizon: z.string().optional(),
+              description: z.string().optional()
+            })
+          )
+          .optional(),
+        organisationStructure: z.array(z.string()).optional(),
+        discoveryObjectives: z
+          .array(
+            z.object({
+              objective: z.string().optional(),
+              linkedKpis: z.array(z.string()).optional(),
+              timeframe: z.string().optional()
+            })
+          )
+          .optional(),
+        personaKpis: z.record(z.array(z.string())).optional(),
+        sources: z.array(z.string()).optional()
+      })
+    )
+    .max(4),
+  confidenceNote: z.string().optional()
+});
+
+const OrganizationIntelSchema = z.object({
+  summary: z.string(),
+  dominantFrameworks: z
+    .array(
+      z.object({
+        name: z.string(),
+        guidance: z.string().optional()
+      })
+    )
+    .max(6),
+  vendorSignals: z
+    .array(
+      z.object({
+        theme: z.string(),
+        leadingVendors: z.array(z.string()).optional(),
+        investmentNotes: z.string().optional()
+      })
+    )
+    .max(6),
+  profile: z.object({
+    canonicalName: z.string().optional(),
+    classification: z.string().optional(),
+    industryTags: z.array(z.string()).optional(),
+    headcountEstimate: z.string().optional(),
+    employeeRange: z.string().optional(),
+    annualRevenueEstimate: z.string().optional(),
+    turnover: z.string().optional(),
+    fundingRounds: z
+      .array(
+        z.object({
+          round: z.string().optional(),
+          amount: z.string().optional(),
+          date: z.string().optional(),
+          leadInvestors: z.array(z.string()).optional()
+        })
+      )
+      .optional(),
+    investmentHighlights: z.array(z.string()).optional(),
+    keyInitiatives: z
+      .array(
+        z.object({
+          name: z.string().optional(),
+          objective: z.string().optional(),
+          horizon: z.string().optional(),
+          description: z.string().optional()
+        })
+      )
+      .optional(),
+    organisationStructure: z
+      .array(
+        z.object({
+          function: z.string().optional(),
+          leader: z.string().optional(),
+          remit: z.string().optional(),
+          primaryKpis: z.array(z.string()).optional()
+        })
+      )
+      .optional(),
+    discoveryObjectives: z
+      .array(
+        z.object({
+          objective: z.string().optional(),
+          linkedKpis: z.array(z.string()).optional(),
+          timeframe: z.string().optional()
+        })
+      )
+      .optional(),
+    personaKpis: z.record(z.array(z.string())).optional(),
+    renewalCalendar: z
+      .array(
+        z.object({
+          vendor: z.string().optional(),
+          renewalWindow: z.string().optional(),
+          action: z.string().optional()
+        })
+      )
+      .optional(),
+    architectureSignals: z
+      .array(
+        z.object({
+          layer: z.string().optional(),
+          observation: z.string().optional(),
+          implication: z.string().optional()
+        })
+      )
+      .optional(),
+    dataConfidence: z.string().optional(),
+    sources: z.array(z.string()).optional()
+  })
+});
+
+const RfpDraftSchema = z.object({
+  capability: z.string(),
+  industry: z.string().optional(),
+  criteria: z
+    .array(
+      z.object({
+        title: z.string(),
+        weight: z.number().optional(),
+        description: z.string().optional()
+      })
+    )
+    .max(12),
+  questions: z
+    .array(
+      z.object({
+        section: z.string().optional(),
+        prompt: z.string(),
+        guidance: z.string().optional()
+      })
+    )
+    .max(30),
+  scoringRubric: z.record(z.any()),
+  timeline: z.object({
+    phases: z
+      .array(
+        z.object({
+          name: z.string(),
+          durationWeeks: z.number().optional(),
+          activities: z.array(z.string()).optional()
+        })
+      )
+      .max(8),
+    targetLaunch: z.string().optional()
+  }),
+  stakeholders: z
+    .array(
+      z.object({
+        name: z.string(),
+        role: z.string().optional()
+      })
+    )
+    .max(10)
+});
+
+function defaultExecutiveNarrativeFallback() {
+  return {
+    executiveSummary: [
+      'Executive AI summary requires OpenAI configuration. Configure OPENAI_API_KEY to unlock narrative intelligence.'
+    ],
+    strategicRisks: [],
+    valueRealisation: [],
+    personaGuidance: {},
+    operatingModel: { phases: [] }
+  };
+}
+
 async function generateExecutiveNarrative({ assessment, report, capability }) {
-  const system = `You are Agama Technologies' executive intelligence engine. Craft concise, board-ready narratives with numbered recommendations. Output JSON.`;
+  if (!OPENAI_API_KEY) {
+    return defaultExecutiveNarrativeFallback();
+  }
   const payload = {
     organisation: assessment.organization?.name || 'Unknown organisation',
     industry: assessment.industry || assessment.vertical,
@@ -60,130 +615,201 @@ async function generateExecutiveNarrative({ assessment, report, capability }) {
     techLandscape: assessment.techLandscape || {},
     vendorStrategy: assessment.vendorStrategy || {},
     operatingModel: assessment.operatingModel || {},
-    architectureSignals: assessment.architectureSignals || {},
     personas: assessment.personas || [],
-    officialExtract: assessment.organization?.extract || '',
     officialIntel: assessment.organization?.intel || {},
-    headlineScore: report.headlineScore,
-    pillarScores: report.pillarScores,
-    recommendations: report.recommendations,
-    roadmap: report.roadmap,
-    investmentOutlook: report.investmentOutlook,
-    personaBriefings: report.personaBriefings,
-    riskRegister: report.riskRegister,
-    revenueOpportunities: report.revenueOpportunities,
+    report,
     capability
   };
-  const user = `Create a premium enterprise assessment narrative using Gartner-style tone. Provide executiveSummary (3 bullets), strategicRisks (3 items with risk, impact, mitigation), valueRealisation (3 bullets linking to revenue/cost/experience), personaGuidance (map persona title -> two bullet guidance), and operatingModel (phases with highlights). Base it strictly on this JSON:\n\n${JSON.stringify(payload)}\n`;
-  const resp = await callOpenAI({ system, user });
-  if (!resp) {
-    return {
-      executiveSummary: [
-        'Executive AI summary requires OpenAI configuration. Configure OPENAI_API_KEY to unlock narrative intelligence.'
-      ]
-    };
-  }
-  return resp;
+
+  const toolInsights = await runToolPlanner({
+    system: 'You are an enterprise strategist preparing supporting intelligence for an executive narrative.',
+    payload
+  });
+
+  const result = await structuredOutput({
+    system:
+      "You are Agama Technologies' executive intelligence engine. Craft concise, board-ready narratives with numbered recommendations.",
+    schema: ExecutiveNarrativeSchema,
+    messages: [
+      {
+        role: 'user',
+        content: `Base context:${JSON.stringify(payload)}`
+      },
+      {
+        role: 'user',
+        content: `Supporting insights:${JSON.stringify(toolInsights)}`
+      }
+    ]
+  });
+
+  return result || defaultExecutiveNarrativeFallback();
 }
 
 async function generateStrategicIntelligence({ stage, assessment, report, capability }) {
   if (!OPENAI_API_KEY) {
     return {};
   }
-  const system = `You are a senior McKinsey-style consultant creating industry intelligence packs. Respond in JSON with keys industryHeatmap (array of {dimension, rating, commentary}), maturityNarrative (string), investmentCases (array of {title, outcome, payback, sponsors}), riskSignals (array of {title, trigger, mitigation, timeframe}).`;
-  const user = `Stage: ${stage}. Capability: ${capability.name}. Use the following JSON to ground recommendations: ${JSON.stringify({
-    assessment: {
-      industry: assessment.industry,
-      companySize: assessment.companySize,
-      region: assessment.region,
-      personas: assessment.personas,
-      strategicDrivers: assessment.strategicDrivers,
-      stakeholderProfile: assessment.stakeholderProfile,
-      investmentProfile: assessment.investmentProfile,
-      architectureSignals: assessment.architectureSignals
-    },
+  const payload = {
+    stage,
+    capability,
+    assessment,
     report
-  })}`;
-  const resp = await callOpenAI({ system, user });
-  return resp || {};
+  };
+
+  const toolInsights = await runToolPlanner({
+    system: 'You are preparing industry intelligence and may call tools for scoring or vendor context.',
+    payload
+  });
+
+  const result = await structuredOutput({
+    system:
+      'You are a senior McKinsey-style consultant creating industry intelligence packs. Respond in JSON that matches the schema.',
+    schema: StrategicIntelligenceSchema,
+    messages: [
+      { role: 'user', content: `Context:${JSON.stringify(payload)}` },
+      { role: 'user', content: `Tool research:${JSON.stringify(toolInsights)}` }
+    ]
+  });
+
+  return result || {};
 }
 
 async function generateCommandBlueprint({ assessment, capability, vendorEngagements, deliveryTimeline, industryInsights, report }) {
   if (!OPENAI_API_KEY) {
     return {};
   }
-  const system = `You are an elite transformation partner building a board-level command deck. Respond in JSON with keys vendorOrchestration (array of {vendor, pocFocus, negotiationMoves, pricingWatchouts}), architectureDirectives (array of strings), executiveTimeline (array of {phase, leader, actions}), boardTalkingPoints (array of strings).`;
   const payload = {
-    assessment: {
-      industry: assessment.industry,
-      region: assessment.region,
-      personas: assessment.personas,
-      architectureUploads: assessment.architectureUploads,
-      initiativeTimeline: assessment.initiativeTimeline,
-      vendorStrategy: assessment.vendorStrategy,
-      operatingModel: assessment.operatingModel,
-      architectureSignals: assessment.architectureSignals
-    },
-    capability: capability.name,
+    assessment,
+    capability,
     vendorEngagements,
     deliveryTimeline,
     industryInsights,
     report
   };
-  const user = `Create a command blueprint for the executive team using this JSON: ${JSON.stringify(payload)}. Keep guidance decisive, financially grounded, and reference transformation leadership best practices.`;
-  const resp = await callOpenAI({ system, user });
-  return resp || {};
+
+  const toolInsights = await runToolPlanner({
+    system: 'You are a transformation partner planning a command blueprint. Use tools for vendor and ROI insights when helpful.',
+    payload
+  });
+
+  const result = await structuredOutput({
+    system:
+      'You are an elite transformation partner building a board-level command deck. Respond strictly with JSON that matches the schema.',
+    schema: CommandBlueprintSchema,
+    messages: [
+      { role: 'user', content: `Context:${JSON.stringify(payload)}` },
+      { role: 'user', content: `Tool research:${JSON.stringify(toolInsights)}` }
+    ]
+  });
+
+  return result || {};
+}
+
+async function generateArchitectureAssets({ assessment, report, capability }) {
+  if (!OPENAI_API_KEY) {
+    return {};
+  }
+  const payload = {
+    assessment,
+    report,
+    capability
+  };
+
+  const toolInsights = await runToolPlanner({
+    system: 'You are an enterprise architect preparing supporting evidence for architecture guidance.',
+    payload
+  });
+
+  const result = await structuredOutput({
+    system:
+      'You are an enterprise architect producing board-ready blueprints. Return JSON conforming to the schema.',
+    schema: ArchitectureAssetsSchema,
+    messages: [
+      { role: 'user', content: `Context:${JSON.stringify(payload)}` },
+      { role: 'user', content: `Tool research:${JSON.stringify(toolInsights)}` }
+    ]
+  });
+
+  return result || {};
+}
+
+async function generateFollowUpPrompts({ step, capability, answers, organization, industry }) {
+  if (!OPENAI_API_KEY) {
+    return { prompts: [] };
+  }
+  const payload = { step, capability, answers, organization, industry };
+  const toolInsights = await runToolPlanner({
+    system: 'You help the intake copilot identify gaps before crafting follow-up prompts.',
+    payload
+  });
+  const result = await structuredOutput({
+    system:
+      "You are a senior transformation consultant embedded in Agama's assessment wizard. Suggest clarifying follow-up questions in JSON matching the schema.",
+    schema: FollowUpSchema,
+    messages: [
+      { role: 'user', content: `Context:${JSON.stringify(payload)}` },
+      { role: 'user', content: `Tool research:${JSON.stringify(toolInsights)}` }
+    ]
+  });
+  if (!result) {
+    return { prompts: [] };
+  }
+  return result;
+}
+
+async function generateAssessmentAssistantReply({ message, assessmentDraft, capability }) {
+  if (!OPENAI_API_KEY) {
+    return {
+      answer: 'The assessment assistant is offline. Configure OPENAI_API_KEY to unlock contextual guidance and live Q&A.'
+    };
+  }
+  const messages = [
+    { role: 'system', content: "You are Agama Technologies' assessment copilot. Provide concise, actionable guidance grounded only in the provided assessment draft." },
+    { role: 'user', content: `User question: ${message}\n\nContext JSON:${JSON.stringify({ capability, assessmentDraft })}` }
+  ];
+  const data = await openAIRequest({
+    model: DEFAULT_MODEL,
+    temperature: 0.4,
+    messages
+  });
+  if (!data) {
+    return { answer: 'No response available right now.' };
+  }
+  const content = extractMessageContent(data.choices?.[0]?.message) || 'No response available right now.';
+  return { answer: content };
 }
 
 async function searchOrganizationProfiles({ query, capability, industry }) {
   if (!OPENAI_API_KEY) {
-    return { matches: [] };
-  }
-  const system = `You are an enterprise intelligence analyst. Return JSON {matches: [{name, ticker, hqRegion, description, classification, industryTags, employeeRange, headcountEstimate, annualRevenueEstimate, turnover, fundingRounds, investmentHighlights, keyInitiatives, organisationStructure, discoveryObjectives, personaKpis, sources}], confidenceNote}. Provide factual, recent public data (<= 2024). If unsure, include null values and note low confidence. Limit matches to 4.`;
-  const user = `Organisation lookup request.
-Query: ${query}
-Relevant capability: ${capability || 'enterprise transformation'}
-Industry context: ${industry || 'general'}
-Return best-matching publicly known organisations.`;
-  const resp = await callOpenAI({ system, user });
-  if (!resp) {
     return {
       matches: [],
       confidenceNote: 'Organisation enrichment disabled. Configure OPENAI_API_KEY to unlock auto-complete.'
     };
   }
-  resp.matches = Array.isArray(resp.matches) ? resp.matches : [];
-  return resp;
+  const payload = { query, capability, industry };
+  const result = await structuredOutput({
+    system:
+      'You are an enterprise intelligence analyst. Return JSON that lists best match organisations with accurate metadata.',
+    schema: OrganizationMatchSchema,
+    messages: [
+      {
+        role: 'user',
+        content: `Organisation lookup request. Query: ${query}. Relevant capability: ${capability}. Industry context: ${industry}.`
+      }
+    ]
+  });
+  if (!result) {
+    return {
+      matches: [],
+      confidenceNote: 'Organisation enrichment disabled. Configure OPENAI_API_KEY to unlock auto-complete.'
+    };
+  }
+  result.matches = Array.isArray(result.matches) ? result.matches : [];
+  return result;
 }
 
 async function fetchOrganizationIntel({ organization, assessmentType, industry }) {
-  const system = `You synthesise analyst, regulatory, and funding intelligence for enterprise technology initiatives. Respond in JSON with keys summary, dominantFrameworks, vendorSignals, profile.
-- summary: string (2 sentences)
-- dominantFrameworks: array of {name, guidance}
-- vendorSignals: array of {theme, leadingVendors, investmentNotes}
-- profile: {
-    canonicalName,
-    classification,
-    industryTags,
-    headcountEstimate,
-    employeeRange,
-    annualRevenueEstimate,
-    turnover,
-    fundingRounds: array of {round, amount, date, leadInvestors},
-    investmentHighlights: array of strings,
-    keyInitiatives: array of {name, objective, horizon, description},
-    organisationStructure: array of {function, leader, remit, primaryKpis},
-    discoveryObjectives: array of {objective, linkedKpis, timeframe},
-    personaKpis: object map of persona -> array of KPIs,
-    renewalCalendar: array of {vendor, renewalWindow, action},
-    architectureSignals: array of {layer, observation, implication},
-    dataConfidence,
-    sources
-  }
-Return only substantiated insights (<= 2024). If confidence is low, populate dataConfidence with explanation and leave uncertain fields null.`;
-  const user = `Provide official perspectives and organisational intelligence for ${organization} focusing on ${assessmentType} programmes in the ${industry || 'cross-industry'} domain.`;
-  const resp = await callOpenAI({ system, user });
-  if (!resp) {
+  if (!OPENAI_API_KEY) {
     return {
       summary: `External research for ${organization} unavailable. Configure OPENAI_API_KEY to enable automatic enrichment.`,
       dominantFrameworks: [],
@@ -197,85 +823,139 @@ Return only substantiated insights (<= 2024). If confidence is low, populate dat
       }
     };
   }
-  if (resp.profile && !Array.isArray(resp.profile.industryTags) && resp.profile.industryTags) {
-    resp.profile.industryTags = String(resp.profile.industryTags).split(/,|;|\n/).map(s => s.trim()).filter(Boolean);
-  }
-  return resp;
-}
-
-async function generateArchitectureAssets({ assessment, report, capability }) {
-  if (!OPENAI_API_KEY) {
-    return {};
-  }
-  const system = `You are an enterprise architect producing board-ready blueprints. Respond in JSON with keys:
-- architectureBlueprint: {layers: [{name, components: [{label, description, owners}]}], commentary}
-- roiMap: array of {initiative, valueDrivers, costToImplement, paybackWindow, stakeholders}
-- renewalCalendar: array of {vendor, renewalWindow, riskLevel, recommendedAction}
-- personaIntelligence: object where key is persona id or title and value is {summary, priorities, kpis, questions, visualNarrative}
-Ground responses in the provided assessment, organisation intel, and roadmap.`;
-  const payload = {
-    organisation: assessment.organization?.name,
-    organisationIntel: assessment.organization?.intel || {},
-    companyProfile: assessment.companyProfile || {},
-    strategicDrivers: assessment.strategicDrivers || [],
-    roadmap: report.roadmap,
-    investmentOutlook: report.investmentOutlook,
-    personas: assessment.personas || [],
-    capability: capability.name,
-    pillarScores: report.pillarScores,
-    pillarInsights: report.pillarInsights,
-    technologyRadar: report.technologyRadar,
-    riskRegister: report.riskRegister
-  };
-  const user = `Create architecture visuals, ROI mapping, and renewal priorities for this engagement:${JSON.stringify(payload)}`;
-  const resp = await callOpenAI({ system, user });
-  return resp || {};
-}
-
-async function generateFollowUpPrompts({ step, capability, answers, organization, industry }) {
-  if (!OPENAI_API_KEY) {
-    return { prompts: [] };
-  }
-  const system = `You are a senior transformation consultant embedded in Agama's assessment wizard. Suggest clarifying follow-up questions to gather deeper context. Respond in JSON {prompts: [{question, rationale, suggestedOptions?}]}. Keep it grounded in provided answers.`;
-  const payload = {
-    step,
-    capability,
-    organization,
-    industry,
-    answers
-  };
-  const user = `Based on this intake step, craft up to 3 targeted follow-up prompts to remove ambiguity. Answers so far: ${JSON.stringify(payload)}`;
-  const resp = await callOpenAI({ system, user });
-  if (!resp || !Array.isArray(resp.prompts)) {
-    return { prompts: [] };
-  }
-  resp.prompts = resp.prompts.slice(0, 3).map(prompt => ({
-    question: prompt.question || 'Provide additional context for this step.',
-    rationale: prompt.rationale || 'Clarify this area to strengthen the tailored recommendations.',
-    suggestedOptions: Array.isArray(prompt.suggestedOptions) ? prompt.suggestedOptions.slice(0, 5) : []
-  }));
-  return resp;
-}
-
-async function generateAssessmentAssistantReply({ message, assessmentDraft, capability }) {
-  if (!OPENAI_API_KEY) {
+  const payload = { organization, assessmentType, industry };
+  const result = await structuredOutput({
+    system:
+      'You synthesise analyst, regulatory, and funding intelligence for enterprise technology initiatives. Provide JSON matching the schema.',
+    schema: OrganizationIntelSchema,
+    messages: [
+      {
+        role: 'user',
+        content: `Provide official perspectives and organisational intelligence for ${organization} focusing on ${assessmentType} programmes in the ${industry || 'cross-industry'} domain.`
+      }
+    ]
+  });
+  if (!result) {
     return {
-      answer:
-        'The assessment assistant is offline. Configure OPENAI_API_KEY to unlock contextual guidance and live Q&A.'
+      summary: `External research for ${organization} unavailable. Configure OPENAI_API_KEY to enable automatic enrichment.`,
+      dominantFrameworks: [],
+      vendorSignals: [],
+      profile: {
+        canonicalName: organization,
+        classification: 'Unknown',
+        industryTags: [industry].filter(Boolean),
+        dataConfidence: 'OpenAI enrichment disabled.',
+        sources: []
+      }
     };
   }
-  const system = `You are Agama Technologies' assessment copilot. Answer with concise, actionable guidance grounded only in the provided assessment draft. Use markdown bullet lists where useful. If information is missing, state assumptions and invite the user to capture it in the relevant step.`;
-  const payload = {
-    capability,
-    assessmentDraft
+  if (result.profile && Array.isArray(result.profile.industryTags) === false && result.profile.industryTags) {
+    result.profile.industryTags = String(result.profile.industryTags)
+      .split(/,|;|\n/)
+      .map(s => s.trim())
+      .filter(Boolean);
+  }
+  return result;
+}
+
+async function generateRfpDraft({ project, template, overrides = {}, assessment }) {
+  if (!OPENAI_API_KEY) {
+    return {
+      capability: overrides.capability || template?.capability || 'Capability',
+      industry: overrides.industry || template?.industry || project?.industry,
+      criteria: overrides.criteria || template?.criteria || [],
+      questions: overrides.questions || [],
+      scoringRubric: overrides.scoringRubric || {},
+      timeline: overrides.timeline || { phases: [], targetLaunch: undefined },
+      stakeholders: overrides.stakeholders || []
+    };
+  }
+
+  const base = {
+    project: project
+      ? {
+          name: project.name,
+          industry: project.industry,
+          region: project.region,
+          companySize: project.companySize,
+          strategicDrivers: project.strategicDrivers,
+          capabilityFocus: project.capabilityFocus
+        }
+      : {},
+    template,
+    overrides,
+    assessment,
+    scoreSummary: assessment
+      ? getComputeScoreSummary()({
+          answers: assessment.answers || {},
+          vertical: assessment.vertical,
+          companySize: assessment.companySize
+        })
+      : null
   };
-  const user = `User question: ${message}\n\nContext JSON:${JSON.stringify(payload)}`;
-  const content = await callOpenAI({ system, user, responseFormat: null });
-  return { answer: content || 'No response available right now.' };
+
+  const toolInsights = await runToolPlanner({
+    system: 'You are preparing procurement intelligence to build an RFP draft. Use tools for vendor alignment, scoring context, and ROI.',
+    payload: base
+  });
+
+  const result = await structuredOutput({
+    system: 'You are an enterprise sourcing strategist. Produce an RFP draft JSON that matches the schema exactly.',
+    schema: RfpDraftSchema,
+    messages: [
+      { role: 'user', content: `Context:${JSON.stringify(base)}` },
+      { role: 'user', content: `Tool research:${JSON.stringify(toolInsights)}` }
+    ]
+  });
+
+  if (!result) {
+    return {
+      capability: overrides.capability || template?.capability || project?.capabilityFocus?.[0] || 'Capability',
+      industry: overrides.industry || template?.industry || project?.industry,
+      criteria: overrides.criteria || template?.criteria || [],
+      questions: overrides.questions || [],
+      scoringRubric: overrides.scoringRubric || {},
+      timeline: overrides.timeline || { phases: [], targetLaunch: undefined },
+      stakeholders: overrides.stakeholders || []
+    };
+  }
+  return result;
+}
+
+async function callOpenAI({ system, user, responseFormat = { type: 'json_object' } }) {
+  if (!OPENAI_API_KEY) {
+    return null;
+  }
+  const messages = [];
+  if (system) {
+    messages.push({ role: 'system', content: system });
+  }
+  if (user) {
+    messages.push({ role: 'user', content: user });
+  }
+  const data = await openAIRequest({
+    model: DEFAULT_MODEL,
+    temperature: 0.4,
+    messages,
+    response_format: responseFormat || undefined
+  });
+  if (!data) return null;
+  const content = extractMessageContent(data.choices?.[0]?.message) || '';
+  if (responseFormat?.type === 'json_object') {
+    try {
+      return JSON.parse(content);
+    } catch (err) {
+      console.warn('Failed to parse OpenAI JSON content', err);
+      return null;
+    }
+  }
+  return content;
 }
 
 module.exports = {
   callOpenAI,
+  structuredOutput,
+  toolCalling,
   generateExecutiveNarrative,
   generateStrategicIntelligence,
   generateCommandBlueprint,
@@ -283,5 +963,12 @@ module.exports = {
   searchOrganizationProfiles,
   generateArchitectureAssets,
   generateFollowUpPrompts,
-  generateAssessmentAssistantReply
+  generateAssessmentAssistantReply,
+  generateRfpDraft,
+  ExecutiveNarrativeSchema,
+  StrategicIntelligenceSchema,
+  CommandBlueprintSchema,
+  ArchitectureAssetsSchema,
+  FollowUpSchema,
+  RfpDraftSchema
 };

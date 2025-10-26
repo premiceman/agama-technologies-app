@@ -18,17 +18,31 @@
         <div id="reportActions" class="d-flex flex-wrap gap-2">
           <a href="/dashboard.html" class="btn btn-outline-light">Dashboard</a>
           <button id="exportPlan" class="btn btn-outline-light">Export value path (xlsx)</button>
+          <button id="exportRfp" class="btn btn-outline-light d-none">Export RFP (.docx)</button>
           <button id="unlock" class="btn btn-primary d-none">Unlock full report (mock payment)</button>
           <a id="premiumIntake" class="btn btn-outline-light d-none">Complete premium intake</a>
         </div>
       </div>
 
-      <section class="card glass p-4 mb-4">
-        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
-          <div class="badge-pill" id="reportStatus">Preview</div>
-          <div class="text-fg-3" id="reportDate"></div>
-        </div>
-        <div class="row g-4 align-items-start">
+      <ul class="nav nav-pills mb-4 report-tabs" id="reportTabs">
+        <li class="nav-item">
+          <button class="nav-link active" data-tab-target="overview">Overview</button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-tab-target="vendors">Vendors</button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-tab-target="rfp">RFP</button>
+        </li>
+      </ul>
+
+      <div class="tab-panel" data-tab="overview">
+        <section class="card glass p-4 mb-4">
+          <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+            <div class="badge-pill" id="reportStatus">Preview</div>
+            <div class="text-fg-3" id="reportDate"></div>
+          </div>
+          <div class="row g-4 align-items-start">
           <div class="col-lg-4">
             <div class="display-4 fw-bold" id="headlineScore">--</div>
             <p class="text-fg-2" id="reportSummary">Loading...</p>
@@ -61,11 +75,11 @@
             </div>
           </div>
         </div>
-      </section>
+        </section>
 
-      <section class="card glass p-4 mb-4">
-        <h5 class="section-heading mb-3">Overview</h5>
-        <div class="row g-4">
+        <section class="card glass p-4 mb-4">
+          <h5 class="section-heading mb-3">Overview</h5>
+          <div class="row g-4">
           <div class="col-lg-6">
             <div class="summary-panel h-100">
               <h6 class="text-fg-2 mb-2">Persona highlights</h6>
@@ -79,10 +93,10 @@
             </div>
           </div>
         </div>
-      </section>
+        </section>
 
-      <section class="card glass p-4 mb-4">
-        <h5 class="section-heading mb-3">Technology</h5>
+        <section class="card glass p-4 mb-4">
+          <h5 class="section-heading mb-3">Technology</h5>
         <div class="row g-4">
           <div class="col-lg-6">
             <div class="summary-panel h-100">
@@ -109,10 +123,10 @@
             </div>
           </div>
         </div>
-      </section>
+        </section>
 
-      <section class="card glass p-4 mb-4">
-        <h5 class="section-heading mb-3">Data & analytics</h5>
+        <section class="card glass p-4 mb-4">
+          <h5 class="section-heading mb-3">Data & analytics</h5>
         <div class="row g-4">
           <div class="col-lg-6">
             <div class="summary-panel h-100">
@@ -139,10 +153,10 @@
             </div>
           </div>
         </div>
-      </section>
+        </section>
 
-      <section class="card glass p-4 mb-4">
-        <h5 class="section-heading mb-3">People</h5>
+        <section class="card glass p-4 mb-4">
+          <h5 class="section-heading mb-3">People</h5>
         <div class="row g-4">
           <div class="col-lg-6">
             <div class="summary-panel h-100">
@@ -163,10 +177,10 @@
             </div>
           </div>
         </div>
-      </section>
+        </section>
 
-      <section class="card glass p-4 mb-4">
-        <h5 class="section-heading mb-3">Process</h5>
+        <section class="card glass p-4 mb-4">
+          <h5 class="section-heading mb-3">Process</h5>
         <div class="row g-4">
           <div class="col-lg-4">
             <div class="summary-panel h-100">
@@ -187,10 +201,10 @@
             </div>
           </div>
         </div>
-      </section>
+        </section>
 
-      <section class="card glass p-4 mb-4">
-        <h5 class="section-heading mb-3">Value path</h5>
+        <section class="card glass p-4 mb-4">
+          <h5 class="section-heading mb-3">Value path</h5>
         <div class="row g-4">
           <div class="col-lg-7">
             <div class="summary-panel h-100">
@@ -222,7 +236,60 @@
             </div>
           </div>
         </div>
-      </section>
+        </section>
+      </div>
+
+      <div class="tab-panel d-none" data-tab="vendors">
+        <section class="card glass p-4 mb-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="section-heading mb-0">Vendor shortlist</h5>
+            <span class="badge-pill" id="vendorContext"></span>
+          </div>
+          <div id="vendorShortlist" class="row g-3"></div>
+          <div id="vendorEmpty" class="text-fg-3 small"></div>
+        </section>
+        <section class="card glass p-4 mb-4">
+          <h5 class="section-heading mb-3">Strengths & caveats</h5>
+          <div id="vendorInsights" class="row g-3"></div>
+        </section>
+      </div>
+
+      <div class="tab-panel d-none" data-tab="rfp">
+        <section class="card glass p-4 mb-4">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <h5 class="section-heading mb-1">RFP draft</h5>
+              <div class="text-fg-3" id="rfpMeta"></div>
+            </div>
+          </div>
+          <div class="row g-4">
+            <div class="col-lg-6">
+              <div class="summary-panel h-100">
+                <h6 class="text-fg-2 mb-2">Evaluation criteria</h6>
+                <div id="rfpCriteria" class="d-flex flex-column gap-2"></div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="summary-panel h-100">
+                <h6 class="text-fg-2 mb-2">Stakeholders</h6>
+                <div id="rfpStakeholders" class="d-flex flex-column gap-2"></div>
+              </div>
+            </div>
+            <div class="col-lg-12">
+              <div class="summary-panel">
+                <h6 class="text-fg-2 mb-2">Key questions</h6>
+                <div id="rfpQuestions" class="d-flex flex-column gap-2"></div>
+              </div>
+            </div>
+            <div class="col-lg-12">
+              <div class="summary-panel">
+                <h6 class="text-fg-2 mb-2">Timeline</h6>
+                <div id="rfpTimeline" class="d-flex flex-column gap-2"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
 
     <div id="loading" class="d-flex align-items-center justify-content-center py-5">
@@ -243,8 +310,13 @@
     const contentEl = document.getElementById('content');
     const loadingEl = document.getElementById('loading');
     const exportBtn = document.getElementById('exportPlan');
+    const exportRfpBtn = document.getElementById('exportRfp');
     const unlockBtn = document.getElementById('unlock');
     const premiumIntake = document.getElementById('premiumIntake');
+    const tabButtons = document.querySelectorAll('#reportTabs [data-tab-target]');
+    const tabPanels = document.querySelectorAll('.tab-panel');
+
+    let currentRfpDraftId = null;
 
     const setText = (id, value, fallback = '—') => {
       const el = document.getElementById(id);
@@ -600,6 +672,58 @@
       });
     };
 
+    const renderVendorShortlist = (vendors = []) => {
+      const grid = document.getElementById('vendorShortlist');
+      const empty = document.getElementById('vendorEmpty');
+      if (!grid || !empty) return;
+      grid.innerHTML = '';
+      empty.textContent = '';
+      if (!vendors.length) {
+        empty.textContent = 'Shortlist will populate once capability focus and project details are available.';
+        return;
+      }
+      vendors.forEach(vendor => {
+        const col = document.createElement('div');
+        col.className = 'col-lg-4';
+        col.innerHTML = `
+          <div class="summary-panel h-100">
+            <h6 class="mb-1">${vendor.name || vendor.slug}</h6>
+            <div class="text-fg-3 small mb-2">${(vendor.categories || []).join(', ')}</div>
+            ${vendor.pricingNotes ? `<div class="small mb-2">Pricing: ${vendor.pricingNotes}</div>` : ''}
+            ${Array.isArray(vendor.reasons) && vendor.reasons.length ? `<ul class="small mb-0">${vendor.reasons.map(reason => `<li>${reason}</li>`).join('')}</ul>` : ''}
+          </div>
+        `;
+        grid.appendChild(col);
+      });
+    };
+
+    const renderVendorInsights = (vendors = []) => {
+      const grid = document.getElementById('vendorInsights');
+      if (!grid) return;
+      grid.innerHTML = '';
+      if (!vendors.length) {
+        const col = document.createElement('div');
+        col.className = 'col-12 text-fg-3 small';
+        col.textContent = 'Generate a shortlist to surface strengths and caveats.';
+        grid.appendChild(col);
+        return;
+      }
+      vendors.slice(0, 3).forEach(vendor => {
+        const col = document.createElement('div');
+        col.className = 'col-lg-4';
+        const strengths = (vendor.strengths || []).slice(0, 4);
+        const caveats = (vendor.caveats || []).slice(0, 3);
+        col.innerHTML = `
+          <div class="summary-panel h-100">
+            <h6 class="mb-2">${vendor.name || vendor.slug}</h6>
+            ${strengths.length ? `<div class="small mb-2"><strong>Strengths:</strong> ${strengths.join(', ')}</div>` : ''}
+            ${caveats.length ? `<div class="small text-fg-3"><strong>Caveats:</strong> ${caveats.join(', ')}</div>` : ''}
+          </div>
+        `;
+        grid.appendChild(col);
+      });
+    };
+
     const renderAnalyticsFocus = (items = []) => {
       const container = document.getElementById('analyticsFocus');
       if (!container) return;
@@ -734,6 +858,85 @@
       renderDataLists('analyticsFocus', list);
     };
 
+    const renderRfpDraft = draft => {
+      const meta = document.getElementById('rfpMeta');
+      const criteriaContainer = document.getElementById('rfpCriteria');
+      const stakeholdersContainer = document.getElementById('rfpStakeholders');
+      const questionsContainer = document.getElementById('rfpQuestions');
+      const timelineContainer = document.getElementById('rfpTimeline');
+
+      if (meta) {
+        if (draft) {
+          meta.textContent = `Capability: ${draft.capability || '—'}${draft.industry ? ` · Industry: ${draft.industry}` : ''}`;
+        } else {
+          meta.textContent = 'RFP draft will appear once a capability assessment is available.';
+        }
+      }
+
+      const hydrateList = (container, items, { emptyText, formatter }) => {
+        if (!container) return;
+        container.innerHTML = '';
+        const list = Array.isArray(items) ? items : [];
+        if (!list.length) {
+          const empty = document.createElement('div');
+          empty.className = 'text-fg-3 small';
+          empty.textContent = emptyText;
+          container.appendChild(empty);
+          return;
+        }
+        list.forEach(item => {
+          const tile = document.createElement('div');
+          tile.className = 'summary-tile';
+          tile.innerHTML = formatter(item);
+          container.appendChild(tile);
+        });
+      };
+
+      hydrateList(criteriaContainer, draft?.criteria, {
+        emptyText: 'No evaluation criteria generated yet.',
+        formatter: item => {
+          const weight = typeof item?.weight === 'number' ? `<span class="text-fg-3 ms-2">${item.weight}%</span>` : '';
+          const desc = item?.description ? `<div class="small mt-1">${item.description}</div>` : '';
+          return `<strong>${item?.title || 'Criterion'}</strong>${weight}${desc}`;
+        }
+      });
+
+      hydrateList(stakeholdersContainer, draft?.stakeholders, {
+        emptyText: 'Add stakeholders to tailor governance guidance.',
+        formatter: person => {
+          const role = person?.role ? `<div class="small text-fg-3">${person.role}</div>` : '';
+          return `<strong>${person?.name || 'Stakeholder'}</strong>${role}`;
+        }
+      });
+
+      hydrateList(questionsContainer, draft?.questions, {
+        emptyText: 'No supplier questions generated yet.',
+        formatter: question => {
+          const section = question?.section ? `<div class="small text-fg-3 mb-1">${question.section}</div>` : '';
+          const guidance = question?.guidance ? `<div class="small text-fg-3 mt-1">Guidance: ${question.guidance}</div>` : '';
+          return `${section}<div>${question?.prompt || ''}</div>${guidance}`;
+        }
+      });
+
+      hydrateList(timelineContainer, draft?.timeline?.phases, {
+        emptyText: 'Add timeline expectations to structure the sourcing process.',
+        formatter: phase => {
+          const duration = phase?.durationWeeks ? `<span class="text-fg-3 ms-2">${phase.durationWeeks} weeks</span>` : '';
+          const activities = Array.isArray(phase?.activities) && phase.activities.length
+            ? `<div class="small text-fg-3 mt-1">${phase.activities.join('; ')}</div>`
+            : '';
+          return `<strong>${phase?.name || 'Phase'}</strong>${duration}${activities}`;
+        }
+      });
+
+      if (draft?.timeline?.targetLaunch && timelineContainer) {
+        const footer = document.createElement('div');
+        footer.className = 'text-fg-3 small mt-2';
+        footer.textContent = `Target launch: ${draft.timeline.targetLaunch}`;
+        timelineContainer.appendChild(footer);
+      }
+    };
+
     const renderCoverageMetrics = (report) => {
       const metrics = [];
       metrics.push({ title: 'Overall score', value: `${report.headlineScore ?? '--'}` });
@@ -805,6 +1008,73 @@
       renderCoverage(report.coverageSummary || {});
     };
 
+    const loadVendorData = async report => {
+      if (!report.projectId) return;
+      try {
+        const res = await fetch('/api/vendors/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            projectId: report.projectId,
+            capability: report.assessmentType,
+            query: report.summary?.slice(0, 120)
+          })
+        });
+        if (!res.ok) throw new Error('Vendor search failed');
+        const json = await res.json();
+        const matches = Array.isArray(json.matches) ? json.matches : [];
+        setText('vendorContext', matches.length ? `${matches.length} matches` : 'No matches');
+        renderVendorShortlist(matches);
+        renderVendorInsights(matches);
+      } catch (err) {
+        console.error(err);
+        const empty = document.getElementById('vendorEmpty');
+        if (empty) {
+          empty.textContent = 'Unable to load vendor shortlist right now.';
+        }
+        setText('vendorContext', 'Unavailable');
+      }
+    };
+
+    const loadRfpDraft = async report => {
+      if (!report.projectId) {
+        renderRfpDraft(null);
+        return;
+      }
+      try {
+        const res = await fetch('/api/rfp/templates/materialize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            projectId: report.projectId,
+            capability: report.assessmentType,
+            industry: report.vertical,
+            assessmentId: report.assessmentId
+          })
+        });
+        if (!res.ok) throw new Error('Unable to generate RFP draft');
+        const json = await res.json();
+        const draft = json.draft;
+        renderRfpDraft(draft);
+        currentRfpDraftId = draft?._id || null;
+        if (draft?._id && exportRfpBtn) {
+          exportRfpBtn.classList.remove('d-none');
+          exportRfpBtn.onclick = () => {
+            window.location.href = `/api/rfp/${encodeURIComponent(draft._id)}/export`;
+          };
+        }
+      } catch (err) {
+        console.error(err);
+        renderRfpDraft(null);
+        if (exportRfpBtn) {
+          exportRfpBtn.classList.add('d-none');
+        }
+        currentRfpDraftId = null;
+      }
+    };
+
     const handleUnlock = async (reportId) => {
       try {
         const res = await fetch('/api/payments/mock/checkout', {
@@ -826,6 +1096,7 @@
     };
 
     const init = async () => {
+      activateTab('overview');
       try {
         const res = await fetch(`/api/reports/${encodeURIComponent(reportId)}`, { credentials: 'include' });
         if (res.status === 401) {
@@ -858,6 +1129,11 @@
         }
 
         renderReport(report);
+        if (exportRfpBtn) {
+          exportRfpBtn.classList.add('d-none');
+        }
+        loadVendorData(report);
+        loadRfpDraft(report);
         loadingEl.classList.add('d-none');
         contentEl.classList.remove('d-none');
       } catch (err) {
@@ -870,3 +1146,20 @@
   </script>
 </body>
 </html>
+    const activateTab = target => {
+      tabButtons.forEach(btn => {
+        const isActive = btn.dataset.tabTarget === target;
+        btn.classList.toggle('active', isActive);
+      });
+      tabPanels.forEach(panel => {
+        const isActive = panel.dataset.tab === target;
+        panel.classList.toggle('d-none', !isActive);
+      });
+    };
+
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', event => {
+        event.preventDefault();
+        activateTab(btn.dataset.tabTarget);
+      });
+    });
