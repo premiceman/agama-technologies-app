@@ -761,7 +761,22 @@ async function loadProjects() {
   }
   renderProjectOptions();
   if (projects.length) {
-    setActiveProject(projects[0]);
+    const params = new URLSearchParams(location.search);
+    const requestedProjectId = params.get('projectId');
+    let initialProject = null;
+    if (requestedProjectId) {
+      initialProject = projects.find(p => p.id === requestedProjectId) || null;
+    }
+    if (!initialProject) {
+      initialProject = projects[0];
+    }
+    setActiveProject(initialProject);
+    if (requestedProjectId && initialProject && typeof history.replaceState === 'function') {
+      params.delete('projectId');
+      const nextSearch = params.toString();
+      const newUrl = `${location.pathname}${nextSearch ? `?${nextSearch}` : ''}${location.hash}`;
+      history.replaceState({}, '', newUrl);
+    }
     if (!hasSeenProjectTour()) {
       openProjectWizard({ startAt: 1 });
     }
