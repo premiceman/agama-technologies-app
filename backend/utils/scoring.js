@@ -746,22 +746,7 @@ function buildCoverageSummary({ assessment, pillarScores, pillarUrgency, capabil
   };
 }
 
-async function computeReport({ assessment }) {
-  const stageMap = {
-    free: 'insight',
-    premium: 'strategic'
-  };
-  const rawStage = assessment.stage || 'insight';
-  const stage = stageMap[rawStage] || rawStage;
-  const capability = getCapability(assessment.assessmentType || 'security');
-
-  const baseAnswers = assessment.answers || {};
-  const answers = mergeAnswers(
-    baseAnswers,
-    assessment.premiumAnswers || {},
-    assessment.extendedAnswers || {},
-    assessment.commandAnswers || {}
-  );
+function computeScoreSummary({ answers = {}, vertical = 'generic', companySize }) {
   const pillars = Object.keys(answers);
   const pillarScores = {};
   const pillarUrgency = {};
@@ -792,9 +777,43 @@ async function computeReport({ assessment }) {
     )
   );
 
-  const verticalKey = assessment.vertical || 'generic';
-  const verticalLabel = verticalKey === 'generic' ? 'cross-industry peers' : verticalKey.toUpperCase();
+  const verticalKey = vertical || 'generic';
   const bm = loadBenchmarks(verticalKey);
+
+  return {
+    pillarScores,
+    pillarUrgency,
+    headlineScore,
+    vertical: verticalKey,
+    companySize,
+    benchmarks: bm
+  };
+}
+
+async function computeReport({ assessment }) {
+  const stageMap = {
+    free: 'insight',
+    premium: 'strategic'
+  };
+  const rawStage = assessment.stage || 'insight';
+  const stage = stageMap[rawStage] || rawStage;
+  const capability = getCapability(assessment.assessmentType || 'security');
+
+  const baseAnswers = assessment.answers || {};
+  const answers = mergeAnswers(
+    baseAnswers,
+    assessment.premiumAnswers || {},
+    assessment.extendedAnswers || {},
+    assessment.commandAnswers || {}
+  );
+
+  const summary = computeScoreSummary({
+    answers,
+    vertical: assessment.vertical,
+    companySize: assessment.companySize
+  });
+  const { pillarScores, pillarUrgency, headlineScore, vertical: verticalKey, benchmarks: bm } = summary;
+  const verticalLabel = verticalKey === 'generic' ? 'cross-industry peers' : verticalKey.toUpperCase();
   const benchmarks = {
     vertical: verticalKey,
     companySize: assessment.companySize,
@@ -1063,4 +1082,4 @@ async function computeReport({ assessment }) {
   };
 }
 
-module.exports = { computeReport };
+module.exports = { computeReport, computeScoreSummary };

@@ -12,7 +12,7 @@
     "postinstall": "npm run build-frontend",
     "lint": "eslint \"**/*.js\" --max-warnings=0",
     "format": "prettier --write \"**/*.{js,json,md}\"",
-    "test": "NODE_ENV=test jest"
+    "test": "NODE_ENV=test node tests/run-tests.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -35,7 +35,8 @@
     "mongodb-memory-server": "^9.0.0",
     "nodemon": "^3.1.0",
     "prettier": "^3.3.3",
-    "supertest": "^7.1.1"
+    "supertest": "^7.1.1",
+    "zod-to-json-schema": "^3.23.5"
   },
   "jest": {
     "testEnvironment": "node",
