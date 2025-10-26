@@ -1,5 +1,3 @@
-// Agama Technologies — Backend (Express + MongoDB)
-// Serves static frontend from ./public and provides API for auth, assessments, reports, and mock payments.
 require('dotenv').config();
 const path = require('path');
 const express = require('express');
@@ -9,50 +7,87 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const mongoose = require('mongoose');
 const ExcelJS = require('exceljs');
+const rateLimit = require('express-rate-limit');
+const { z } = require('zod');
 
 const app = express();
+const isProduction = process.env.NODE_ENV === 'production';
 
-// ---- Security & parsers ----
 app.use(helmet({
   contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
 }));
+if (isProduction) {
+  app.use(helmet.hsts({ maxAge: 63072000, includeSubDomains: true, preload: true }));
+}
+app.use(helmet.frameguard({ action: 'deny' }));
+app.use(helmet.referrerPolicy({ policy: 'no-referrer' }));
+
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// ---- CORS ----
-const allowed = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
-app.use(cors({
-  origin: function(origin, cb) {
-    if (!origin) return cb(null, true);
-    if (allowed.length === 0 || allowed.includes(origin)) return cb(null, true);
-    return cb(new Error('CORS blocked for origin: ' + origin));
+const allowedOrigins = new Set(
+  (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean)
+);
+const corsInstance = cors({
+  origin(origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.has(origin)) return callback(null, true);
+    return callback(new Error('CORS_NOT_ALLOWED'));
   },
   credentials: true
-}));
+});
+app.use((req, res, next) => {
+  corsInstance(req, res, err => {
+    if (err && err.message === 'CORS_NOT_ALLOWED') {
+      return res.status(403).json({ error: 'Origin not allowed' });
+    }
+    if (err) return next(err);
+    return next();
+  });
+});
 
 app.use(morgan('dev'));
 
-// ---- MongoDB ----
+const limiterDefaults = {
+  windowMs: 15 * 60 * 1000,
+  standardHeaders: true,
+  legacyHeaders: false
+};
+const authLimiter = rateLimit({ ...limiterDefaults, max: 30 });
+const projectLimiter = rateLimit({ ...limiterDefaults, max: 200 });
+const assessmentLimiter = rateLimit({ ...limiterDefaults, max: 120 });
+
+app.use('/api/auth', authLimiter);
+app.use('/api/projects', projectLimiter);
+app.use('/api/assessments', assessmentLimiter);
+app.use('/api/projects/:projectId/assessments', assessmentLimiter);
+
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/agama_tech';
 mongoose.set('strictQuery', true);
-mongoose.connect(MONGODB_URI)
+mongoose
+  .connect(MONGODB_URI)
   .then(() => console.log('✅ MongoDB connected'))
   .catch(err => {
     console.error('❌ MongoDB connection error', err);
     process.exit(1);
   });
 
-// ---- Models ----
 const User = require('./models/User');
 const Assessment = require('./models/Assessment');
 const Project = require('./models/Project');
 const Report = require('./models/Report');
 const Payment = require('./models/Payment');
 
-// ---- Utils ----
 const { requireAuth, issueTokenCookie, clearTokenCookie } = require('./middleware/auth');
+const { requireProjectOwnership } = require('./middleware/project');
+const { validateBody } = require('./middleware/validation');
 const { computeReport } = require('./utils/scoring');
+const { computeProjectAnalyticsSnapshot } = require('./utils/analytics');
 const {
   INDUSTRIES,
   OFFICIAL_ORGANISATIONS,
@@ -68,71 +103,111 @@ const {
   generateAssessmentAssistantReply
 } = require('./utils/openai');
 
-function computeProjectAnalyticsSnapshot({
-  stage,
-  riskAppetite,
-  strategicDrivers = [],
-  capabilityFocus = [],
-  companyProfile = {},
-  operatingModel = {}
-} = {}) {
-  const stageScores = {
-    'Discovery & Fit': 42,
-    'Mobilising programme': 56,
-    'Scaling transformation': 72,
-    'Optimising value': 84
-  };
-  const riskScores = {
-    'Conservative': -6,
-    'Balanced': 0,
-    'Bold innovation': 8
-  };
-  const base = stageScores[stage] || 40;
-  const risk = riskScores[riskAppetite] || 0;
-  const driverContribution = Math.min(strategicDrivers.length * 6, 24);
-  const focusContribution = Math.min(capabilityFocus.length * 5, 20);
-  const readinessScore = Math.max(
-    35,
-    Math.min(base + risk + driverContribution + focusContribution, 96)
-  );
+const signupSchema = z.object({
+  name: z.string().trim().max(120).optional(),
+  email: z.string().email(),
+  password: z.string().min(8),
+  company: z.string().trim().max(160).optional(),
+  role: z.string().trim().max(160).optional(),
+  industry: z.string().trim().max(160).optional()
+});
 
-  const narrativeSignals = [
-    companyProfile.executiveObjectives,
-    companyProfile.narrativeContext,
-    companyProfile.complianceDrivers
-  ].filter(Boolean).length;
-  const governanceSignals = [
-    operatingModel.governanceRhythms,
-    operatingModel.changeManagement,
-    operatingModel.processNotes
-  ].filter(Boolean).length;
-  const clarityScore = Math.min(45 + narrativeSignals * 12 + governanceSignals * 8, 95);
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8)
+});
 
-  const sentiment = readinessScore >= 80
-    ? 'Programme is change-ready with strong acceleration potential.'
-    : readinessScore >= 60
-      ? 'Momentum forming—reinforce governance and stakeholder choreography.'
-      : 'Establish foundational guardrails before expanding the programme.';
+const profileUpdateSchema = z.object({
+  name: z.string().trim().max(120).optional(),
+  company: z.string().trim().max(160).optional(),
+  role: z.string().trim().max(160).optional(),
+  industry: z.string().trim().max(160).optional()
+});
 
-  return {
-    readinessScore,
-    clarityScore,
-    sentiment,
-    driverCount: strategicDrivers.length,
-    focusCount: capabilityFocus.length,
-    stage,
-    riskAppetite
-  };
-}
+const projectCreateSchema = z.object({
+  name: z.string().trim().min(1).max(140),
+  companyDomain: z.string().trim().max(160).optional(),
+  industry: z.string().trim().min(1),
+  region: z.string().trim().min(1),
+  companySize: z.string().trim().min(1),
+  headcount: z.coerce.number().int().nonnegative().optional(),
+  stage: z.string().trim().max(120).optional(),
+  riskAppetite: z.string().trim().max(120).optional(),
+  strategicDrivers: z.array(z.string().trim()).max(20).optional(),
+  capabilityFocus: z.array(z.string().trim()).max(20).optional(),
+  overview: z.string().trim().max(500).optional(),
+  companyProfile: z.record(z.any()).optional(),
+  operatingModel: z.record(z.any()).optional(),
+  techLandscape: z.record(z.any()).optional(),
+  personas: z.array(z.record(z.any())).max(20).optional()
+});
 
-// ---- Routes ----
+const projectUpdateSchema = projectCreateSchema.partial();
+
+const organizationEnrichSchema = z.object({
+  query: z.string().max(200).optional(),
+  capability: z.string().optional(),
+  industry: z.string().optional(),
+  fetchDetailsFor: z.string().optional()
+});
+
+const assessmentBaseSchema = z.object({
+  stage: z.string().optional(),
+  assessmentType: z.string().optional(),
+  vertical: z.string().optional(),
+  companySize: z.string().optional(),
+  region: z.string().optional(),
+  industry: z.string().optional(),
+  strategicDrivers: z.array(z.string()).optional(),
+  organization: z.object({}).passthrough().optional(),
+  companyProfile: z.record(z.any()).optional(),
+  capabilityFocus: z.array(z.string()).optional(),
+  techLandscape: z.record(z.any()).optional(),
+  personas: z.array(z.record(z.any())).optional(),
+  vendorStrategy: z.record(z.any()).optional(),
+  operatingModel: z.record(z.any()).optional(),
+  stakeholderProfile: z.record(z.any()).optional(),
+  investmentProfile: z.record(z.any()).optional(),
+  initiativeTimeline: z.array(z.record(z.any())).optional(),
+  architectureUploads: z.array(z.record(z.any())).optional(),
+  architectureSignals: z.record(z.any()).optional(),
+  answers: z.record(z.any()).optional(),
+  premiumAnswers: z.record(z.any()).optional(),
+  extendedAnswers: z.record(z.any()).optional(),
+  commandAnswers: z.record(z.any()).optional()
+});
+
+const assessmentCreateSchema = assessmentBaseSchema.extend({
+  projectId: z.string().optional()
+});
+
+const assessmentUpdateSchema = assessmentBaseSchema.extend({
+  nextAssessmentType: z.string().optional()
+});
+
+const followUpSchema = z.object({
+  step: z.string().optional(),
+  capabilityId: z.string().optional(),
+  answers: z.record(z.any()).optional(),
+  organization: z.record(z.any()).optional(),
+  industry: z.string().optional()
+});
+
+const assistantSchema = z.object({
+  message: z.string().min(1),
+  capabilityId: z.string().optional(),
+  draft: z.record(z.any()).optional()
+});
+
+const paymentSchema = z.object({
+  reportId: z.string().min(1)
+});
+
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: Date.now() }));
 
-// Auth
-app.post('/api/auth/signup', async (req, res) => {
+app.post('/api/auth/signup', validateBody(signupSchema), async (req, res) => {
   try {
-    const { name, email, password, company, role, industry } = req.body || {};
-    if (!email || !password) return res.status(400).json({ error: 'Missing email/password' });
+    const { name, email, password, company, role, industry } = req.validatedBody;
     const existing = await User.findOne({ email: email.toLowerCase().trim() });
     if (existing) return res.status(409).json({ error: 'Email already registered' });
     const user = await User.createSecure({ name, email, password, company, role, industry });
@@ -144,12 +219,12 @@ app.post('/api/auth/signup', async (req, res) => {
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', validateBody(loginSchema), async (req, res) => {
   try {
-    const { email, password } = req.body || {};
-    const user = await User.findOne({ email: (email||'').toLowerCase().trim() });
+    const { email, password } = req.validatedBody;
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
-    const valid = await user.verifyPassword(password || '');
+    const valid = await user.verifyPassword(password);
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
     const token = issueTokenCookie(res, { uid: user._id.toString() });
     res.json({ ok: true, user: user.public(), token });
@@ -159,7 +234,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-app.post('/api/auth/logout', (req, res) => {
+app.post('/api/auth/logout', requireAuth, (req, res) => {
   clearTokenCookie(res);
   res.json({ ok: true });
 });
@@ -170,17 +245,12 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
   res.json({ ok: true, user: user.public() });
 });
 
-app.put('/api/auth/me', requireAuth, async (req, res) => {
+app.put('/api/auth/me', requireAuth, validateBody(profileUpdateSchema), async (req, res) => {
   try {
     const updates = {};
-    const payload = req.body || {};
-    ['name', 'company', 'role', 'industry'].forEach(field => {
-      if (payload[field] !== undefined) {
-        const value = String(payload[field] ?? '').trim();
-        updates[field] = value;
-      }
+    Object.entries(req.validatedBody).forEach(([key, value]) => {
+      if (value !== undefined) updates[key] = String(value).trim();
     });
-
     const user = await User.findByIdAndUpdate(req.auth.uid, updates, { new: true });
     if (!user) return res.status(404).json({ error: 'Not found' });
     res.json({ ok: true, user: user.public() });
@@ -208,58 +278,47 @@ app.delete('/api/auth/me', requireAuth, async (req, res) => {
   }
 });
 
-// Projects
 app.get('/api/projects', requireAuth, async (req, res) => {
   const projects = await Project.find({ userId: req.auth.uid }).sort({ updatedAt: -1 });
   res.json({ ok: true, projects: projects.map(project => project.public()) });
 });
 
-app.post('/api/projects', requireAuth, async (req, res) => {
+app.post('/api/projects', requireAuth, validateBody(projectCreateSchema), async (req, res) => {
   try {
-    const {
-      name,
-      companyDomain,
-      industry,
-      region,
-      companySize,
-      headcount,
-      stage,
-      riskAppetite,
-      strategicDrivers = [],
-      capabilityFocus = [],
-      overview,
-      companyProfile = {},
-      operatingModel = {},
-      techLandscape = {},
-      personas = []
-    } = req.body || {};
-
-    if (!name || !industry || !region || !companySize) {
-      return res.status(400).json({ error: 'Project name, industry, region, and company size are required.' });
-    }
-
+    const payload = req.validatedBody;
     const projectData = {
       userId: req.auth.uid,
-      name: String(name).trim().slice(0, 140),
-      companyDomain: String(companyDomain || '').trim().slice(0, 160),
-      industry,
-      region,
-      companySize,
-      headcount: Number(headcount) || 0,
-      stage,
-      riskAppetite,
-      strategicDrivers: Array.isArray(strategicDrivers) ? strategicDrivers.slice(0, 10) : [],
-      capabilityFocus: Array.isArray(capabilityFocus) ? capabilityFocus.slice(0, 12) : [],
-      overview: String(overview || '').trim().slice(0, 500),
-      companyProfile,
-      operatingModel,
-      techLandscape,
-      personas: Array.isArray(personas) ? personas.slice(0, 12) : []
+      name: String(payload.name).trim().slice(0, 140),
+      companyDomain: String(payload.companyDomain || '').trim().slice(0, 160),
+      industry: payload.industry,
+      region: payload.region,
+      companySize: payload.companySize,
+      headcount: payload.headcount || 0,
+      stage: payload.stage,
+      riskAppetite: payload.riskAppetite,
+      strategicDrivers: Array.isArray(payload.strategicDrivers)
+        ? payload.strategicDrivers.slice(0, 10)
+        : [],
+      capabilityFocus: Array.isArray(payload.capabilityFocus)
+        ? payload.capabilityFocus.slice(0, 12)
+        : [],
+      overview: String(payload.overview || '').trim().slice(0, 500),
+      companyProfile: payload.companyProfile || {},
+      operatingModel: payload.operatingModel || {},
+      techLandscape: payload.techLandscape || {},
+      personas: Array.isArray(payload.personas) ? payload.personas.slice(0, 12) : []
     };
 
-    projectData.analytics = computeProjectAnalyticsSnapshot(projectData);
+    const snapshot = computeProjectAnalyticsSnapshot(projectData);
+    const analytics = {
+      maturity: {
+        overall: snapshot.readinessScore,
+        pillars: { readiness: snapshot.readinessScore },
+        lastUpdated: new Date()
+      }
+    };
 
-    const project = await Project.create(projectData);
+    const project = await Project.create({ ...projectData, analytics });
     res.json({ ok: true, project: project.public() });
   } catch (err) {
     console.error(err);
@@ -278,12 +337,12 @@ app.get('/api/projects/:id', requireAuth, async (req, res) => {
   }
 });
 
-app.put('/api/projects/:id', requireAuth, async (req, res) => {
+app.put('/api/projects/:id', requireAuth, validateBody(projectUpdateSchema), async (req, res) => {
   try {
     const project = await Project.findOne({ _id: req.params.id, userId: req.auth.uid });
     if (!project) return res.status(404).json({ error: 'Not found' });
 
-    const updates = req.body || {};
+    const updates = req.validatedBody;
     ['name', 'companyDomain', 'industry', 'region', 'companySize', 'stage', 'riskAppetite', 'overview'].forEach(field => {
       if (updates[field] !== undefined) {
         project[field] = String(updates[field]).trim();
@@ -297,7 +356,15 @@ app.put('/api/projects/:id', requireAuth, async (req, res) => {
     if (updates.techLandscape) project.techLandscape = updates.techLandscape;
     if (Array.isArray(updates.personas)) project.personas = updates.personas.slice(0, 12);
 
-    project.analytics = computeProjectAnalyticsSnapshot(project.toObject());
+    const snapshot = computeProjectAnalyticsSnapshot(project.toObject());
+    project.analytics = {
+      maturity: {
+        overall: snapshot.readinessScore,
+        pillars: { readiness: snapshot.readinessScore },
+        lastUpdated: new Date()
+      },
+      timeseriesId: project.analytics?.timeseriesId || null
+    };
 
     await project.save();
     res.json({ ok: true, project: project.public() });
@@ -307,7 +374,6 @@ app.put('/api/projects/:id', requireAuth, async (req, res) => {
   }
 });
 
-// Assessment catalog & questions
 app.get('/api/assessments/catalog', (req, res) => {
   res.json({
     ok: true,
@@ -320,14 +386,9 @@ app.get('/api/assessments/catalog', (req, res) => {
   });
 });
 
-app.post('/api/organizations/enrich', requireAuth, async (req, res) => {
+app.post('/api/organizations/enrich', requireAuth, validateBody(organizationEnrichSchema), async (req, res) => {
   try {
-    const {
-      query,
-      capability: capabilityId = 'security',
-      industry,
-      fetchDetailsFor
-    } = req.body || {};
+    const { query, capability: capabilityId = 'security', industry, fetchDetailsFor } = req.validatedBody;
 
     const safeQuery = String(query || '').trim();
     if (!safeQuery && !fetchDetailsFor) {
@@ -374,15 +435,9 @@ app.get('/api/assessments/questions', (req, res) => {
   res.json({ ok: true, stage: safeStage, questions });
 });
 
-app.post('/api/assessments/follow-up', requireAuth, async (req, res) => {
+app.post('/api/assessments/follow-up', requireAuth, validateBody(followUpSchema), async (req, res) => {
   try {
-    const {
-      step,
-      capabilityId = 'security',
-      answers = {},
-      organization = {},
-      industry = ''
-    } = req.body || {};
+    const { step, capabilityId = 'security', answers = {}, organization = {}, industry = '' } = req.validatedBody;
     const capability = getCapability(capabilityId) || CAPABILITY_CATALOG[0];
     const prompts = await generateFollowUpPrompts({
       step,
@@ -398,12 +453,9 @@ app.post('/api/assessments/follow-up', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/assessments/assistant', requireAuth, async (req, res) => {
+app.post('/api/assessments/assistant', requireAuth, validateBody(assistantSchema), async (req, res) => {
   try {
-    const { message, capabilityId = 'security', draft = {} } = req.body || {};
-    if (!message || String(message).trim().length === 0) {
-      return res.status(400).json({ error: 'Message is required' });
-    }
+    const { message, capabilityId = 'security', draft = {} } = req.validatedBody;
     const capability = getCapability(capabilityId) || CAPABILITY_CATALOG[0];
     const reply = await generateAssessmentAssistantReply({
       message: String(message).slice(0, 800),
@@ -417,185 +469,334 @@ app.post('/api/assessments/assistant', requireAuth, async (req, res) => {
   }
 });
 
-// Create assessment -> compute report (partial by default)
-app.post('/api/assessments', requireAuth, async (req, res) => {
-  try {
-    const {
-      projectId,
-      stage = 'insight',
-      assessmentType = 'security',
-      vertical: verticalRaw = 'generic',
-      companySize = 'SMB',
-      region = 'EMEA',
-      industry = '',
-      strategicDrivers = [],
-      organization = {},
-      companyProfile = {},
-      capabilityFocus = [],
-      techLandscape = {},
-      personas = [],
-      vendorStrategy = {},
-      operatingModel = {},
-      stakeholderProfile = {},
-      investmentProfile = {},
-      initiativeTimeline = [],
-      architectureUploads = [],
-      architectureSignals = {},
-      answers = {},
-      premiumAnswers = {},
-      extendedAnswers = {},
-      commandAnswers = {}
-    } = req.body || {};
+async function buildAssessmentPayload({ assessment, payload, project, capability, profileIntel }) {
+  const normaliseList = value => {
+    if (Array.isArray(value)) return value;
+    if (!value) return [];
+    return String(value)
+      .split(/\n|;|\r|\u2022/g)
+      .map(item => item.trim())
+      .filter(Boolean)
+      .slice(0, 12);
+  };
 
-    if (!projectId) {
+  const mergedCompanyProfile = {
+    ...(assessment.companyProfile || {}),
+    ...(payload.companyProfile || {})
+  };
+
+  if (!mergedCompanyProfile.headcount && profileIntel.headcountEstimate) {
+    mergedCompanyProfile.headcount = profileIntel.headcountEstimate;
+  }
+  if (!mergedCompanyProfile.annualRevenue && profileIntel.annualRevenueEstimate) {
+    mergedCompanyProfile.annualRevenue = profileIntel.annualRevenueEstimate;
+  }
+  if (!mergedCompanyProfile.turnover && profileIntel.turnover) {
+    mergedCompanyProfile.turnover = profileIntel.turnover;
+  }
+  mergedCompanyProfile.investmentRounds = normaliseList(
+    mergedCompanyProfile.investmentRounds || profileIntel.investmentHighlights
+  );
+  mergedCompanyProfile.keyInitiatives = normaliseList(
+    mergedCompanyProfile.keyInitiatives || (profileIntel.keyInitiatives || []).map(k => `${k.name}: ${k.objective || k.description || ''}`)
+  );
+  mergedCompanyProfile.organisationStructure = normaliseList(
+    mergedCompanyProfile.organisationStructure || (profileIntel.organisationStructure || []).map(o => `${o.function || o.leader}: ${o.remit || ''}`)
+  );
+  mergedCompanyProfile.discoveryObjectives = normaliseList(
+    mergedCompanyProfile.discoveryObjectives || (profileIntel.discoveryObjectives || []).map(d => `${d.objective || ''}${d.linkedKpis ? ` · KPIs: ${Array.isArray(d.linkedKpis) ? d.linkedKpis.join(', ') : d.linkedKpis}` : ''}${d.timeframe ? ` · ${d.timeframe}` : ''}`)
+  );
+  if (!mergedCompanyProfile.personaKpis && profileIntel.personaKpis) {
+    mergedCompanyProfile.personaKpis = profileIntel.personaKpis;
+  }
+
+  assessment.companyProfile = mergedCompanyProfile;
+  assessment.capabilityFocus = Array.isArray(payload.capabilityFocus) && payload.capabilityFocus.length
+    ? payload.capabilityFocus
+    : assessment.capabilityFocus?.length
+      ? assessment.capabilityFocus
+      : project?.capabilityFocus?.length
+        ? project.capabilityFocus
+        : capability.domains;
+  assessment.techLandscape = { ...(project?.techLandscape || {}), ...(assessment.techLandscape || {}), ...(payload.techLandscape || {}) };
+  assessment.vendorStrategy = { ...(assessment.vendorStrategy || {}), ...(payload.vendorStrategy || {}) };
+  assessment.operatingModel = {
+    ...(project?.operatingModel || {}),
+    ...(assessment.operatingModel || {}),
+    ...(payload.operatingModel || {}),
+    discoveryObjectives: payload.operatingModel?.discoveryObjectives || mergedCompanyProfile.discoveryObjectives
+  };
+  assessment.personas = Array.isArray(payload.personas) && payload.personas.length
+    ? payload.personas
+    : assessment.personas?.length
+      ? assessment.personas
+      : project?.personas?.length
+        ? project.personas
+        : capability.personas;
+  assessment.answers = { ...(assessment.answers || {}), ...(payload.answers || {}) };
+  assessment.premiumAnswers = { ...(assessment.premiumAnswers || {}), ...(payload.premiumAnswers || {}) };
+  assessment.extendedAnswers = { ...(assessment.extendedAnswers || {}), ...(payload.extendedAnswers || {}) };
+  assessment.commandAnswers = { ...(assessment.commandAnswers || {}), ...(payload.commandAnswers || {}) };
+
+  const newArchitectureSignals = Object.fromEntries(
+    Object.entries(payload.architectureSignals || {}).map(([key, value]) => [key, String(value || '').slice(0, 1000)])
+  );
+  if (Array.isArray(profileIntel.architectureSignals)) {
+    newArchitectureSignals.organisationIntel = profileIntel.architectureSignals.slice(0, 10);
+  }
+  if (Array.isArray(profileIntel.renewalCalendar)) {
+    newArchitectureSignals.renewalCalendar = profileIntel.renewalCalendar.slice(0, 10);
+  }
+  assessment.architectureSignals = {
+    ...(assessment.architectureSignals || {}),
+    ...newArchitectureSignals
+  };
+
+  if (Array.isArray(payload.initiativeTimeline)) {
+    assessment.initiativeTimeline = payload.initiativeTimeline.slice(0, 10).map(item => ({
+      title: String(item?.title || '').slice(0, 160),
+      owner: String(item?.owner || '').slice(0, 120),
+      timeline: String(item?.timeline || '').slice(0, 80),
+      outcome: String(item?.outcome || '').slice(0, 200),
+      description: String(item?.description || '').slice(0, 240)
+    }));
+  }
+
+  assessment.architectureUploads = Array.isArray(payload.architectureUploads)
+    ? payload.architectureUploads.slice(0, 10)
+    : assessment.architectureUploads || [];
+  assessment.stakeholderProfile = {
+    ...(assessment.stakeholderProfile || {}),
+    ...(payload.stakeholderProfile || {})
+  };
+  assessment.investmentProfile = {
+    ...(assessment.investmentProfile || {}),
+    ...(payload.investmentProfile || {})
+  };
+}
+
+async function createAssessment({ userId, project, payload }) {
+  const stageMap = { free: 'insight', premium: 'strategic' };
+  const requestedStage = stageMap[payload.stage] || payload.stage;
+  const allowedStages = ['insight', 'strategic', 'command'];
+  const safeStage = allowedStages.includes(requestedStage) ? requestedStage : 'insight';
+  const safeVertical = String(payload.vertical || 'generic').toLowerCase();
+  const vertical = ['generic', 'saas'].includes(safeVertical) ? safeVertical : 'generic';
+  const capability = getCapability(payload.assessmentType || 'security');
+
+  let organizationIntel = {};
+  const organization = payload.organization || {};
+  if (organization?.name) {
+    organizationIntel = await fetchOrganizationIntel({
+      organization: organization.name,
+      assessmentType: capability.name,
+      industry: payload.industry || vertical
+    });
+  }
+
+  const profileIntel = organizationIntel?.profile || {};
+
+  const assessment = await Assessment.create({
+    userId,
+    projectId: project._id,
+    stage: safeStage,
+    assessmentType: capability.id,
+    vertical,
+    companySize: payload.companySize || 'SMB',
+    region: payload.region || 'EMEA',
+    industry: payload.industry || '',
+    strategicDrivers: Array.isArray(payload.strategicDrivers) ? payload.strategicDrivers : [],
+    organization: {
+      name: organization?.name || project?.companyProfile?.legalName || '',
+      extract:
+        organization?.extract ||
+        organizationIntel.summary ||
+        project?.companyProfile?.summary ||
+        '',
+      intel: organizationIntel
+    },
+    companyProfile: {},
+    capabilityFocus: Array.isArray(payload.capabilityFocus) ? payload.capabilityFocus : [],
+    techLandscape: payload.techLandscape || {},
+    personas: Array.isArray(payload.personas) ? payload.personas : [],
+    vendorStrategy: payload.vendorStrategy || {},
+    operatingModel: payload.operatingModel || {},
+    stakeholderProfile: payload.stakeholderProfile || {},
+    investmentProfile: payload.investmentProfile || {},
+    initiativeTimeline: Array.isArray(payload.initiativeTimeline) ? payload.initiativeTimeline : [],
+    architectureUploads: Array.isArray(payload.architectureUploads) ? payload.architectureUploads : [],
+    architectureSignals: payload.architectureSignals || {},
+    answers: payload.answers || {},
+    premiumAnswers: payload.premiumAnswers || {},
+    extendedAnswers: payload.extendedAnswers || {},
+    commandAnswers: payload.commandAnswers || {},
+    projectSnapshot: project.public()
+  });
+
+  await buildAssessmentPayload({ assessment, payload, project, capability, profileIntel });
+  assessment.projectSnapshot = project.public();
+  await assessment.save();
+
+  const reportData = await computeReport({ assessment });
+  const report = await Report.findOneAndUpdate(
+    { assessmentId: assessment._id, userId },
+    {
+      ...reportData,
+      paid: true,
+      assessmentId: assessment._id,
+      userId,
+      projectId: assessment.projectId
+    },
+    { new: true, upsert: true, setDefaultsOnInsert: true }
+  );
+
+  return { assessment, report };
+}
+
+async function updateAssessment({ assessment, project, payload }) {
+  const targetType = payload.nextAssessmentType || assessment.assessmentType;
+  const capability = getCapability(targetType);
+  assessment.assessmentType = capability.id;
+
+  let organizationIntel = assessment.organization?.intel || {};
+  const organization = payload.organization || {};
+  if (organization?.name && organization.name !== assessment.organization?.name) {
+    organizationIntel = await fetchOrganizationIntel({
+      organization: organization.name,
+      assessmentType: capability.name,
+      industry: assessment.industry || assessment.vertical
+    });
+  } else if (!organization?.name) {
+    organizationIntel = {};
+  }
+
+  assessment.stage = 'strategic';
+  if (payload.industry) assessment.industry = payload.industry;
+  if (payload.companySize) assessment.companySize = payload.companySize;
+  if (payload.region) assessment.region = payload.region;
+  assessment.strategicDrivers = Array.isArray(payload.strategicDrivers) && payload.strategicDrivers.length
+    ? payload.strategicDrivers
+    : assessment.strategicDrivers;
+
+  const orgName = organization?.name || '';
+  assessment.organization = {
+    name: orgName || project?.companyProfile?.legalName || '',
+    extract: orgName
+      ? organizationIntel.summary || organization?.extract || assessment.organization?.extract || project?.companyProfile?.summary || ''
+      : project?.companyProfile?.summary || assessment.organization?.extract || '',
+    intel: orgName ? organizationIntel : assessment.organization?.intel || {}
+  };
+
+  const profileIntel = organizationIntel?.profile || {};
+
+    await buildAssessmentPayload({ assessment, payload, project, capability, profileIntel });
+    assessment.projectSnapshot = project.public();
+    await assessment.save();
+
+  const reportData = await computeReport({ assessment });
+  const report = await Report.findOneAndUpdate(
+    { assessmentId: assessment._id, userId: assessment.userId },
+    {
+      ...reportData,
+      paid: true,
+      assessmentId: assessment._id,
+      userId: assessment.userId,
+      projectId: assessment.projectId
+    },
+    { new: true, upsert: true, setDefaultsOnInsert: true }
+  );
+
+  return { assessment, report };
+}
+
+app.get('/api/projects/:projectId/assessments', requireAuth, requireProjectOwnership('projectId'), async (req, res) => {
+  const assessments = await Assessment.find({ userId: req.auth.uid, projectId: req.project._id })
+    .sort({ updatedAt: -1 });
+  res.json({ ok: true, assessments });
+});
+
+app.post(
+  '/api/projects/:projectId/assessments',
+  requireAuth,
+  requireProjectOwnership('projectId'),
+  validateBody(assessmentBaseSchema),
+  async (req, res) => {
+    try {
+      const payload = req.validatedBody;
+      const { assessment, report } = await createAssessment({
+        userId: req.auth.uid,
+        project: req.project,
+        payload
+      });
+      res.json({ ok: true, assessmentId: assessment._id, reportId: report._id, stage: report.stage });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Server error' });
+    }
+  }
+);
+
+app.get(
+  '/api/projects/:projectId/assessments/:assessmentId',
+  requireAuth,
+  requireProjectOwnership('projectId'),
+  async (req, res) => {
+    try {
+      const assessment = await Assessment.findOne({
+        _id: req.params.assessmentId,
+        userId: req.auth.uid,
+        projectId: req.project._id
+      });
+      if (!assessment) return res.status(404).json({ error: 'Not found' });
+      res.json({ ok: true, assessment, project: req.project.public() });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Server error' });
+    }
+  }
+);
+
+app.put(
+  '/api/projects/:projectId/assessments/:assessmentId',
+  requireAuth,
+  requireProjectOwnership('projectId'),
+  validateBody(assessmentUpdateSchema),
+  async (req, res) => {
+    try {
+      const assessment = await Assessment.findOne({
+        _id: req.params.assessmentId,
+        userId: req.auth.uid,
+        projectId: req.project._id
+      });
+      if (!assessment) return res.status(404).json({ error: 'Not found' });
+      const { report } = await updateAssessment({
+        assessment,
+        project: req.project,
+        payload: req.validatedBody
+      });
+      res.json({ ok: true, assessmentId: assessment._id, reportId: report._id, stage: report.stage });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Server error' });
+    }
+  }
+);
+
+app.post('/api/assessments', requireAuth, validateBody(assessmentCreateSchema), async (req, res) => {
+  try {
+    const payload = req.validatedBody;
+    if (!payload.projectId) {
       return res.status(400).json({ error: 'A project is required before starting an assessment.' });
     }
-
-    const project = await Project.findOne({ _id: projectId, userId: req.auth.uid });
+    const project = await Project.findOne({ _id: payload.projectId, userId: req.auth.uid });
     if (!project) {
-      return res.status(404).json({ error: 'Project not found' });
+      return res.status(403).json({ error: 'Forbidden' });
     }
-
-    const stageMap = { free: 'insight', premium: 'strategic' };
-    const requestedStage = stageMap[stage] || stage;
-    const allowedStages = ['insight', 'strategic', 'command'];
-    const safeStage = allowedStages.includes(requestedStage) ? requestedStage : 'insight';
-    const safeVertical = String(verticalRaw || 'generic').toLowerCase();
-    const vertical = ['generic', 'saas'].includes(safeVertical) ? safeVertical : 'generic';
-    const capability = getCapability(assessmentType);
-
-    let organizationIntel = {};
-    if (organization?.name) {
-      organizationIntel = await fetchOrganizationIntel({
-        organization: organization.name,
-        assessmentType: capability.name,
-        industry: industry || vertical
-      });
-    }
-
-    const profileIntel = organizationIntel?.profile || {};
-
-    const normaliseList = (value) => {
-      if (Array.isArray(value)) return value;
-      if (!value) return [];
-      return String(value)
-        .split(/\n|;|\r|\u2022/g)
-        .map(item => item.trim())
-        .filter(Boolean)
-        .slice(0, 12);
-    };
-
-    const enrichedCompanyProfile = {
-      ...project.companyProfile,
-      ...companyProfile,
-      headcount: companyProfile.headcount || profileIntel.headcountEstimate || profileIntel.employeeRange,
-      annualRevenue: companyProfile.annualRevenue || project.companyProfile?.annualRevenue || profileIntel.annualRevenueEstimate,
-      turnover: companyProfile.turnover || project.companyProfile?.turnover || profileIntel.turnover,
-      investmentRounds: normaliseList(companyProfile.investmentRounds || project.companyProfile?.investmentRounds || profileIntel.investmentHighlights),
-      keyInitiatives: normaliseList(
-        companyProfile.keyInitiatives || project.companyProfile?.keyInitiatives || (profileIntel.keyInitiatives || []).map(k => `${k.name}: ${k.objective || k.description || ''}`)
-      ),
-      organisationStructure: normaliseList(
-        companyProfile.organisationStructure || project.companyProfile?.organisationStructure || (profileIntel.organisationStructure || []).map(o => `${o.function || o.leader}: ${o.remit || ''}`)
-      ),
-      personaKpis: companyProfile.personaKpis || project.companyProfile?.personaKpis || profileIntel.personaKpis || {},
-      discoveryObjectives: normaliseList(
-        companyProfile.discoveryObjectives || project.companyProfile?.discoveryObjectives || (profileIntel.discoveryObjectives || []).map(d => `${d.objective || ''}${d.linkedKpis ? ` · KPIs: ${Array.isArray(d.linkedKpis) ? d.linkedKpis.join(', ') : d.linkedKpis}` : ''}${d.timeframe ? ` · ${d.timeframe}` : ''}`)
-      )
-    };
-
-    const normalizedTimeline = Array.isArray(initiativeTimeline)
-      ? initiativeTimeline.slice(0, 10).map(item => ({
-          title: String(item?.title || '').slice(0, 160),
-          owner: String(item?.owner || '').slice(0, 120),
-          timeline: String(item?.timeline || '').slice(0, 80),
-          outcome: String(item?.outcome || '').slice(0, 200),
-          description: String(item?.description || '').slice(0, 240)
-        }))
-      : [];
-
-    const sanitizedUploads = Array.isArray(architectureUploads)
-      ? architectureUploads.slice(0, 5).map(file => ({
-          filename: String(file?.filename || '').slice(0, 140),
-          mimeType: String(file?.mimeType || '').slice(0, 80),
-          data: typeof file?.data === 'string' ? file.data.slice(0, 2_000_000) : ''
-        }))
-      : [];
-
-    const sanitizedSignals = Object.fromEntries(
-      Object.entries(architectureSignals || {}).map(([key, value]) => [key, String(value || '').slice(0, 1000)])
-    );
-    if (Array.isArray(profileIntel.architectureSignals)) {
-      sanitizedSignals.organisationIntel = profileIntel.architectureSignals.slice(0, 10);
-    }
-    if (Array.isArray(profileIntel.renewalCalendar)) {
-      sanitizedSignals.renewalCalendar = profileIntel.renewalCalendar.slice(0, 10);
-    }
-
-    const storedExtendedAnswers =
-      safeStage === 'insight'
-        ? {}
-        : Object.keys(extendedAnswers || {}).length
-          ? extendedAnswers
-          : Object.keys(premiumAnswers || {}).length
-            ? premiumAnswers
-            : {};
-
-    const storedPremiumAnswers =
-      safeStage === 'strategic' && !Object.keys(extendedAnswers || {}).length
-        ? premiumAnswers
-        : {};
-
-    const storedCommandAnswers = safeStage === 'command' ? commandAnswers : {};
-
-    const assessment = await Assessment.create({
+    const { assessment, report } = await createAssessment({
       userId: req.auth.uid,
-      projectId: project._id,
-      assessmentType,
-      stage: safeStage,
-      vertical,
-      industry: industry || project.industry,
-      companySize: companySize || project.companySize,
-      region: region || project.region,
-      strategicDrivers: strategicDrivers.length ? strategicDrivers : project.strategicDrivers,
-      organization: {
-        name: organization?.name || project.companyProfile?.legalName || '',
-        extract: organizationIntel.summary || organization?.extract || project.companyProfile?.summary || '',
-        intel: organizationIntel
-      },
-      companyProfile: enrichedCompanyProfile,
-      capabilityFocus: capabilityFocus.length ? capabilityFocus : (project.capabilityFocus?.length ? project.capabilityFocus : capability.domains),
-      techLandscape,
-      vendorStrategy,
-      operatingModel: {
-        ...project.operatingModel,
-        ...operatingModel,
-        discoveryObjectives: operatingModel.discoveryObjectives || project.operatingModel?.discoveryObjectives || enrichedCompanyProfile.discoveryObjectives
-      },
-      stakeholderProfile,
-      investmentProfile,
-      initiativeTimeline: normalizedTimeline,
-      architectureUploads: sanitizedUploads,
-      architectureSignals: sanitizedSignals,
-      personas: personas.length ? personas : (project.personas?.length ? project.personas : capability.personas),
-      answers,
-      premiumAnswers: storedPremiumAnswers,
-      extendedAnswers: storedExtendedAnswers,
-      commandAnswers: storedCommandAnswers,
-      projectSnapshot: project.public()
+      project,
+      payload
     });
-
-    const reportData = await computeReport({ assessment });
-    const report = await Report.create({
-      userId: req.auth.uid,
-      assessmentId: assessment._id,
-      projectId: project._id,
-      ...reportData,
-      architectureUploads: sanitizedUploads,
-      architectureSignals: sanitizedSignals,
-      paid: safeStage !== 'insight'
-    });
-
     res.json({ ok: true, assessmentId: assessment._id, reportId: report._id, stage: report.stage });
   } catch (err) {
     console.error(err);
@@ -608,154 +809,30 @@ app.get('/api/assessments/:id', requireAuth, async (req, res) => {
     const assessment = await Assessment.findOne({ _id: req.params.id, userId: req.auth.uid });
     if (!assessment) return res.status(404).json({ error: 'Not found' });
 
-    let project = null;
-    if (assessment.projectId) {
-      const projectDoc = await Project.findOne({ _id: assessment.projectId, userId: req.auth.uid });
-      project = projectDoc ? projectDoc.public() : null;
+    const projectDoc = await Project.findOne({ _id: assessment.projectId, userId: req.auth.uid });
+    if (!projectDoc) {
+      return res.status(403).json({ error: 'Forbidden' });
     }
-    res.json({ ok: true, assessment, project });
+    res.json({ ok: true, assessment, project: projectDoc.public() });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-app.put('/api/assessments/:id/premium', requireAuth, async (req, res) => {
+app.put('/api/assessments/:id/premium', requireAuth, validateBody(assessmentUpdateSchema), async (req, res) => {
   try {
     const assessment = await Assessment.findOne({ _id: req.params.id, userId: req.auth.uid });
     if (!assessment) return res.status(404).json({ error: 'Not found' });
-
-    const {
-      strategicDrivers = [],
-      organization = {},
-      companyProfile = {},
-      capabilityFocus = [],
-      techLandscape = {},
-      vendorStrategy = {},
-      operatingModel = {},
-      personas = [],
-      answers = {},
-      premiumAnswers = {},
-      architectureSignals = {},
-      nextAssessmentType,
-      industry: industryInput,
-      companySize: companySizeInput,
-      region: regionInput
-    } = req.body || {};
-
-    const targetType = nextAssessmentType || assessment.assessmentType;
-    const capability = getCapability(targetType);
-    assessment.assessmentType = capability.id;
-
-    let organizationIntel = assessment.organization?.intel || {};
-    if (organization?.name && organization.name !== assessment.organization?.name) {
-      organizationIntel = await fetchOrganizationIntel({
-        organization: organization.name,
-        assessmentType: capability.name,
-        industry: assessment.industry || assessment.vertical
-      });
-    } else if (!organization?.name) {
-      organizationIntel = {};
+    const project = await Project.findOne({ _id: assessment.projectId, userId: req.auth.uid });
+    if (!project) {
+      return res.status(403).json({ error: 'Forbidden' });
     }
-
-    assessment.stage = 'strategic';
-    if (industryInput) assessment.industry = industryInput;
-    if (companySizeInput) assessment.companySize = companySizeInput;
-    if (regionInput) assessment.region = regionInput;
-    assessment.strategicDrivers = strategicDrivers.length ? strategicDrivers : assessment.strategicDrivers;
-    const orgName = organization?.name || '';
-    assessment.organization = {
-      name: orgName || project?.companyProfile?.legalName || '',
-      extract: orgName
-        ? (organizationIntel.summary || organization?.extract || assessment.organization?.extract || project?.companyProfile?.summary || '')
-        : (project?.companyProfile?.summary || assessment.organization?.extract || ''),
-      intel: orgName ? organizationIntel : (assessment.organization?.intel || {})
-    };
-    const profileIntel = organizationIntel?.profile || {};
-    const normaliseList = (value) => {
-      if (Array.isArray(value)) return value;
-      if (!value) return [];
-      return String(value)
-        .split(/\n|;|\r|\u2022/g)
-        .map(item => item.trim())
-        .filter(Boolean)
-        .slice(0, 12);
-    };
-
-    const mergedCompanyProfile = {
-      ...(assessment.companyProfile || {}),
-      ...companyProfile
-    };
-
-    if (!mergedCompanyProfile.headcount && profileIntel.headcountEstimate) {
-      mergedCompanyProfile.headcount = profileIntel.headcountEstimate;
-    }
-    if (!mergedCompanyProfile.annualRevenue && profileIntel.annualRevenueEstimate) {
-      mergedCompanyProfile.annualRevenue = profileIntel.annualRevenueEstimate;
-    }
-    if (!mergedCompanyProfile.turnover && profileIntel.turnover) {
-      mergedCompanyProfile.turnover = profileIntel.turnover;
-    }
-    mergedCompanyProfile.investmentRounds = normaliseList(
-      mergedCompanyProfile.investmentRounds || profileIntel.investmentHighlights
-    );
-    mergedCompanyProfile.keyInitiatives = normaliseList(
-      mergedCompanyProfile.keyInitiatives || (profileIntel.keyInitiatives || []).map(k => `${k.name}: ${k.objective || k.description || ''}`)
-    );
-    mergedCompanyProfile.organisationStructure = normaliseList(
-      mergedCompanyProfile.organisationStructure || (profileIntel.organisationStructure || []).map(o => `${o.function || o.leader}: ${o.remit || ''}`)
-    );
-    mergedCompanyProfile.discoveryObjectives = normaliseList(
-      mergedCompanyProfile.discoveryObjectives || (profileIntel.discoveryObjectives || []).map(d => `${d.objective || ''}${d.linkedKpis ? ` · KPIs: ${Array.isArray(d.linkedKpis) ? d.linkedKpis.join(', ') : d.linkedKpis}` : ''}${d.timeframe ? ` · ${d.timeframe}` : ''}`)
-    );
-    if (!mergedCompanyProfile.personaKpis && profileIntel.personaKpis) {
-      mergedCompanyProfile.personaKpis = profileIntel.personaKpis;
-    }
-
-    assessment.companyProfile = mergedCompanyProfile;
-    assessment.capabilityFocus = capabilityFocus.length
-      ? capabilityFocus
-      : (assessment.capabilityFocus?.length ? assessment.capabilityFocus : (project?.capabilityFocus?.length ? project.capabilityFocus : capability.domains));
-    assessment.techLandscape = { ...(project?.techLandscape || {}), ...(assessment.techLandscape || {}), ...techLandscape };
-    assessment.vendorStrategy = { ...(assessment.vendorStrategy || {}), ...vendorStrategy };
-    assessment.operatingModel = {
-      ...(project?.operatingModel || {}),
-      ...(assessment.operatingModel || {}),
-      ...operatingModel,
-      discoveryObjectives: operatingModel.discoveryObjectives || mergedCompanyProfile.discoveryObjectives
-    };
-    assessment.personas = personas.length
-      ? personas
-      : (assessment.personas?.length ? assessment.personas : (project?.personas?.length ? project.personas : capability.personas));
-    assessment.answers = { ...(assessment.answers || {}), ...answers };
-    assessment.premiumAnswers = { ...(assessment.premiumAnswers || {}), ...premiumAnswers };
-    const newArchitectureSignals = Object.fromEntries(
-      Object.entries(architectureSignals || {}).map(([key, value]) => [key, String(value || '').slice(0, 1000)])
-    );
-    if (Array.isArray(profileIntel.architectureSignals)) {
-      newArchitectureSignals.organisationIntel = profileIntel.architectureSignals.slice(0, 10);
-    }
-    if (Array.isArray(profileIntel.renewalCalendar)) {
-      newArchitectureSignals.renewalCalendar = profileIntel.renewalCalendar.slice(0, 10);
-    }
-    assessment.architectureSignals = {
-      ...(assessment.architectureSignals || {}),
-      ...newArchitectureSignals
-    };
-
-    if (project) {
-      assessment.projectSnapshot = project.public();
-    }
-
-    await assessment.save();
-
-    const reportData = await computeReport({ assessment });
-    const report = await Report.findOneAndUpdate(
-      { assessmentId: assessment._id, userId: req.auth.uid },
-      { ...reportData, paid: true, assessmentId: assessment._id, userId: req.auth.uid, projectId: assessment.projectId },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    );
-
+    const { report } = await updateAssessment({
+      assessment,
+      project,
+      payload: req.validatedBody
+    });
     res.json({ ok: true, assessmentId: assessment._id, reportId: report._id, stage: report.stage });
   } catch (err) {
     console.error(err);
@@ -763,7 +840,6 @@ app.put('/api/assessments/:id/premium', requireAuth, async (req, res) => {
   }
 });
 
-// Fetch report (partial view if not paid)
 app.get('/api/reports/:id', requireAuth, async (req, res) => {
   try {
     const rep = await Report.findOne({ _id: req.params.id, userId: req.auth.uid });
@@ -780,15 +856,19 @@ app.get('/api/reports/:id', requireAuth, async (req, res) => {
       pillarScores: rep.pillarScores,
       benchmarks: { medians: rep.benchmarks?.medians },
       recommendations: rep.recommendations.slice(0, 3),
-      competitorSummary: rep.competitorSummary ? {
-        percentile: rep.competitorSummary.percentile,
-        narrative: rep.competitorSummary.narrative,
-        median: rep.competitorSummary.median
-      } : undefined,
+      competitorSummary: rep.competitorSummary
+        ? {
+            percentile: rep.competitorSummary.percentile,
+            narrative: rep.competitorSummary.narrative,
+            median: rep.competitorSummary.median
+          }
+        : undefined,
       pillarInsights: Object.fromEntries(Object.entries(rep.pillarInsights || {}).slice(0, 1)),
       investmentOutlook: {
         savingsNarrative: rep.investmentOutlook?.savingsNarrative,
-        pillarAllocations: Object.fromEntries(Object.entries(rep.investmentOutlook?.pillarAllocations || {}).slice(0, 1))
+        pillarAllocations: Object.fromEntries(
+          Object.entries(rep.investmentOutlook?.pillarAllocations || {}).slice(0, 1)
+        )
       },
       roadmap: Object.fromEntries(Object.entries(rep.roadmap || {}).slice(0, 1)),
       technologyRadar: (rep.technologyRadar || []).slice(0, 1),
@@ -796,77 +876,44 @@ app.get('/api/reports/:id', requireAuth, async (req, res) => {
       riskRegister: (rep.riskRegister || []).slice(0, 1),
       revenueOpportunities: (rep.revenueOpportunities || []).slice(0, 1),
       operationalPlan: Object.fromEntries(Object.entries(rep.operationalPlan || {}).slice(0, 1)),
-      aiNarrative: rep.aiNarrative && rep.aiNarrative.executiveSummary ? { executiveSummary: rep.aiNarrative.executiveSummary } : {},
+      aiNarrative:
+        rep.aiNarrative && rep.aiNarrative.executiveSummary
+          ? { executiveSummary: rep.aiNarrative.executiveSummary }
+          : {},
       architectureSignals: rep.architectureSignals || {},
-      architectureBlueprint: {},
-      roiMap: [],
-      renewalCalendar: [],
-      personaIntelligence: {},
-      paid: rep.paid,
-      partial: !rep.paid
+      investmentProfile: rep.investmentProfile || {},
+      personas: rep.personas || []
     };
-    res.json({ ok: true, report: rep.paid ? rep : partial });
+    res.json({ ok: true, report: rep.paid ? rep : partial, paid: rep.paid });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Unable to load report' });
   }
 });
 
 app.get('/api/reports/:id/export', requireAuth, async (req, res) => {
   try {
-    const rep = await Report.findOne({ _id: req.params.id, userId: req.auth.uid });
-    if (!rep) return res.status(404).json({ error: 'Not found' });
+    const report = await Report.findOne({ _id: req.params.id, userId: req.auth.uid });
+    if (!report) return res.status(404).json({ error: 'Not found' });
 
     const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('Value Path');
+    const sheet = workbook.addWorksheet('Assessment Summary');
     sheet.columns = [
-      { header: 'Section', key: 'section', width: 28 },
-      { header: 'Details', key: 'details', width: 90 }
+      { header: 'Metric', key: 'metric', width: 40 },
+      { header: 'Value', key: 'value', width: 80 }
     ];
 
-    sheet.addRow({ section: 'Organisation', details: rep.structuredSections?.overview?.organisation || 'N/A' });
-    sheet.addRow({ section: 'Summary', details: rep.summary || '' });
-    sheet.addRow({ section: 'Strategic Drivers', details: (rep.structuredSections?.overview?.strategicDrivers || []).join('; ') });
-    sheet.addRow({ section: 'Capability Focus', details: (rep.structuredSections?.overview?.capabilityFocus || []).join('; ') });
-    sheet.addRow({ section: 'Headline Score', details: `${rep.headlineScore} (Percentile ${rep.competitorSummary?.percentile || '--'})` });
+    const summaryData = [
+      ['Headline Score', report.headlineScore],
+      ['Stage', report.stage],
+      ['Vertical', report.vertical],
+      ['Assessment Type', report.assessmentType],
+      ['Summary', report.summary]
+    ];
 
-    sheet.addRow({ section: '---', details: 'Technology' });
-    (rep.structuredSections?.technology?.toolingSnapshot || []).forEach(item => {
-      sheet.addRow({ section: `Tech · ${item.area}`, details: item.tools.join(', ') });
-    });
-    (rep.structuredSections?.technology?.vendorSignals || []).forEach(item => {
-      sheet.addRow({ section: `Vendor · ${item.theme}`, details: `${(item.vendors || []).join(', ')} — ${item.note || ''}` });
-    });
+    summaryData.forEach(([metric, value]) => sheet.addRow({ metric, value }));
 
-    sheet.addRow({ section: '---', details: 'Data & Analytics' });
-    (rep.structuredSections?.data?.pipelines || []).forEach(entry => {
-      sheet.addRow({ section: 'Pipeline', details: entry });
-    });
-    (rep.structuredSections?.data?.insightExpectations || []).forEach(entry => {
-      sheet.addRow({ section: 'Insights', details: entry });
-    });
-
-    sheet.addRow({ section: '---', details: 'People & Process' });
-    (rep.structuredSections?.people?.organisationStructure || []).forEach(entry => {
-      sheet.addRow({ section: 'Org Structure', details: entry });
-    });
-    sheet.addRow({ section: 'Talent Focus', details: rep.structuredSections?.people?.talentFocus || '' });
-    sheet.addRow({ section: 'Change Management', details: rep.structuredSections?.people?.changeManagement || '' });
-    sheet.addRow({ section: 'Governance', details: rep.structuredSections?.process?.governanceCadence || '' });
-    sheet.addRow({ section: 'Procurement', details: rep.structuredSections?.process?.procurement || '' });
-    sheet.addRow({ section: 'Reporting Chains', details: rep.structuredSections?.process?.reportingChains || '' });
-    sheet.addRow({ section: 'MTTI Strategy', details: rep.structuredSections?.process?.meanTimeToInnocence || '' });
-
-    sheet.addRow({ section: '---', details: 'Value Path Phases' });
-    (rep.valuePath || []).forEach(phase => {
-      sheet.addRow({
-        section: phase.phase,
-        details: `Duration: ${phase.duration || 'n/a'} | Focus: ${phase.focusPillar} | Target: ${phase.targetScore} | Coverage: ${phase.coverageFocus}`
-      });
-    });
-
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `${(rep.structuredSections?.overview?.organisation || 'agama-plan')}-${timestamp}.xlsx`;
+    const filename = `assessment-report-${report._id}.xlsx`;
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     await workbook.xlsx.write(res);
@@ -877,7 +924,6 @@ app.get('/api/reports/:id/export', requireAuth, async (req, res) => {
   }
 });
 
-// List latest reports for dashboard
 app.get('/api/reports', requireAuth, async (req, res) => {
   try {
     const reports = await Report.find({ userId: req.auth.uid })
@@ -891,13 +937,11 @@ app.get('/api/reports', requireAuth, async (req, res) => {
   }
 });
 
-// Mock payment to unlock
-app.post('/api/payments/mock/checkout', requireAuth, async (req, res) => {
+app.post('/api/payments/mock/checkout', requireAuth, validateBody(paymentSchema), async (req, res) => {
   try {
-    const { reportId } = req.body || {};
+    const { reportId } = req.validatedBody;
     const rep = await Report.findOne({ _id: reportId, userId: req.auth.uid });
     if (!rep) return res.status(404).json({ error: 'Report not found' });
-    // create payment record
     const pay = await Payment.create({
       userId: req.auth.uid,
       reportId,
@@ -914,17 +958,19 @@ app.post('/api/payments/mock/checkout', requireAuth, async (req, res) => {
   }
 });
 
-// ---- Static frontend ----
 const PUBLIC_DIR = path.join(__dirname, 'public');
 app.use(express.static(PUBLIC_DIR));
 
-// Fallback to index.html for basic navigation
 app.get('*', (req, res) => {
   const p = path.join(PUBLIC_DIR, 'index.html');
   res.sendFile(p);
 });
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log('🚀 Agama Technologies backend running on port', port);
-});
+if (require.main === module) {
+  app.listen(port, () => {
+    console.log('🚀 Agama Technologies backend running on port', port);
+  });
+}
+
+module.exports = app;
