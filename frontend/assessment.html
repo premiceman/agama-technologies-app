@@ -15,6 +15,35 @@
       <p class="text-fg-3 lead">Select a report tier, then progress through animated sections covering strategy, people, technology, and maturity. Each response fuels an OpenAI-powered consultant that tailors industry playbooks, vendor orchestration, and delivery roadmaps.</p>
     </div>
 
+    <div class="accordion mb-4" id="projectAnalyticsPanel">
+      <div class="accordion-item glass">
+        <h2 class="accordion-header" id="analyticsHeading">
+          <button class="accordion-button d-flex align-items-center gap-2" type="button" data-bs-toggle="collapse" data-bs-target="#projectAnalyticsCollapse" aria-expanded="true" aria-controls="projectAnalyticsCollapse">
+            <span class="fw-semibold">Analytics</span>
+          </button>
+        </h2>
+        <div id="projectAnalyticsCollapse" class="accordion-collapse collapse show" aria-labelledby="analyticsHeading">
+          <div class="accordion-body">
+            <div id="analyticsEmptyState" class="text-fg-3 small">Select a project to load analytics.</div>
+            <div id="analyticsContent" class="d-flex flex-column gap-4 d-none">
+              <div>
+                <h6 class="text-fg-2 mb-2">Maturity momentum</h6>
+                <div id="analyticsMaturityRow" class="row g-3"></div>
+              </div>
+              <div>
+                <h6 class="text-fg-2 mb-2">Business signals</h6>
+                <div id="analyticsBusinessRow" class="row g-3"></div>
+              </div>
+              <div>
+                <h6 class="text-fg-2 mb-2">Top drivers this period</h6>
+                <div id="analyticsDriversRow" class="d-flex flex-wrap gap-2"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="project-launcher" id="projectLauncher">
       <div>
         <h2 class="fw-bold mb-1">Project workspace</h2>

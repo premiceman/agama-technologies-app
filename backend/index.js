@@ -25,6 +25,7 @@ app.use(helmet.referrerPolicy({ policy: 'no-referrer' }));
 
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
+const csvTextParser = express.text({ type: ['text/csv', 'application/csv', 'text/plain'], limit: '200kb' });
 app.use(cookieParser());
 
 const allowedOrigins = new Set(
@@ -61,6 +62,7 @@ const limiterDefaults = {
 const authLimiter = rateLimit({ ...limiterDefaults, max: 30 });
 const projectLimiter = rateLimit({ ...limiterDefaults, max: 200 });
 const assessmentLimiter = rateLimit({ ...limiterDefaults, max: 120 });
+const analyticsLimiter = rateLimit({ ...limiterDefaults, max: 60 });
 
 app.use('/api/auth', authLimiter);
 app.use('/api/projects', projectLimiter);
@@ -82,12 +84,21 @@ const Assessment = require('./models/Assessment');
 const Project = require('./models/Project');
 const Report = require('./models/Report');
 const Payment = require('./models/Payment');
+const BusinessMetric = require('./models/BusinessMetric');
+const Initiative = require('./models/Initiative');
 
 const { requireAuth, issueTokenCookie, clearTokenCookie } = require('./middleware/auth');
 const { requireProjectOwnership } = require('./middleware/project');
 const { validateBody } = require('./middleware/validation');
 const { computeReport } = require('./utils/scoring');
 const { computeProjectAnalyticsSnapshot } = require('./utils/analytics');
+const {
+  recordMaturityTimepoint,
+  queueProjectAnalyticsRecompute,
+  getProjectAnalyticsSummary,
+  getMaturityTimeseries,
+  recomputeProjectAnalytics
+} = require('./utils/project-analytics');
 const {
   INDUSTRIES,
   OFFICIAL_ORGANISATIONS,
@@ -203,6 +214,55 @@ const paymentSchema = z.object({
   reportId: z.string().min(1)
 });
 
+const optionalMoney = z
+  .union([
+    z.coerce.number().nonnegative(),
+    z.literal('').transform(() => undefined),
+    z.null().transform(() => undefined)
+  ])
+  .optional()
+  .transform(value => (value === undefined ? undefined : Number(value)));
+
+const optionalHeadcount = z
+  .union([
+    z.coerce.number().nonnegative(),
+    z.literal('').transform(() => undefined),
+    z.null().transform(() => undefined)
+  ])
+  .optional()
+  .transform(value => (value === undefined ? undefined : Number(value)));
+
+const businessMetricSchema = z.object({
+  year: z.coerce.number().int().min(1900).max(3000),
+  arrUSD: optionalMoney,
+  headcount: optionalHeadcount,
+  source: z
+    .object({
+      type: z.enum(['manual', 'csv']),
+      url: z.string().url().max(500).optional(),
+      confidence: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional()
+    })
+    .default({ type: 'manual' }),
+  notes: z.string().trim().max(500).optional()
+});
+
+const impactedPillarSchema = z.object({
+  pillar: z.string().trim().min(1).max(120),
+  expectedImpact: z.coerce.number().min(-3).max(3)
+});
+
+const initiativeSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(2000).optional(),
+  startDate: z.coerce.date(),
+  endDate: z.coerce.date().optional(),
+  impactedPillars: z.array(impactedPillarSchema).max(12).optional(),
+  status: z.enum(['planned', 'in-progress', 'done']).default('planned'),
+  owner: z.string().trim().max(160).optional()
+});
+
+const initiativeUpdateSchema = initiativeSchema.partial();
+
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: Date.now() }));
 
 app.post('/api/auth/signup', validateBody(signupSchema), async (req, res) => {
@@ -310,11 +370,21 @@ app.post('/api/projects', requireAuth, validateBody(projectCreateSchema), async 
     };
 
     const snapshot = computeProjectAnalyticsSnapshot(projectData);
+    const now = new Date();
     const analytics = {
+      readinessScore: snapshot.readinessScore,
+      clarityScore: snapshot.clarityScore,
+      sentiment: snapshot.sentiment,
+      driverCount: snapshot.driverCount,
+      focusCount: snapshot.focusCount,
+      stage: snapshot.stage,
+      riskAppetite: snapshot.riskAppetite,
       maturity: {
         overall: snapshot.readinessScore,
         pillars: { readiness: snapshot.readinessScore },
-        lastUpdated: new Date()
+        delta: { overall: 0, pillars: {} },
+        history: { overall: [], pillars: {} },
+        lastUpdated: now
       }
     };
 
@@ -357,11 +427,21 @@ app.put('/api/projects/:id', requireAuth, validateBody(projectUpdateSchema), asy
     if (Array.isArray(updates.personas)) project.personas = updates.personas.slice(0, 12);
 
     const snapshot = computeProjectAnalyticsSnapshot(project.toObject());
+    const now = new Date();
     project.analytics = {
+      readinessScore: snapshot.readinessScore,
+      clarityScore: snapshot.clarityScore,
+      sentiment: snapshot.sentiment,
+      driverCount: snapshot.driverCount,
+      focusCount: snapshot.focusCount,
+      stage: snapshot.stage,
+      riskAppetite: snapshot.riskAppetite,
       maturity: {
         overall: snapshot.readinessScore,
         pillars: { readiness: snapshot.readinessScore },
-        lastUpdated: new Date()
+        delta: { overall: 0, pillars: {} },
+        history: { overall: [], pillars: {} },
+        lastUpdated: now
       },
       timeseriesId: project.analytics?.timeseriesId || null
     };
@@ -373,6 +453,222 @@ app.put('/api/projects/:id', requireAuth, validateBody(projectUpdateSchema), asy
     res.status(500).json({ error: 'Unable to update project' });
   }
 });
+
+app.get(
+  '/api/projects/:id/analytics/summary',
+  requireAuth,
+  analyticsLimiter,
+  requireProjectOwnership('id'),
+  async (req, res) => {
+    try {
+      await recomputeProjectAnalytics(req.project._id);
+      const summary = await getProjectAnalyticsSummary(req.project._id);
+      res.json({ ok: true, ...summary });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Unable to load analytics summary' });
+    }
+  }
+);
+
+app.get(
+  '/api/projects/:id/maturity/timeseries',
+  requireAuth,
+  analyticsLimiter,
+  requireProjectOwnership('id'),
+  async (req, res) => {
+    try {
+      const pillar = String(req.query.pillar || 'overall');
+      const allowed = ['overall', 'Tech', 'Data', 'People', 'Process'];
+      if (!allowed.includes(pillar)) {
+        return res.status(400).json({ error: 'Unsupported pillar' });
+      }
+      const series = await getMaturityTimeseries(req.project._id, pillar);
+      res.json({ ok: true, pillar, series });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Unable to load maturity timeseries' });
+    }
+  }
+);
+
+app.get(
+  '/api/projects/:id/business/metrics',
+  requireAuth,
+  requireProjectOwnership('id'),
+  async (req, res) => {
+    try {
+      const metrics = await BusinessMetric.find({ projectId: req.project._id }).sort({ year: -1 }).lean();
+      res.json({ ok: true, metrics });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Unable to load business metrics' });
+    }
+  }
+);
+
+app.post(
+  '/api/projects/:id/business/metrics',
+  requireAuth,
+  requireProjectOwnership('id'),
+  validateBody(businessMetricSchema),
+  async (req, res) => {
+    try {
+      const payload = req.validatedBody;
+      const metric = await BusinessMetric.findOneAndUpdate(
+        { projectId: req.project._id, year: payload.year },
+        {
+          projectId: req.project._id,
+          year: payload.year,
+          arrUSD: payload.arrUSD ?? null,
+          headcount: payload.headcount ?? null,
+          source: {
+            type: payload.source?.type || 'manual',
+            url: payload.source?.url || '',
+            confidence: payload.source?.confidence !== undefined ? payload.source.confidence : 1
+          },
+          notes: payload.notes || ''
+        },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      );
+      res.json({ ok: true, metric });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Unable to save business metric' });
+    }
+  }
+);
+
+app.post(
+  '/api/projects/:id/business/metrics/upload',
+  requireAuth,
+  analyticsLimiter,
+  requireProjectOwnership('id'),
+  csvTextParser,
+  async (req, res) => {
+    try {
+      if (!req.body || typeof req.body !== 'string') {
+        return res.status(400).json({ error: 'CSV payload required' });
+      }
+      const rows = parseBusinessMetricsCsv(req.body);
+      if (!rows.length) {
+        return res.status(400).json({ error: 'No valid rows found' });
+      }
+      const results = [];
+      for (const row of rows) {
+        const payload = businessMetricSchema.parse({
+          year: row.year,
+          arrUSD: row.arrUSD,
+          headcount: row.headcount,
+          source: {
+            type: 'csv',
+            url: row.sourceUrl || '',
+            confidence: row.sourceConfidence
+          },
+          notes: row.notes
+        });
+        const metric = await BusinessMetric.findOneAndUpdate(
+          { projectId: req.project._id, year: payload.year },
+          {
+            projectId: req.project._id,
+            year: payload.year,
+            arrUSD: payload.arrUSD ?? null,
+            headcount: payload.headcount ?? null,
+            source: {
+              type: 'csv',
+              url: payload.source?.url || '',
+              confidence:
+                payload.source?.confidence !== undefined ? payload.source.confidence : row.sourceConfidence ?? 1
+            },
+            notes: payload.notes || ''
+          },
+          { new: true, upsert: true, setDefaultsOnInsert: true }
+        );
+        results.push(metric);
+      }
+      res.json({ ok: true, metrics: results });
+    } catch (err) {
+      console.error(err);
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Invalid CSV data', details: err.errors });
+      }
+      res.status(400).json({ error: err.message || 'Unable to import CSV' });
+    }
+  }
+);
+
+app.get(
+  '/api/projects/:id/initiatives',
+  requireAuth,
+  requireProjectOwnership('id'),
+  async (req, res) => {
+    try {
+      const initiatives = await Initiative.find({ projectId: req.project._id }).sort({ startDate: -1 }).lean();
+      res.json({ ok: true, initiatives });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Unable to load initiatives' });
+    }
+  }
+);
+
+app.post(
+  '/api/projects/:id/initiatives',
+  requireAuth,
+  requireProjectOwnership('id'),
+  validateBody(initiativeSchema),
+  async (req, res) => {
+    try {
+      const payload = req.validatedBody;
+      const initiative = await Initiative.create({
+        projectId: req.project._id,
+        title: payload.title,
+        description: payload.description || '',
+        startDate: payload.startDate,
+        endDate: payload.endDate,
+        impactedPillars: payload.impactedPillars || [],
+        status: payload.status,
+        owner: payload.owner || ''
+      });
+      res.json({ ok: true, initiative });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Unable to create initiative' });
+    }
+  }
+);
+
+app.put(
+  '/api/projects/:id/initiatives/:initiativeId',
+  requireAuth,
+  requireProjectOwnership('id'),
+  validateBody(initiativeUpdateSchema),
+  async (req, res) => {
+    try {
+      const { initiativeId } = req.params;
+      if (!mongoose.Types.ObjectId.isValid(initiativeId)) {
+        return res.status(400).json({ error: 'Invalid initiative id' });
+      }
+      const initiative = await Initiative.findOne({ _id: initiativeId, projectId: req.project._id });
+      if (!initiative) {
+        return res.status(404).json({ error: 'Initiative not found' });
+      }
+      const payload = req.validatedBody;
+      if (payload.title !== undefined) initiative.title = payload.title;
+      if (payload.description !== undefined) initiative.description = payload.description || '';
+      if (payload.startDate !== undefined) initiative.startDate = payload.startDate;
+      if (payload.endDate !== undefined) initiative.endDate = payload.endDate;
+      if (payload.impactedPillars !== undefined) initiative.impactedPillars = payload.impactedPillars || [];
+      if (payload.status !== undefined) initiative.status = payload.status;
+      if (payload.owner !== undefined) initiative.owner = payload.owner || '';
+      await initiative.save();
+      res.json({ ok: true, initiative });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Unable to update initiative' });
+    }
+  }
+);
 
 app.get('/api/assessments/catalog', (req, res) => {
   res.json({
@@ -650,6 +946,14 @@ async function createAssessment({ userId, project, payload }) {
     { new: true, upsert: true, setDefaultsOnInsert: true }
   );
 
+  await recordMaturityTimepoint({
+    projectId: assessment.projectId,
+    assessmentId: assessment._id,
+    domain: assessment.assessmentType,
+    report
+  });
+  queueProjectAnalyticsRecompute(assessment.projectId);
+
   return { assessment, report };
 }
 
@@ -705,6 +1009,14 @@ async function updateAssessment({ assessment, project, payload }) {
     },
     { new: true, upsert: true, setDefaultsOnInsert: true }
   );
+
+  await recordMaturityTimepoint({
+    projectId: assessment.projectId,
+    assessmentId: assessment._id,
+    domain: assessment.assessmentType,
+    report
+  });
+  queueProjectAnalyticsRecompute(assessment.projectId);
 
   return { assessment, report };
 }
@@ -936,6 +1248,81 @@ app.get('/api/reports', requireAuth, async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+function splitCsvLine(line = '') {
+  const cells = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      cells.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
+function parseNumericCell(value) {
+  if (value === undefined || value === null) return undefined;
+  const cleaned = String(value).replace(/[$,\s]/g, '');
+  if (!cleaned) return undefined;
+  const num = Number(cleaned);
+  if (!Number.isFinite(num)) {
+    throw new Error('Invalid numeric value');
+  }
+  return num;
+}
+
+function parseBusinessMetricsCsv(text) {
+  const lines = String(text || '')
+    .replace(/^\uFEFF/, '')
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean);
+  if (!lines.length) return [];
+  const header = splitCsvLine(lines.shift()).map(cell => cell.toLowerCase());
+  const rows = [];
+  lines.forEach(line => {
+    const cells = splitCsvLine(line);
+    if (!cells.length || cells.every(cell => !cell)) return;
+    const record = {};
+    header.forEach((column, index) => {
+      record[column] = cells[index] ?? '';
+    });
+    const yearRaw = record.year || record.fiscalyear || record.period;
+    const year = Number(String(yearRaw).replace(/[^0-9]/g, ''));
+    if (!Number.isInteger(year)) {
+      throw new Error('Invalid year in CSV');
+    }
+    const arrUSD = parseNumericCell(record.arrusd || record.arr || record.revenue || record.annualrecurringrevenue);
+    const headcount = parseNumericCell(record.headcount || record.fte || record.employees);
+    const confidenceRaw = record.sourceconfidence || record.confidence;
+    const sourceConfidence = confidenceRaw === undefined || confidenceRaw === '' ? undefined : Number(confidenceRaw);
+    if (sourceConfidence !== undefined && ![0, 1, 2].includes(sourceConfidence)) {
+      throw new Error('Invalid confidence score');
+    }
+    rows.push({
+      year,
+      arrUSD,
+      headcount,
+      sourceUrl: record.sourceurl || record.url || '',
+      sourceConfidence,
+      notes: record.notes || record.comment || ''
+    });
+  });
+  return rows;
+}
 
 app.post('/api/payments/mock/checkout', requireAuth, validateBody(paymentSchema), async (req, res) => {
   try {

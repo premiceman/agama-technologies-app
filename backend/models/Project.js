@@ -20,9 +20,18 @@ const ProjectSchema = new Schema({
   techLandscape: { type: Schema.Types.Mixed, default: {} },
   personas: { type: [Schema.Types.Mixed], default: [] },
   analytics: {
+    readinessScore: { type: Number, default: 0 },
+    clarityScore: { type: Number, default: 0 },
+    sentiment: { type: String, default: '' },
+    driverCount: { type: Number, default: 0 },
+    focusCount: { type: Number, default: 0 },
+    stage: { type: String, default: '' },
+    riskAppetite: { type: String, default: '' },
     maturity: {
       overall: { type: Number, default: 0 },
       pillars: { type: Schema.Types.Mixed, default: {} },
+      delta: { type: Schema.Types.Mixed, default: { overall: 0, pillars: {} } },
+      history: { type: Schema.Types.Mixed, default: { overall: [], pillars: {} } },
       lastUpdated: { type: Date }
     },
     timeseriesId: { type: Schema.Types.ObjectId, ref: 'ProjectAnalyticsSeries' }
@@ -58,9 +67,18 @@ ProjectSchema.methods.public = function() {
     techLandscape: this.techLandscape || {},
     personas: this.personas || [],
     analytics: {
+      readinessScore: this.analytics?.readinessScore ?? 0,
+      clarityScore: this.analytics?.clarityScore ?? 0,
+      sentiment: this.analytics?.sentiment || '',
+      driverCount: this.analytics?.driverCount ?? 0,
+      focusCount: this.analytics?.focusCount ?? 0,
+      stage: this.analytics?.stage || this.stage || '',
+      riskAppetite: this.analytics?.riskAppetite || this.riskAppetite || '',
       maturity: {
         overall: this.analytics?.maturity?.overall ?? 0,
         pillars: this.analytics?.maturity?.pillars || {},
+        delta: this.analytics?.maturity?.delta || { overall: 0, pillars: {} },
+        history: this.analytics?.maturity?.history || { overall: [], pillars: {} },
         lastUpdated: this.analytics?.maturity?.lastUpdated || null
       },
       timeseriesId: this.analytics?.timeseriesId || null
