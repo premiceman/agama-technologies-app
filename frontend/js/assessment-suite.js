@@ -23,6 +23,12 @@ const addInitiativeBtn = document.getElementById('addInitiative');
 const projectLauncher = document.getElementById('projectLauncher');
 const projectSelect = document.getElementById('projectSelect');
 const projectAnalyticsPreview = document.getElementById('projectAnalyticsPreview');
+const analyticsPanel = document.getElementById('projectAnalyticsPanel');
+const analyticsEmptyState = document.getElementById('analyticsEmptyState');
+const analyticsContent = document.getElementById('analyticsContent');
+const analyticsMaturityRow = document.getElementById('analyticsMaturityRow');
+const analyticsBusinessRow = document.getElementById('analyticsBusinessRow');
+const analyticsDriversRow = document.getElementById('analyticsDriversRow');
 const launchProjectWizardBtn = document.getElementById('launchProjectWizard');
 const replayProjectTourBtn = document.getElementById('replayProjectTour');
 const projectOverlay = document.getElementById('projectOnboarding');
@@ -66,6 +72,317 @@ const formCompanySizeTiles = document.getElementById('formCompanySizeTiles');
 const formRegionTiles = document.getElementById('formRegionTiles');
 const formStageTiles = document.getElementById('formStageTiles');
 const formRiskTiles = document.getElementById('formRiskTiles');
+
+const compactCurrency = typeof Intl !== 'undefined'
+  ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 })
+  : null;
+const compactNumber = typeof Intl !== 'undefined'
+  ? new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 })
+  : null;
+
+function showAnalyticsMessage(message) {
+  if (!analyticsEmptyState || !analyticsContent) return;
+  analyticsEmptyState.textContent = message;
+  analyticsEmptyState.classList.remove('d-none');
+  analyticsContent.classList.add('d-none');
+}
+
+function revealAnalyticsContent() {
+  if (!analyticsEmptyState || !analyticsContent) return;
+  analyticsEmptyState.classList.add('d-none');
+  analyticsContent.classList.remove('d-none');
+}
+
+function formatScore(value) {
+  if (!Number.isFinite(value)) return '--';
+  return Math.round(value).toString();
+}
+
+function formatDelta(delta) {
+  if (!Number.isFinite(delta)) return '--';
+  const rounded = Number(delta.toFixed(1));
+  const prefix = rounded > 0 ? '+' : '';
+  return `${prefix}${rounded}`;
+}
+
+function formatPercent(value) {
+  if (!Number.isFinite(value)) return '--';
+  const rounded = Number(value.toFixed(1));
+  const prefix = rounded > 0 ? '+' : '';
+  return `${prefix}${rounded}%`;
+}
+
+function formatCurrency(value) {
+  if (!Number.isFinite(value)) return '--';
+  if (compactCurrency) return compactCurrency.format(value);
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}k`;
+  return `$${Math.round(value)}`;
+}
+
+function formatNumber(value) {
+  if (!Number.isFinite(value)) return '--';
+  if (compactNumber) return compactNumber.format(value);
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
+  return Math.round(value).toString();
+}
+
+function computeYoYPercent(series = []) {
+  if (!Array.isArray(series) || series.length < 2) return null;
+  const sorted = series.slice().sort((a, b) => a.year - b.year);
+  const prev = sorted[sorted.length - 2];
+  const curr = sorted[sorted.length - 1];
+  if (!prev || !curr) return null;
+  if (!Number.isFinite(prev.value) || !Number.isFinite(curr.value) || prev.value === 0) return null;
+  return ((curr.value - prev.value) / Math.abs(prev.value)) * 100;
+}
+
+function computeArrPerEmployee(arrSeries = [], headcountSeries = []) {
+  if (!arrSeries.length || !headcountSeries.length) return null;
+  const latestArr = arrSeries.slice().sort((a, b) => a.year - b.year).pop();
+  if (!latestArr || !Number.isFinite(latestArr.value)) return null;
+  const matchingHeadcount = headcountSeries.find(entry => entry.year === latestArr.year) || headcountSeries.slice().sort((a, b) => a.year - b.year).pop();
+  if (!matchingHeadcount || !Number.isFinite(matchingHeadcount.value) || matchingHeadcount.value <= 0) return null;
+  return latestArr.value / matchingHeadcount.value;
+}
+
+function createSparklineSvg(points = []) {
+  const valid = points
+    .map(point => ({ value: Number(point?.value), computedAt: point?.computedAt }))
+    .filter(point => Number.isFinite(point.value));
+  if (!valid.length) return null;
+  const width = 120;
+  const height = 18;
+  const min = Math.min(...valid.map(point => point.value));
+  const max = Math.max(...valid.map(point => point.value));
+  const span = max - min || 1;
+  const step = valid.length > 1 ? width / (valid.length - 1) : width;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  svg.setAttribute('width', width);
+  svg.setAttribute('height', height);
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.classList.add('w-100');
+
+  let pathData = '';
+  let lastX = 0;
+  let lastY = height / 2;
+  valid.forEach((point, index) => {
+    const x = valid.length > 1 ? index * step : width / 2;
+    const relative = (point.value - min) / span;
+    const y = height - relative * (height - 2) - 1;
+    pathData += index === 0 ? `M${x},${y}` : ` L${x},${y}`;
+    lastX = x;
+    lastY = y;
+  });
+
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', pathData);
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke', 'var(--brand)');
+  path.setAttribute('stroke-width', '1.6');
+  path.setAttribute('stroke-linecap', 'round');
+  svg.appendChild(path);
+
+  const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  circle.setAttribute('cx', lastX);
+  circle.setAttribute('cy', lastY);
+  circle.setAttribute('r', 2);
+  circle.setAttribute('fill', 'var(--brand)');
+  svg.appendChild(circle);
+
+  return svg;
+}
+
+function buildBusinessTile({ label, value, yoy, series }) {
+  const card = document.createElement('div');
+  card.className = 'card glass p-3 h-100';
+  const header = document.createElement('div');
+  header.className = 'd-flex justify-content-between align-items-start gap-3';
+  const labelWrap = document.createElement('div');
+  const labelEl = document.createElement('div');
+  labelEl.className = 'text-uppercase small text-fg-3';
+  labelEl.textContent = label;
+  const valueEl = document.createElement('div');
+  valueEl.className = 'fs-4 fw-bold';
+  valueEl.textContent = value;
+  const yoyEl = document.createElement('div');
+  yoyEl.className = 'small text-fg-3';
+  yoyEl.textContent = yoy === '--' ? 'YoY --' : `YoY ${yoy}`;
+  labelWrap.appendChild(labelEl);
+  labelWrap.appendChild(valueEl);
+  labelWrap.appendChild(yoyEl);
+
+  const sparklineWrap = document.createElement('div');
+  const svg = createSparklineSvg(series);
+  if (svg) sparklineWrap.appendChild(svg);
+
+  header.appendChild(labelWrap);
+  header.appendChild(sparklineWrap);
+  card.appendChild(header);
+  return card;
+}
+
+function formatDateRange(startDate, endDate) {
+  if (!startDate && !endDate) return '';
+  const start = startDate ? new Date(startDate) : null;
+  const end = endDate ? new Date(endDate) : null;
+  const startLabel = start && !Number.isNaN(start.valueOf()) ? start.toLocaleDateString() : '';
+  const endLabel = end && !Number.isNaN(end.valueOf()) ? end.toLocaleDateString() : '';
+  if (startLabel && endLabel) return `${startLabel} → ${endLabel}`;
+  return startLabel || endLabel;
+}
+
+function renderMaturityAnalytics(summary) {
+  if (!analyticsMaturityRow) return;
+  analyticsMaturityRow.innerHTML = '';
+  const entries = [
+    { key: 'overall', label: 'Overall' },
+    { key: 'Tech', label: 'Tech' },
+    { key: 'Data', label: 'Data' },
+    { key: 'People', label: 'People' },
+    { key: 'Process', label: 'Process' }
+  ];
+  entries.forEach(entry => {
+    const col = document.createElement('div');
+    col.className = 'col-md';
+    const card = document.createElement('div');
+    card.className = 'card glass p-3 h-100';
+
+    const header = document.createElement('div');
+    header.className = 'd-flex justify-content-between align-items-start gap-3';
+
+    const labelWrap = document.createElement('div');
+    const label = document.createElement('div');
+    label.className = 'text-uppercase small text-fg-3';
+    label.textContent = entry.label;
+    const valueWrap = document.createElement('div');
+    valueWrap.className = 'd-flex align-items-center gap-2';
+
+    const scoreValue = entry.key === 'overall'
+      ? summary.maturity?.overall
+      : summary.maturity?.pillars?.[entry.key];
+    const scoreEl = document.createElement('div');
+    scoreEl.className = 'fs-4 fw-bold';
+    scoreEl.textContent = formatScore(scoreValue);
+
+    const deltaValue = entry.key === 'overall'
+      ? summary.maturity?.delta?.overall
+      : summary.maturity?.delta?.pillars?.[entry.key];
+    const deltaEl = document.createElement('span');
+    const deltaClass = deltaValue > 0 ? 'text-success' : deltaValue < 0 ? 'text-danger' : 'text-muted';
+    deltaEl.className = `badge-soft ${deltaClass}`;
+    deltaEl.textContent = formatDelta(deltaValue);
+
+    valueWrap.appendChild(scoreEl);
+    valueWrap.appendChild(deltaEl);
+
+    labelWrap.appendChild(label);
+    labelWrap.appendChild(valueWrap);
+
+    const sparklineWrap = document.createElement('div');
+    const series = entry.key === 'overall'
+      ? summary.sparklines?.overall || []
+      : summary.sparklines?.pillars?.[entry.key] || [];
+    const svg = createSparklineSvg(series);
+    if (svg) sparklineWrap.appendChild(svg);
+
+    header.appendChild(labelWrap);
+    header.appendChild(sparklineWrap);
+    card.appendChild(header);
+    col.appendChild(card);
+    analyticsMaturityRow.appendChild(col);
+  });
+}
+
+function renderBusinessAnalytics(summary) {
+  if (!analyticsBusinessRow) return;
+  analyticsBusinessRow.innerHTML = '';
+  const arrSeries = Array.isArray(summary.business?.arr) ? summary.business.arr.slice().sort((a, b) => a.year - b.year) : [];
+  const headcountSeries = Array.isArray(summary.business?.headcount)
+    ? summary.business.headcount.slice().sort((a, b) => a.year - b.year)
+    : [];
+
+  const arrTile = document.createElement('div');
+  arrTile.className = 'col-md';
+  arrTile.appendChild(buildBusinessTile({
+    label: 'ARR',
+    value: arrSeries.length ? formatCurrency(arrSeries[arrSeries.length - 1].value) : '--',
+    yoy: formatPercent(computeYoYPercent(arrSeries)),
+    series: arrSeries
+  }));
+  analyticsBusinessRow.appendChild(arrTile);
+
+  const headcountTile = document.createElement('div');
+  headcountTile.className = 'col-md';
+  headcountTile.appendChild(buildBusinessTile({
+    label: 'Headcount',
+    value: headcountSeries.length ? formatNumber(headcountSeries[headcountSeries.length - 1].value) : '--',
+    yoy: formatPercent(computeYoYPercent(headcountSeries)),
+    series: headcountSeries
+  }));
+  analyticsBusinessRow.appendChild(headcountTile);
+
+  const ratioTile = document.createElement('div');
+  ratioTile.className = 'col-md';
+  const arrPerEmployee = computeArrPerEmployee(arrSeries, headcountSeries);
+  ratioTile.appendChild(buildBusinessTile({
+    label: 'ARR / Employee',
+    value: formatCurrency(arrPerEmployee || NaN),
+    yoy: headcountSeries.length && arrSeries.length ? formatPercent(computeYoYPercent(arrSeries)) : '--',
+    series: arrSeries
+  }));
+  analyticsBusinessRow.appendChild(ratioTile);
+}
+
+function renderDriverAnalytics(changeAttribution = []) {
+  if (!analyticsDriversRow) return;
+  analyticsDriversRow.innerHTML = '';
+  if (!changeAttribution.length) {
+    const empty = document.createElement('div');
+    empty.className = 'text-fg-3 small';
+    empty.textContent = 'No initiative attributions for the latest change window yet.';
+    analyticsDriversRow.appendChild(empty);
+    return;
+  }
+  changeAttribution.forEach(entry => {
+    if (!Array.isArray(entry.initiatives) || !entry.initiatives.length) {
+      const chip = document.createElement('span');
+      chip.className = 'badge-soft text-muted';
+      chip.textContent = `${formatDelta(entry.delta)} ${entry.pillar}`;
+      analyticsDriversRow.appendChild(chip);
+      return;
+    }
+    entry.initiatives.forEach(initiative => {
+      const chip = document.createElement('span');
+      const directionClass = initiative.direction >= 0 ? 'text-success' : 'text-danger';
+      chip.className = `badge-soft ${directionClass}`;
+      const deltaText = formatDelta(entry.delta);
+      chip.textContent = `${deltaText} ${entry.pillar} · ${initiative.title}`;
+      const dateRange = formatDateRange(initiative.startDate, initiative.endDate);
+      chip.title = dateRange ? `${initiative.title} (${dateRange})` : initiative.title;
+      analyticsDriversRow.appendChild(chip);
+    });
+  });
+}
+
+function renderAnalyticsSummary(summary) {
+  if (!summary) {
+    showAnalyticsMessage('Run an assessment to unlock analytics trends.');
+    return;
+  }
+  const hasMaturityHistory = Array.isArray(summary.sparklines?.overall) && summary.sparklines.overall.length > 0;
+  if (!hasMaturityHistory) {
+    showAnalyticsMessage('Run an assessment to unlock analytics trends.');
+    return;
+  }
+  revealAnalyticsContent();
+  renderMaturityAnalytics(summary);
+  renderBusinessAnalytics(summary);
+  renderDriverAnalytics(summary.changeAttribution || []);
+}
 
 function renderTileOptions(groupEl, options = []) {
   if (!groupEl) return;
@@ -616,6 +933,39 @@ function updateProjectAnalyticsPreview(project) {
     </div>`;
 }
 
+async function loadProjectAnalytics(project) {
+  if (!analyticsPanel) return;
+  if (!project) {
+    showAnalyticsMessage('Select a project to load analytics.');
+    return;
+  }
+  try {
+    if (analyticsAbortController) {
+      analyticsAbortController.abort();
+    }
+    analyticsAbortController = new AbortController();
+    showAnalyticsMessage('Loading analytics…');
+    const res = await fetch(`/api/projects/${project.id}/analytics/summary`, {
+      credentials: 'include',
+      signal: analyticsAbortController.signal
+    });
+    if (res.status === 401) {
+      showAnalyticsMessage('Please sign in again to view analytics.');
+      analyticsAbortController = null;
+      return;
+    }
+    if (!res.ok) throw new Error('Unable to load analytics');
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'Unable to load analytics');
+    renderAnalyticsSummary(json);
+    analyticsAbortController = null;
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    console.error(err);
+    showAnalyticsMessage('Analytics unavailable right now. Please try again soon.');
+  }
+}
+
 function applyProjectContext(project) {
   if (!form || !project) return;
   if (form.companyName) form.companyName.value = project.companyProfile?.legalName || project.name || '';
@@ -739,6 +1089,7 @@ function setActiveProject(projectOrId) {
   if (!project || typeof project === 'string') {
     activeProject = null;
     updateProjectAnalyticsPreview(null);
+    showAnalyticsMessage('Select a project to load analytics.');
     return;
   }
   activeProject = project;
@@ -747,6 +1098,7 @@ function setActiveProject(projectOrId) {
   }
   updateProjectAnalyticsPreview(project);
   applyProjectContext(project);
+  loadProjectAnalytics(project);
 }
 
 async function loadProjects() {
@@ -867,6 +1219,7 @@ let strategicDriverSelection = new Set();
 let selectedPersonaIds = new Set();
 let projectCapabilitySelection = new Set();
 let projectDriverSelection = new Set();
+let analyticsAbortController = null;
 
 let strategicDriverGroup;
 let personaGroup;
@@ -1585,6 +1938,10 @@ async function init() {
   renderOrganisations();
   renderCapabilityFocusOptions();
   renderProjectTileGroups();
+
+  if (analyticsPanel) {
+    showAnalyticsMessage('Select a project to load analytics.');
+  }
 
   await loadProjects();
 
