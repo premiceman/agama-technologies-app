@@ -103,8 +103,6 @@ async function recomputeProjectAnalytics(projectId) {
     {
       $set: {
         'analytics.maturity': maturity,
-        'analytics.maturity.overall': maturity.overall,
-        'analytics.maturity.lastUpdated': maturity.lastUpdated,
         'analytics.readinessScore': maturity.overall
       }
     }

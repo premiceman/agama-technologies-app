@@ -10,8 +10,16 @@ const ExcelJS = require('exceljs');
 const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
 
+const { getStripe, isStripeConfigured, isStripeStub } = require('./utils/stripe');
+
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
+const ADMIN_EMAILS = new Set(
+  (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map(email => email.trim().toLowerCase())
+    .filter(Boolean)
+);
 
 app.use(helmet({
   contentSecurityPolicy: false,
@@ -23,7 +31,16 @@ if (isProduction) {
 app.use(helmet.frameguard({ action: 'deny' }));
 app.use(helmet.referrerPolicy({ policy: 'no-referrer' }));
 
-app.use(express.json({ limit: '1mb' }));
+app.use(
+  express.json({
+    limit: '1mb',
+    verify: (req, res, buf) => {
+      if (req.originalUrl.startsWith('/api/payments/webhook')) {
+        req.rawBody = Buffer.from(buf);
+      }
+    }
+  })
+);
 app.use(express.urlencoded({ extended: true }));
 const csvTextParser = express.text({ type: ['text/csv', 'application/csv', 'text/plain'], limit: '200kb' });
 app.use(cookieParser());
@@ -64,27 +81,56 @@ const projectLimiter = rateLimit({ ...limiterDefaults, max: 200 });
 const assessmentLimiter = rateLimit({ ...limiterDefaults, max: 120 });
 const analyticsLimiter = rateLimit({ ...limiterDefaults, max: 60 });
 const vendorSearchLimiter = rateLimit({ ...limiterDefaults, max: 40 });
+const paymentsLimiter = rateLimit({ ...limiterDefaults, max: 20 });
+const paymentsWebhookLimiter = rateLimit({ ...limiterDefaults, max: 400 });
+const adminLimiter = rateLimit({ ...limiterDefaults, max: 30 });
 
 app.use('/api/auth', authLimiter);
 app.use('/api/projects', projectLimiter);
 app.use('/api/assessments', assessmentLimiter);
 app.use('/api/projects/:projectId/assessments', assessmentLimiter);
+app.use('/api/payments/checkout', paymentsLimiter);
+app.use('/api/payments/webhook', paymentsWebhookLimiter);
+app.use('/api/admin', adminLimiter);
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/agama_tech';
 mongoose.set('strictQuery', true);
-mongoose
-  .connect(MONGODB_URI)
-  .then(() => console.log('✅ MongoDB connected'))
-  .catch(err => {
+
+async function ensureMongoConnection() {
+  const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/agama_tech';
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
+  }
+  if (mongoose.connection.readyState === 2) {
+    await new Promise((resolve, reject) => {
+      mongoose.connection.once('open', resolve);
+      mongoose.connection.once('error', reject);
+    });
+    return mongoose.connection;
+  }
+  if (mongoose.connection.readyState === 3) {
+    await new Promise(resolve => {
+      mongoose.connection.once('disconnected', resolve);
+    });
+    return ensureMongoConnection();
+  }
+  await mongoose.connect(uri);
+  console.log('✅ MongoDB connected');
+  return mongoose.connection;
+}
+
+if (process.env.NODE_ENV !== 'test') {
+  ensureMongoConnection().catch(err => {
     console.error('❌ MongoDB connection error', err);
     process.exit(1);
   });
+}
 
 const User = require('./models/User');
 const Assessment = require('./models/Assessment');
 const Project = require('./models/Project');
 const Report = require('./models/Report');
 const Payment = require('./models/Payment');
+const Entitlement = require('./models/Entitlement');
 const BusinessMetric = require('./models/BusinessMetric');
 const Initiative = require('./models/Initiative');
 const Vendor = require('./models/Vendor');
@@ -120,6 +166,15 @@ const {
   generateRfpDraft
 } = require('./utils/openai');
 const { vendorMatch } = require('./utils/llm-tools');
+const {
+  sanitizeReportForTier,
+  resolveTierForUser,
+  getActiveEntitlement,
+  attachAccessToReports,
+  grantEntitlement,
+  tierAllowsStrategic,
+  tierRank
+} = require('./utils/entitlements');
 
 const signupSchema = z.object({
   name: z.string().trim().max(120).optional(),
@@ -293,9 +348,84 @@ const assistantSchema = z.object({
   draft: z.record(z.any()).optional()
 });
 
-const paymentSchema = z.object({
-  reportId: z.string().min(1)
+const checkoutSchema = z.object({
+  tier: z.enum(['strategic', 'command'])
 });
+
+const entitlementGrantSchema = z.object({
+  userId: z.string().min(1),
+  tier: z.enum(['free', 'strategic', 'command']),
+  expiresAt: z.string().optional()
+});
+
+const TIER_REQUIREMENTS = {
+  free: tierRank('free'),
+  strategic: tierRank('strategic'),
+  command: tierRank('command')
+};
+
+async function loadRequestEntitlement(req, { fallbackPaid = false } = {}) {
+  if (req.entitlementInfo) return req.entitlementInfo;
+  const { tier, record } = await resolveTierForUser(req.auth?.uid, fallbackPaid);
+  req.entitlementInfo = { tier, record };
+  return req.entitlementInfo;
+}
+
+function requireTierAccess(minTier = 'free') {
+  return async function entitlementMiddleware(req, res, next) {
+    try {
+      const info = await loadRequestEntitlement(req);
+      if ((TIER_REQUIREMENTS[info.tier] ?? 0) < (TIER_REQUIREMENTS[minTier] ?? 0)) {
+        return res.status(403).json({ error: 'Upgrade required' });
+      }
+      return next();
+    } catch (err) {
+      console.error('Entitlement check failed', err);
+      return res.status(500).json({ error: 'Unable to verify entitlement' });
+    }
+  };
+}
+
+const DEFAULT_CURRENCY = (process.env.STRIPE_CURRENCY || 'usd').toLowerCase();
+const STRATEGIC_DEFAULT_AMOUNT = Number(process.env.STRIPE_AMOUNT_STRATEGIC || 25000);
+const COMMAND_DEFAULT_AMOUNT = Number(process.env.STRIPE_AMOUNT_COMMAND || 250000);
+const COMMAND_DEFAULT_MODE = (process.env.STRIPE_COMMAND_MODE || 'payment').toLowerCase();
+
+function getTierCheckoutConfig(tier) {
+  const currency = DEFAULT_CURRENCY;
+  if (tier === 'strategic') {
+    return {
+      tier,
+      name: 'Strategic Assessment Intelligence',
+      amountCents: Number.isFinite(STRATEGIC_DEFAULT_AMOUNT) ? STRATEGIC_DEFAULT_AMOUNT : 25000,
+      currency,
+      mode: 'payment',
+      priceId: process.env.STRIPE_PRICE_STRATEGIC || null
+    };
+  }
+  if (tier === 'command') {
+    const mode = COMMAND_DEFAULT_MODE === 'subscription' ? 'subscription' : 'payment';
+    const priceIdPayment = process.env.STRIPE_PRICE_COMMAND || null;
+    const priceIdSubscription = process.env.STRIPE_PRICE_COMMAND_SUBSCRIPTION || null;
+    const priceId = mode === 'subscription' ? priceIdSubscription || priceIdPayment : priceIdPayment || priceIdSubscription;
+    return {
+      tier,
+      name: 'Command Blueprint Programme',
+      amountCents: Number.isFinite(COMMAND_DEFAULT_AMOUNT) ? COMMAND_DEFAULT_AMOUNT : 250000,
+      currency,
+      mode,
+      priceId
+    };
+  }
+  throw new Error('Unsupported tier');
+}
+
+async function isAdminUser(userId) {
+  if (!userId) return false;
+  const user = await User.findById(userId);
+  if (!user) return false;
+  return ADMIN_EMAILS.has(String(user.email || '').toLowerCase());
+}
 
 const optionalMoney = z
   .union([
@@ -385,7 +515,12 @@ app.post('/api/auth/logout', requireAuth, (req, res) => {
 app.get('/api/auth/me', requireAuth, async (req, res) => {
   const user = await User.findById(req.auth.uid);
   if (!user) return res.status(404).json({ error: 'Not found' });
-  res.json({ ok: true, user: user.public() });
+  const { tier, record } = await resolveTierForUser(user._id);
+  res.json({
+    ok: true,
+    user: user.public(),
+    entitlement: { tier, expiresAt: record?.expiresAt || null }
+  });
 });
 
 app.put('/api/auth/me', requireAuth, validateBody(profileUpdateSchema), async (req, res) => {
@@ -396,7 +531,12 @@ app.put('/api/auth/me', requireAuth, validateBody(profileUpdateSchema), async (r
     });
     const user = await User.findByIdAndUpdate(req.auth.uid, updates, { new: true });
     if (!user) return res.status(404).json({ error: 'Not found' });
-    res.json({ ok: true, user: user.public() });
+    const { tier, record } = await resolveTierForUser(user._id);
+    res.json({
+      ok: true,
+      user: user.public(),
+      entitlement: { tier, expiresAt: record?.expiresAt || null }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Unable to update profile' });
@@ -410,7 +550,8 @@ app.delete('/api/auth/me', requireAuth, async (req, res) => {
       Assessment.deleteMany({ userId }),
       Project.deleteMany({ userId }),
       Report.deleteMany({ userId }),
-      Payment.deleteMany({ userId })
+      Payment.deleteMany({ userId }),
+      Entitlement.deleteMany({ userId })
     ]);
     await User.deleteOne({ _id: userId });
     clearTokenCookie(res);
@@ -422,8 +563,18 @@ app.delete('/api/auth/me', requireAuth, async (req, res) => {
 });
 
 app.get('/api/projects', requireAuth, async (req, res) => {
-  const projects = await Project.find({ userId: req.auth.uid }).sort({ updatedAt: -1 });
-  res.json({ ok: true, projects: projects.map(project => project.public()) });
+  const [projects, entitlement] = await Promise.all([
+    Project.find({ userId: req.auth.uid }).sort({ updatedAt: -1 }),
+    getActiveEntitlement(req.auth.uid)
+  ]);
+  res.json({
+    ok: true,
+    projects: projects.map(project => project.public()),
+    entitlement: {
+      tier: entitlement?.tier || 'free',
+      expiresAt: entitlement?.expiresAt || null
+    }
+  });
 });
 
 app.post('/api/projects', requireAuth, validateBody(projectCreateSchema), async (req, res) => {
@@ -483,7 +634,15 @@ app.get('/api/projects/:id', requireAuth, async (req, res) => {
   try {
     const project = await Project.findOne({ _id: req.params.id, userId: req.auth.uid });
     if (!project) return res.status(404).json({ error: 'Not found' });
-    res.json({ ok: true, project: project.public() });
+    const entitlement = await getActiveEntitlement(req.auth.uid);
+    res.json({
+      ok: true,
+      project: project.public(),
+      entitlement: {
+        tier: entitlement?.tier || 'free',
+        expiresAt: entitlement?.expiresAt || null
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Unable to load project' });
@@ -530,7 +689,15 @@ app.put('/api/projects/:id', requireAuth, validateBody(projectUpdateSchema), asy
     };
 
     await project.save();
-    res.json({ ok: true, project: project.public() });
+    const entitlement = await getActiveEntitlement(req.auth.uid);
+    res.json({
+      ok: true,
+      project: project.public(),
+      entitlement: {
+        tier: entitlement?.tier || 'free',
+        expiresAt: entitlement?.expiresAt || null
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Unable to update project' });
@@ -835,6 +1002,7 @@ app.post('/api/assessments/follow-up', requireAuth, validateBody(followUpSchema)
 app.post(
   '/api/vendors/search',
   requireAuth,
+  requireTierAccess('strategic'),
   vendorSearchLimiter,
   validateBody(vendorSearchSchema),
   requireProjectOwnership('projectId'),
@@ -860,6 +1028,7 @@ app.post(
 app.post(
   '/api/rfp/templates/materialize',
   requireAuth,
+  requireTierAccess('strategic'),
   validateBody(rfpMaterializeSchema),
   requireProjectOwnership('projectId'),
   async (req, res) => {
@@ -1233,7 +1402,7 @@ async function createAssessment({ userId, project, payload }) {
     { assessmentId: assessment._id, userId },
     {
       ...reportData,
-      paid: true,
+      paid: false,
       assessmentId: assessment._id,
       userId,
       projectId: assessment.projectId
@@ -1297,7 +1466,7 @@ async function updateAssessment({ assessment, project, payload }) {
     { assessmentId: assessment._id, userId: assessment.userId },
     {
       ...reportData,
-      paid: true,
+      paid: false,
       assessmentId: assessment._id,
       userId: assessment.userId,
       projectId: assessment.projectId
@@ -1451,48 +1620,13 @@ app.get('/api/reports/:id', requireAuth, async (req, res) => {
   try {
     const rep = await Report.findOne({ _id: req.params.id, userId: req.auth.uid });
     if (!rep) return res.status(404).json({ error: 'Not found' });
-    const partial = {
-      _id: rep._id,
-      projectId: rep.projectId,
-      createdAt: rep.createdAt,
-      vertical: rep.vertical,
-      assessmentType: rep.assessmentType,
-      stage: rep.stage,
-      assessmentId: rep.assessmentId,
-      summary: rep.summary,
-      headlineScore: rep.headlineScore,
-      pillarScores: rep.pillarScores,
-      benchmarks: { medians: rep.benchmarks?.medians },
-      recommendations: rep.recommendations.slice(0, 3),
-      competitorSummary: rep.competitorSummary
-        ? {
-            percentile: rep.competitorSummary.percentile,
-            narrative: rep.competitorSummary.narrative,
-            median: rep.competitorSummary.median
-          }
-        : undefined,
-      pillarInsights: Object.fromEntries(Object.entries(rep.pillarInsights || {}).slice(0, 1)),
-      investmentOutlook: {
-        savingsNarrative: rep.investmentOutlook?.savingsNarrative,
-        pillarAllocations: Object.fromEntries(
-          Object.entries(rep.investmentOutlook?.pillarAllocations || {}).slice(0, 1)
-        )
-      },
-      roadmap: Object.fromEntries(Object.entries(rep.roadmap || {}).slice(0, 1)),
-      technologyRadar: (rep.technologyRadar || []).slice(0, 1),
-      personaBriefings: (rep.personaBriefings || []).slice(0, 1),
-      riskRegister: (rep.riskRegister || []).slice(0, 1),
-      revenueOpportunities: (rep.revenueOpportunities || []).slice(0, 1),
-      operationalPlan: Object.fromEntries(Object.entries(rep.operationalPlan || {}).slice(0, 1)),
-      aiNarrative:
-        rep.aiNarrative && rep.aiNarrative.executiveSummary
-          ? { executiveSummary: rep.aiNarrative.executiveSummary }
-          : {},
-      architectureSignals: rep.architectureSignals || {},
-      investmentProfile: rep.investmentProfile || {},
-      personas: rep.personas || []
-    };
-    res.json({ ok: true, report: rep.paid ? rep : partial, paid: rep.paid });
+    const info = await loadRequestEntitlement(req, { fallbackPaid: Boolean(rep.paid) });
+    const report = sanitizeReportForTier(rep, info.tier);
+    res.json({
+      ok: true,
+      report,
+      entitlement: { tier: info.tier, expiresAt: info.record?.expiresAt || null }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Unable to load report' });
@@ -1503,6 +1637,11 @@ app.get('/api/reports/:id/export', requireAuth, async (req, res) => {
   try {
     const report = await Report.findOne({ _id: req.params.id, userId: req.auth.uid });
     if (!report) return res.status(404).json({ error: 'Not found' });
+
+    const info = await loadRequestEntitlement(req, { fallbackPaid: Boolean(report.paid) });
+    if (!tierAllowsStrategic(info.tier)) {
+      return res.status(403).json({ error: 'Upgrade required' });
+    }
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Assessment Summary');
@@ -1537,8 +1676,15 @@ app.get('/api/reports', requireAuth, async (req, res) => {
     const reports = await Report.find({ userId: req.auth.uid })
       .sort({ createdAt: -1 })
       .limit(20)
-      .select('_id createdAt headlineScore paid vertical');
-    res.json({ ok: true, reports });
+      .select('_id createdAt headlineScore paid vertical')
+      .lean();
+    const info = await loadRequestEntitlement(req);
+    const hydrated = attachAccessToReports(reports, info.tier);
+    res.json({
+      ok: true,
+      reports: hydrated,
+      entitlement: { tier: info.tier, expiresAt: info.record?.expiresAt || null }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -1620,26 +1766,177 @@ function parseBusinessMetricsCsv(text) {
   return rows;
 }
 
-app.post('/api/payments/mock/checkout', requireAuth, validateBody(paymentSchema), async (req, res) => {
+app.post('/api/payments/checkout', requireAuth, validateBody(checkoutSchema), async (req, res) => {
+  if (!isStripeConfigured()) {
+    return res.status(503).json({ error: 'Payments are not enabled' });
+  }
   try {
-    const { reportId } = req.validatedBody;
-    const rep = await Report.findOne({ _id: reportId, userId: req.auth.uid });
-    if (!rep) return res.status(404).json({ error: 'Report not found' });
-    const pay = await Payment.create({
-      userId: req.auth.uid,
-      reportId,
-      amount: 49900,
-      currency: 'GBP',
-      status: 'paid'
+    const { tier } = req.validatedBody;
+    const config = getTierCheckoutConfig(tier);
+    const user = await User.findById(req.auth.uid);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const stripe = getStripe();
+    if (isStripeStub()) {
+      return res.status(503).json({ error: 'Payments are not enabled in this environment' });
+    }
+    const payment = await Payment.create({
+      userId: user._id,
+      amountCents: config.amountCents,
+      currency: config.currency,
+      provider: 'stripe',
+      status: 'pending',
+      tier
     });
-    rep.paid = true;
-    await rep.save();
-    res.json({ ok: true, paymentId: pay._id, reportId: rep._id, assessmentId: rep.assessmentId });
+
+    const originHost = req.headers.origin || `${req.protocol}://${req.get('host')}`;
+    const baseUrl = originHost.replace(/\/$/, '');
+    const lineItem = config.priceId
+      ? { price: config.priceId, quantity: 1 }
+      : {
+          price_data: {
+            currency: config.currency,
+            product_data: { name: config.name },
+            unit_amount: config.amountCents
+          },
+          quantity: 1
+        };
+
+    const session = await stripe.checkout.sessions.create({
+      mode: config.mode,
+      line_items: [lineItem],
+      success_url: `${baseUrl}/dashboard.html?checkout=success`,
+      cancel_url: `${baseUrl}/dashboard.html?checkout=cancelled`,
+      allow_promotion_codes: true,
+      customer_email: user.email,
+      metadata: {
+        userId: user._id.toString(),
+        tier,
+        paymentId: payment._id.toString()
+      }
+    });
+
+    payment.stripeSessionId = session.id;
+    payment.metadata = { ...(payment.metadata || {}), checkoutMode: config.mode };
+    if (session.amount_total) payment.amountCents = session.amount_total;
+    if (session.currency) payment.currency = session.currency;
+    await payment.save();
+
+    res.json({ ok: true, checkoutUrl: session.url, sessionId: session.id });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Checkout session creation failed', err);
+    res.status(500).json({ error: 'Unable to initiate checkout' });
   }
 });
+
+app.post('/api/payments/webhook', async (req, res) => {
+  if (!isStripeConfigured() || !process.env.STRIPE_WEBHOOK_SECRET) {
+    return res.status(503).json({ error: 'Webhook not configured' });
+  }
+  const signature = req.headers['stripe-signature'];
+  if (!signature || !req.rawBody) {
+    return res.status(400).json({ error: 'Invalid signature' });
+  }
+
+  let event;
+  try {
+    event = getStripe().webhooks.constructEvent(req.rawBody, signature, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error('Stripe signature verification failed', err);
+    return res.status(400).json({ error: 'Signature verification failed' });
+  }
+
+  try {
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object;
+        const metadata = session.metadata || {};
+        const paymentId = metadata.paymentId;
+        let payment = null;
+        if (paymentId && mongoose.Types.ObjectId.isValid(paymentId)) {
+          payment = await Payment.findById(paymentId);
+        }
+        if (!payment && session.id) {
+          payment = await Payment.findOne({ stripeSessionId: session.id });
+        }
+        if (payment) {
+          payment.status = 'paid';
+          payment.stripeSessionId = session.id;
+          payment.metadata = { ...(payment.metadata || {}), ...metadata };
+          if (session.amount_total) payment.amountCents = session.amount_total;
+          if (session.currency) payment.currency = session.currency;
+          await payment.save();
+        }
+        const userId = payment?.userId || metadata.userId;
+        const tier = metadata.tier || payment?.tier;
+        if (userId && tier) {
+          let expiresAt = null;
+          if (session.mode === 'subscription' && session.subscription) {
+            try {
+              const subscription = await getStripe().subscriptions.retrieve(session.subscription);
+              if (subscription?.current_period_end) {
+                expiresAt = new Date(subscription.current_period_end * 1000);
+              }
+            } catch (err) {
+              console.error('Unable to retrieve subscription period', err);
+            }
+          }
+          await grantEntitlement({ userId, tier, expiresAt });
+        }
+        break;
+      }
+      case 'checkout.session.expired': {
+        const session = event.data.object;
+        if (session?.id) {
+          await Payment.findOneAndUpdate({ stripeSessionId: session.id }, { status: 'failed' });
+        }
+        break;
+      }
+      default:
+        break;
+    }
+    res.json({ received: true });
+  } catch (err) {
+    console.error('Stripe webhook handling failed', err);
+    res.status(500).json({ error: 'Webhook handling failed' });
+  }
+});
+
+app.post(
+  '/api/admin/entitlements/grant',
+  requireAuth,
+  validateBody(entitlementGrantSchema),
+  async (req, res) => {
+    try {
+      if (!(await isAdminUser(req.auth.uid))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const { userId, tier, expiresAt } = req.validatedBody;
+      if (tier === 'free') {
+        await Entitlement.deleteMany({ userId });
+        return res.json({ ok: true, entitlement: { tier: 'free', expiresAt: null } });
+      }
+      let expiry = null;
+      if (expiresAt) {
+        const parsed = new Date(expiresAt);
+        if (Number.isNaN(parsed.getTime())) {
+          return res.status(400).json({ error: 'Invalid expiresAt value' });
+        }
+        expiry = parsed;
+      }
+      const entitlement = await grantEntitlement({ userId, tier, expiresAt: expiry });
+      res.json({
+        ok: true,
+        entitlement: { tier: entitlement.tier, expiresAt: entitlement.expiresAt || null }
+      });
+    } catch (err) {
+      console.error('Admin entitlement grant failed', err);
+      res.status(500).json({ error: 'Unable to grant entitlement' });
+    }
+  }
+);
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
 app.use(express.static(PUBLIC_DIR));
@@ -1657,3 +1954,4 @@ if (require.main === module) {
 }
 
 module.exports = app;
+module.exports.ensureMongoConnection = ensureMongoConnection;

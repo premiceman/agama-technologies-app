@@ -12,7 +12,10 @@
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
       <div>
         <span class="eyebrow">Client workspace</span>
-        <h1 class="h3 mb-0">Projects &amp; assessments</h1>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <h1 class="h3 mb-0">Projects &amp; assessments</h1>
+          <span class="badge-soft" id="tierBadge">Insight Pulse tier</span>
+        </div>
       </div>
       <div class="d-flex gap-2">
         <a class="btn btn-outline-light" href="/assessment.html">New project</a>
@@ -141,6 +144,7 @@
 
   <script>
     const logoutBtn = document.getElementById('logout');
+    const tierBadgeEl = document.getElementById('tierBadge');
     if (logoutBtn) {
       logoutBtn.onclick = async () => {
         await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
@@ -155,6 +159,13 @@
     const profileForm = document.getElementById('profileForm');
     const profileFeedbackEl = document.getElementById('profileFeedback');
     const deleteProfileBtn = document.getElementById('profileDelete');
+
+    const tierLabels = {
+      free: 'Insight Pulse',
+      strategic: 'Strategic',
+      command: 'Command'
+    };
+    let currentEntitlement = null;
 
     function escapeHtml(value) {
       return String(value ?? '')
@@ -171,6 +182,22 @@
         return false;
       }
       return true;
+    }
+
+    function applyEntitlement(entitlement) {
+      if (!entitlement) return;
+      currentEntitlement = entitlement;
+      if (tierBadgeEl) {
+        const tier = String(entitlement.tier || 'free').toLowerCase();
+        const label = tierLabels[tier] || tier;
+        tierBadgeEl.textContent = `${label} tier`;
+        if (entitlement.expiresAt) {
+          const expires = new Date(entitlement.expiresAt);
+          tierBadgeEl.title = `Access until ${expires.toLocaleDateString()}`;
+        } else {
+          tierBadgeEl.removeAttribute('title');
+        }
+      }
     }
 
     function renderProjects(projects) {
@@ -240,6 +267,7 @@
         if (!ensureAuth(res)) return;
         const json = await res.json();
         if (!json.ok) throw new Error('Unable to load projects');
+        if (json.entitlement) applyEntitlement(json.entitlement);
         renderProjects(json.projects || []);
       } catch (err) {
         console.error(err);
@@ -259,16 +287,22 @@
       }
       activityEmptyEl.style.display = 'none';
       reports.forEach(rep => {
+        const tier = rep.access?.tier || currentEntitlement?.tier || 'free';
+        const hasPremium = Boolean(rep.access?.hasPremium);
+        const tierLabel = tierLabels[tier] || tier;
         const card = document.createElement('div');
         card.className = 'notice';
         card.innerHTML = `
           <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
             <div>
               <div class="small text-fg-3">${escapeHtml(new Date(rep.createdAt).toLocaleString())}</div>
-              <div><strong>${escapeHtml(rep.vertical)}</strong> · Score <span class="grad">${escapeHtml(rep.headlineScore)}</span></div>
+              <div class="d-flex flex-column">
+                <div><strong>${escapeHtml(rep.vertical)}</strong> · Score <span class="grad">${escapeHtml(rep.headlineScore)}</span></div>
+                <div class="small text-fg-3">${escapeHtml(`${tierLabel} ${hasPremium ? 'access' : 'preview'}`)}</div>
+              </div>
             </div>
             <div class="d-flex gap-2">
-              <a class="btn btn-primary btn-sm" href="/report.html?id=${encodeURIComponent(rep._id)}">${rep.paid ? 'View full report' : 'View preview'}</a>
+              <a class="btn btn-primary btn-sm" href="/report.html?id=${encodeURIComponent(rep._id)}">${hasPremium ? 'View full report' : 'View preview'}</a>
             </div>
           </div>`;
         reportsEl.appendChild(card);
@@ -281,6 +315,7 @@
         if (!ensureAuth(res)) return;
         const json = await res.json();
         if (!json.ok) throw new Error('Unable to load reports');
+        if (json.entitlement) applyEntitlement(json.entitlement);
         renderReports(json.reports || []);
       } catch (err) {
         console.error(err);
@@ -298,6 +333,7 @@
         if (!ensureAuth(res)) return;
         const json = await res.json();
         if (!json.ok) throw new Error('Unable to load profile');
+        if (json.entitlement) applyEntitlement(json.entitlement);
         const user = json.user || {};
         profileForm.elements.name.value = user.name || '';
         profileForm.elements.company.value = user.company || '';

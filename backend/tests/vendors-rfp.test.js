@@ -4,6 +4,8 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 
 const Vendor = require('../models/Vendor');
 const RfpTemplate = require('../models/RfpTemplate');
+const Entitlement = require('../models/Entitlement');
+const User = require('../models/User');
 
 let app;
 let mongoServer;
@@ -18,6 +20,7 @@ beforeAll(async () => {
   mongoServer = await MongoMemoryServer.create();
   process.env.MONGODB_URI = mongoServer.getUri();
   app = require('../index');
+  await app.ensureMongoConnection();
 });
 
 afterAll(async () => {
@@ -47,6 +50,8 @@ async function bootstrapProject(client) {
     companySize: 'Scale-up',
     capabilityFocus: ['Observability']
   });
+  const user = await User.findOne({ email: 'owner@example.com' });
+  await Entitlement.create({ userId: user._id, tier: 'strategic' });
   return projectRes.body.project.id;
 }
 
