@@ -12,4 +12,4 @@ services:
       - key: JWT_SECRET
         sync: false
       - key: ALLOWED_ORIGINS
-        value: https://www.agamatechnologies.com
+        value: https://www.agamatechnologies.com,https://agamatechnologies.com
