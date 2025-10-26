@@ -12,7 +12,11 @@ function getComputeScoreSummary() {
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+const OPENAI_FILES_URL = 'https://api.openai.com/v1/files';
+const OPENAI_VECTOR_STORE_URL = 'https://api.openai.com/v1/vector_stores';
+const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 const DEFAULT_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const RAG_MODEL = process.env.OPENAI_RAG_MODEL || DEFAULT_MODEL;
 const DEFAULT_TOOLS = ['scoring.compute', 'vendor.match', 'calc.financials', 'rag.query'];
 
 function toJsonSchema(schema, name = 'AgamaSchema') {
@@ -44,6 +48,34 @@ async function openAIRequest(body) {
   }
 }
 
+async function openAIRestRequest({ url, method = 'POST', headers = {}, body }) {
+  if (!OPENAI_API_KEY) return null;
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        ...headers
+      },
+      body
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('OpenAI REST error', method, url, text);
+      return null;
+    }
+    if (res.status === 204) return null;
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      return res.json();
+    }
+    return res.arrayBuffer();
+  } catch (err) {
+    console.error('OpenAI REST call failed', err);
+    return null;
+  }
+}
+
 function extractMessageContent(message) {
   if (!message) return '';
   if (typeof message.content === 'string') {
@@ -55,6 +87,125 @@ function extractMessageContent(message) {
       .join('');
   }
   return '';
+}
+
+async function uploadFileToOpenAI({ buffer, filename, mime }) {
+  if (!OPENAI_API_KEY) return null;
+  const form = new FormData();
+  const blob = new Blob([buffer], { type: mime || 'application/octet-stream' });
+  form.append('purpose', 'assistants');
+  form.append('file', blob, filename);
+  const data = await openAIRestRequest({ url: OPENAI_FILES_URL, body: form });
+  return data;
+}
+
+async function createVectorStore({ name }) {
+  const payload = JSON.stringify({ name });
+  const data = await openAIRestRequest({
+    url: OPENAI_VECTOR_STORE_URL,
+    headers: { 'Content-Type': 'application/json' },
+    body: payload
+  });
+  return data?.id || null;
+}
+
+async function attachFileToVectorStore({ vectorStoreId, fileId }) {
+  if (!vectorStoreId || !fileId) return null;
+  const payload = JSON.stringify({ file_id: fileId });
+  return openAIRestRequest({
+    url: `${OPENAI_VECTOR_STORE_URL}/${vectorStoreId}/files`,
+    headers: { 'Content-Type': 'application/json' },
+    body: payload
+  });
+}
+
+async function detachFileFromVectorStore({ vectorStoreId, fileId }) {
+  if (!vectorStoreId || !fileId) return null;
+  return openAIRestRequest({
+    url: `${OPENAI_VECTOR_STORE_URL}/${vectorStoreId}/files/${fileId}`,
+    method: 'DELETE'
+  });
+}
+
+async function deleteOpenAIFile(fileId) {
+  if (!fileId) return null;
+  return openAIRestRequest({
+    url: `${OPENAI_FILES_URL}/${fileId}`,
+    method: 'DELETE'
+  });
+}
+
+function extractCitationsFromNode(node, acc = []) {
+  if (!node) return acc;
+  if (Array.isArray(node)) {
+    node.forEach(item => extractCitationsFromNode(item, acc));
+    return acc;
+  }
+  if (typeof node === 'object') {
+    if (node.type === 'file_citation' || node.object === 'file_citation') {
+      acc.push({
+        fileId: node.file_id || node.fileId,
+        text: node.quote || node.text || node.content || '',
+        page: node.page ?? node.metadata?.page ?? null,
+        score: node.score ?? node.metadata?.score ?? null
+      });
+    }
+    Object.values(node).forEach(value => extractCitationsFromNode(value, acc));
+  }
+  return acc;
+}
+
+async function executeRagQuery({ projectId, query, filters = {} }) {
+  if (!OPENAI_API_KEY || !projectId || !query) return [];
+  const Project = require('../models/Project');
+  const File = require('../models/File');
+
+  const project = await Project.findById(projectId).lean();
+  if (!project?.ragVectorStoreId) {
+    return [];
+  }
+
+  const payload = JSON.stringify({
+    model: RAG_MODEL,
+    input: query,
+    extra_body: {
+      file_search: {
+        vector_store_ids: [project.ragVectorStoreId],
+        filters
+      }
+    }
+  });
+
+  const data = await openAIRestRequest({
+    url: OPENAI_RESPONSES_URL,
+    headers: { 'Content-Type': 'application/json' },
+    body: payload
+  });
+  if (!data) return [];
+
+  const citations = extractCitationsFromNode(data.output || data.outputs || data.data || data);
+  if (!citations.length) return [];
+
+  const fileIds = [...new Set(citations.map(c => c.fileId).filter(Boolean))];
+  if (!fileIds.length) return [];
+
+  const files = await File.find({ projectId, openaiFileId: { $in: fileIds } }).lean();
+  const fileMap = new Map(files.map(file => [file.openaiFileId, file]));
+
+  return citations
+    .map(citation => {
+      const file = fileMap.get(citation.fileId);
+      if (!file) return null;
+      return {
+        fileId: String(file._id),
+        openaiFileId: citation.fileId,
+        filename: file.filename,
+        page: citation.page ?? null,
+        text: citation.text || '',
+        score: typeof citation.score === 'number' ? citation.score : null
+      };
+    })
+    .filter(Boolean);
 }
 
 async function structuredOutput({ messages, schema, system }) {
@@ -127,11 +278,11 @@ function resolveTools(tools = []) {
 
 async function toolCalling({ messages, tools = [], system, maxIterations = 6 }) {
   if (!OPENAI_API_KEY) {
-    return { response: null, messages: messages || [] };
+    return { response: null, messages: messages || [], executions: [] };
   }
   const resolved = resolveTools(tools);
   if (!resolved.length) {
-    return { response: null, messages: messages || [] };
+    return { response: null, messages: messages || [], executions: [] };
   }
   const apiTools = resolved.map(tool => ({
     type: 'function',
@@ -143,6 +294,7 @@ async function toolCalling({ messages, tools = [], system, maxIterations = 6 }) 
   }));
 
   const convo = Array.isArray(messages) ? [...messages] : [];
+  const executions = [];
   for (let turn = 0; turn < maxIterations; turn += 1) {
     const attemptMessages = [];
     if (system) {
@@ -159,12 +311,12 @@ async function toolCalling({ messages, tools = [], system, maxIterations = 6 }) 
     });
 
     if (!data) {
-      return { response: null, messages: convo };
+      return { response: null, messages: convo, executions };
     }
 
     const message = data.choices?.[0]?.message;
     if (!message) {
-      return { response: null, messages: convo };
+      return { response: null, messages: convo, executions };
     }
 
     const assistantContent = extractMessageContent(message);
@@ -184,6 +336,11 @@ async function toolCalling({ messages, tools = [], system, maxIterations = 6 }) 
             tool_call_id: toolCall.id,
             name: toolCall.function.name,
             content: JSON.stringify({ error: 'UNKNOWN_TOOL' })
+          });
+          executions.push({
+            name: toolCall.function.name,
+            args: parsedArgs,
+            result: { error: 'UNKNOWN_TOOL' }
           });
           continue;
         }
@@ -217,14 +374,15 @@ async function toolCalling({ messages, tools = [], system, maxIterations = 6 }) 
           name: definition.name,
           content: JSON.stringify(result ?? null)
         });
+        executions.push({ name: definition.name, args: parsedArgs, result });
       }
       continue;
     }
 
-    return { response: message, messages: convo };
+    return { response: message, messages: convo, executions };
   }
 
-  return { response: null, messages: convo };
+  return { response: null, messages: convo, executions };
 }
 
 function safeParseJSON(text, fallback = {}) {
@@ -235,6 +393,27 @@ function safeParseJSON(text, fallback = {}) {
   }
 }
 
+function extractRagEvidence(executions = [], section) {
+  if (!Array.isArray(executions)) return [];
+  const entries = [];
+  executions
+    .filter(exec => exec && exec.name === 'rag.query' && exec.result && Array.isArray(exec.result.results))
+    .forEach(exec => {
+      exec.result.results.forEach(item => {
+        entries.push({
+          section,
+          query: exec.result.query || exec.args?.query || '',
+          fileId: item.fileId,
+          filename: item.filename,
+          page: item.page ?? null,
+          text: item.text || '',
+          score: item.score ?? null
+        });
+      });
+    });
+  return entries;
+}
+
 async function runToolPlanner({ system, payload }) {
   const planningMessages = [
     {
@@ -242,10 +421,9 @@ async function runToolPlanner({ system, payload }) {
       content: `Context JSON: ${JSON.stringify(payload)}\n\nUse the available tools to gather supporting data. Respond with JSON {scoring?, vendors?, financials?, notes?}.`
     }
   ];
-  const { response } = await toolCalling({ messages: planningMessages, tools: DEFAULT_TOOLS, system });
-  if (!response) return {};
-  const content = extractMessageContent(response);
-  return safeParseJSON(content, {});
+  const { response, executions } = await toolCalling({ messages: planningMessages, tools: DEFAULT_TOOLS, system });
+  const plan = response ? safeParseJSON(extractMessageContent(response), {}) : {};
+  return { plan, executions: executions || [] };
 }
 
 const ExecutiveNarrativeSchema = z.object({
@@ -625,6 +803,10 @@ async function generateExecutiveNarrative({ assessment, report, capability }) {
     system: 'You are an enterprise strategist preparing supporting intelligence for an executive narrative.',
     payload
   });
+  const plannerContext = {
+    plan: toolInsights.plan || {},
+    executions: toolInsights.executions || []
+  };
 
   const result = await structuredOutput({
     system:
@@ -637,7 +819,7 @@ async function generateExecutiveNarrative({ assessment, report, capability }) {
       },
       {
         role: 'user',
-        content: `Supporting insights:${JSON.stringify(toolInsights)}`
+        content: `Supporting insights:${JSON.stringify(plannerContext)}`
       }
     ]
   });
@@ -660,6 +842,10 @@ async function generateStrategicIntelligence({ stage, assessment, report, capabi
     system: 'You are preparing industry intelligence and may call tools for scoring or vendor context.',
     payload
   });
+  const plannerContext = {
+    plan: toolInsights.plan || {},
+    executions: toolInsights.executions || []
+  };
 
   const result = await structuredOutput({
     system:
@@ -667,11 +853,12 @@ async function generateStrategicIntelligence({ stage, assessment, report, capabi
     schema: StrategicIntelligenceSchema,
     messages: [
       { role: 'user', content: `Context:${JSON.stringify(payload)}` },
-      { role: 'user', content: `Tool research:${JSON.stringify(toolInsights)}` }
+      { role: 'user', content: `Tool research:${JSON.stringify(plannerContext)}` }
     ]
   });
 
-  return result || {};
+  const evidence = extractRagEvidence(toolInsights.executions, 'strategicIntelligence');
+  return { data: result || {}, evidence };
 }
 
 async function generateCommandBlueprint({ assessment, capability, vendorEngagements, deliveryTimeline, industryInsights, report }) {
@@ -691,6 +878,10 @@ async function generateCommandBlueprint({ assessment, capability, vendorEngageme
     system: 'You are a transformation partner planning a command blueprint. Use tools for vendor and ROI insights when helpful.',
     payload
   });
+  const plannerContext = {
+    plan: toolInsights.plan || {},
+    executions: toolInsights.executions || []
+  };
 
   const result = await structuredOutput({
     system:
@@ -698,11 +889,12 @@ async function generateCommandBlueprint({ assessment, capability, vendorEngageme
     schema: CommandBlueprintSchema,
     messages: [
       { role: 'user', content: `Context:${JSON.stringify(payload)}` },
-      { role: 'user', content: `Tool research:${JSON.stringify(toolInsights)}` }
+      { role: 'user', content: `Tool research:${JSON.stringify(plannerContext)}` }
     ]
   });
 
-  return result || {};
+  const evidence = extractRagEvidence(toolInsights.executions, 'commandBlueprint');
+  return { data: result || {}, evidence };
 }
 
 async function generateArchitectureAssets({ assessment, report, capability }) {
@@ -719,6 +911,10 @@ async function generateArchitectureAssets({ assessment, report, capability }) {
     system: 'You are an enterprise architect preparing supporting evidence for architecture guidance.',
     payload
   });
+  const plannerContext = {
+    plan: toolInsights.plan || {},
+    executions: toolInsights.executions || []
+  };
 
   const result = await structuredOutput({
     system:
@@ -726,7 +922,7 @@ async function generateArchitectureAssets({ assessment, report, capability }) {
     schema: ArchitectureAssetsSchema,
     messages: [
       { role: 'user', content: `Context:${JSON.stringify(payload)}` },
-      { role: 'user', content: `Tool research:${JSON.stringify(toolInsights)}` }
+      { role: 'user', content: `Tool research:${JSON.stringify(plannerContext)}` }
     ]
   });
 
@@ -965,6 +1161,12 @@ module.exports = {
   generateFollowUpPrompts,
   generateAssessmentAssistantReply,
   generateRfpDraft,
+  uploadFileToOpenAI,
+  createVectorStore,
+  attachFileToVectorStore,
+  detachFileFromVectorStore,
+  deleteOpenAIFile,
+  executeRagQuery,
   ExecutiveNarrativeSchema,
   StrategicIntelligenceSchema,
   CommandBlueprintSchema,

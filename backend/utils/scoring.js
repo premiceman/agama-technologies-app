@@ -983,8 +983,9 @@ async function computeReport({ assessment }) {
   }, capability });
 
   let strategicIntelligence = {};
+  const evidence = [];
   if (['strategic', 'command'].includes(stage)) {
-    strategicIntelligence = await generateStrategicIntelligence({
+    const strategicResult = await generateStrategicIntelligence({
       stage,
       capability,
       assessment,
@@ -999,11 +1000,24 @@ async function computeReport({ assessment }) {
         revenueOpportunities
       }
     });
+    if (strategicResult && strategicResult.data) {
+      strategicIntelligence = strategicResult.data;
+    } else {
+      strategicIntelligence = strategicResult || {};
+    }
+    if (Array.isArray(strategicResult?.evidence)) {
+      evidence.push(
+        ...strategicResult.evidence.map(entry => ({
+          ...entry,
+          section: entry.section || 'strategicIntelligence'
+        }))
+      );
+    }
   }
 
   let commandAdvisory = {};
   if (stage === 'command') {
-    commandAdvisory = await generateCommandBlueprint({
+    const commandResult = await generateCommandBlueprint({
       capability,
       assessment,
       vendorEngagements,
@@ -1019,6 +1033,19 @@ async function computeReport({ assessment }) {
         architectureSignals: assessment.architectureSignals || {}
       }
     });
+    if (commandResult && commandResult.data) {
+      commandAdvisory = commandResult.data;
+    } else {
+      commandAdvisory = commandResult || {};
+    }
+    if (Array.isArray(commandResult?.evidence)) {
+      evidence.push(
+        ...commandResult.evidence.map(entry => ({
+          ...entry,
+          section: entry.section || 'commandBlueprint'
+        }))
+      );
+    }
   }
 
   let architectureAssets = {};
@@ -1078,7 +1105,8 @@ async function computeReport({ assessment }) {
     structuredSections,
     valuePath,
     coverageSummary,
-    urgencyMap: pillarUrgency
+    urgencyMap: pillarUrgency,
+    evidence
   };
 }
 

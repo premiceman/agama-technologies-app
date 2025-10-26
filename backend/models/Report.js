@@ -43,6 +43,7 @@ const ReportSchema = new Schema({
   valuePath: { type: [Schema.Types.Mixed], default: [] },
   coverageSummary: { type: Schema.Types.Mixed, default: {} },
   urgencyMap: { type: Schema.Types.Mixed, default: {} },
+  evidence: { type: [Schema.Types.Mixed], default: [] },
   paid: { type: Boolean, default: false }
 }, { timestamps: true });
 

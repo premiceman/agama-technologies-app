@@ -19,6 +19,7 @@ const ProjectSchema = new Schema({
   operatingModel: { type: Schema.Types.Mixed, default: {} },
   techLandscape: { type: Schema.Types.Mixed, default: {} },
   personas: { type: [Schema.Types.Mixed], default: [] },
+  ragVectorStoreId: { type: String },
   analytics: {
     readinessScore: { type: Number, default: 0 },
     clarityScore: { type: Number, default: 0 },
