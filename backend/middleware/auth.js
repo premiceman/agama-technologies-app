@@ -10,9 +10,10 @@ if (!SECRET) {
 
 function issueTokenCookie(res, payload) {
   const token = jwt.sign(payload, SECRET, { expiresIn: `${DAYS}d` });
+  const secure = process.env.NODE_ENV === 'production';
   res.cookie(COOKIE, token, {
     httpOnly: true,
-    secure: true,
+    secure,
     sameSite: 'lax',
     maxAge: DAYS * 24 * 60 * 60 * 1000,
     path: '/'
@@ -21,7 +22,8 @@ function issueTokenCookie(res, payload) {
 }
 
 function clearTokenCookie(res) {
-  res.cookie(COOKIE, '', { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 1, path: '/' });
+  const secure = process.env.NODE_ENV === 'production';
+  res.cookie(COOKIE, '', { httpOnly: true, secure, sameSite: 'lax', maxAge: 1, path: '/' });
 }
 
 function requireAuth(req, res, next) {

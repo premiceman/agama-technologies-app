@@ -924,7 +924,7 @@ async function computeReport({ assessment }) {
     });
   }
 
-  const summary = `Your overall maturity score is ${headlineScore}. Compared to ${verticalLabel}, you are ${headlineScore >= overallMedian ? 'ahead of' : 'behind'} the median of ${overallMedian}.`;
+  const executiveSummary = `Your overall maturity score is ${headlineScore}. Compared to ${verticalLabel}, you are ${headlineScore >= overallMedian ? 'ahead of' : 'behind'} the median of ${overallMedian}.`;
   const strategicNarrative = `Agama Technologies experts analysed your ${capability.name} operating model. Drawing on industry research (Gartner, Forrester, MITRE) we identified where AI, security, observability, and analytics can jointly drive modernisation with up to 95% cost optimisation.`;
 
   const personaBriefings = buildPersonaBriefings({ capability, assessment, pillarScores });
@@ -942,7 +942,7 @@ async function computeReport({ assessment }) {
   const structuredSections = buildStructuredSections({
     assessment,
     capability,
-    summary,
+    summary: executiveSummary,
     competitorSummary,
     pillarInsights,
     personaBriefings,
@@ -1048,7 +1048,7 @@ async function computeReport({ assessment }) {
     pillarScores,
     benchmarks,
     recommendations,
-    summary,
+    summary: executiveSummary,
     strategicNarrative,
     competitorSummary,
     pillarInsights,

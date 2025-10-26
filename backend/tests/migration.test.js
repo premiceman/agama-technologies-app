@@ -1,31 +1,19 @@
-const path = require('path');
-const { execFile } = require('child_process');
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const Assessment = require('../models/Assessment');
 const Project = require('../models/Project');
+const { migrate } = require('../scripts/migrate-assessments-into-projects');
 
 let mongoServer;
-
-function runScript(args = []) {
-  return new Promise((resolve, reject) => {
-    const scriptPath = path.join(__dirname, '..', 'scripts', 'migrate-assessments-into-projects.js');
-    execFile('node', [scriptPath, ...args], { env: { ...process.env } }, (err, stdout, stderr) => {
-      if (err) {
-        err.stdout = stdout;
-        err.stderr = stderr;
-        return reject(err);
-      }
-      resolve({ stdout, stderr });
-    });
-  });
-}
 
 beforeAll(async () => {
   process.env.JWT_SECRET = 'test-secret';
   process.env.ALLOWED_ORIGINS = '';
   mongoServer = await MongoMemoryServer.create();
   process.env.MONGODB_URI = mongoServer.getUri();
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect();
+  }
   await mongoose.connect(process.env.MONGODB_URI);
 });
 
@@ -35,7 +23,9 @@ afterAll(async () => {
 });
 
 afterEach(async () => {
-  await mongoose.connection.db.dropDatabase();
+  if (mongoose.connection.readyState === 1) {
+    await mongoose.connection.db.dropDatabase();
+  }
 });
 
 describe('assessment migration script', () => {
@@ -55,10 +45,10 @@ describe('assessment migration script', () => {
       updatedAt: new Date()
     });
 
-    await runScript(['--dry-run']);
+    await migrate({ dryRun: true });
 
     const refreshed = await Assessment.find();
-    expect(refreshed[0].projectId).toBeUndefined();
+    expect(refreshed[0].projectId).toBe(undefined);
   });
 
   test('migration assigns default project', async () => {
@@ -79,12 +69,12 @@ describe('assessment migration script', () => {
     });
     const assessmentId = insert.insertedId;
 
-    await runScript();
+    await migrate();
 
     const updated = await Assessment.findById(assessmentId);
     expect(updated.projectId).toBeDefined();
     const project = await Project.findById(updated.projectId);
-    expect(project).not.toBeNull();
+    expect(project).toBeTruthy();
     expect(project.name).toBe('Auto-imported Project');
   });
 });

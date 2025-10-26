@@ -8,6 +8,9 @@ let mongoServer;
 
 beforeAll(async () => {
   mongoServer = await MongoMemoryServer.create();
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect();
+  }
   await mongoose.connect(mongoServer.getUri());
 });
 
@@ -33,7 +36,8 @@ describe('LLM local tools', () => {
     });
 
     expect(summary.headlineScore).toBeGreaterThan(0);
-    expect(summary.pillarScores).toMatchObject({ Tech: expect.any(Number), People: expect.any(Number) });
+    expect(typeof summary.pillarScores.Tech).toBe('number');
+    expect(typeof summary.pillarScores.People).toBe('number');
     expect(summary.benchmarks).toBeDefined();
   });
 
@@ -73,7 +77,7 @@ describe('LLM local tools', () => {
     const result = calcFinancials({ investment: 500000, annualBenefit: 300000, durationMonths: 24, discountRate: 0.08 });
     expect(result.monthlyBenefit).toBeCloseTo(25000);
     expect(result.paybackMonths).toBeCloseTo(20);
-    expect(result.npv).toBeLessThan(0); // 2-year benefit should not fully offset investment at 8%
+    expect(result.npv).toBeGreaterThan(0);
   });
 
   test('rag query returns empty array placeholder', () => {

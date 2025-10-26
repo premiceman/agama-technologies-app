@@ -7,12 +7,28 @@ const Assessment = require('../models/Assessment');
 const Project = require('../models/Project');
 const { computeProjectAnalyticsSnapshot } = require('../utils/analytics');
 
-const DRY_RUN = process.argv.includes('--dry-run');
+const CLI_DRY_RUN = process.argv.includes('--dry-run');
 
 async function ensureConnection() {
+  if (mongoose.connection.readyState === 1) {
+    return false;
+  }
+  if (mongoose.connection.readyState === 2) {
+    await new Promise((resolve, reject) => {
+      mongoose.connection.once('open', resolve);
+      mongoose.connection.once('error', reject);
+    });
+    return false;
+  }
+  if (mongoose.connection.readyState === 3) {
+    await new Promise(resolve => {
+      mongoose.connection.once('disconnected', resolve);
+    });
+  }
   const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/agama_tech';
   mongoose.set('strictQuery', true);
   await mongoose.connect(uri);
+  return true;
 }
 
 function buildDefaultProjectPayload(assessment) {
@@ -49,16 +65,16 @@ function buildDefaultProjectPayload(assessment) {
   return payload;
 }
 
-async function migrate() {
-  await ensureConnection();
+async function migrate(options = {}) {
+  const { dryRun = CLI_DRY_RUN } = options;
+  const shouldDisconnect = await ensureConnection();
+
   const assessments = await Assessment.find({
-    $or: [
-      { projectId: { $exists: false } },
-      { projectId: null }
-    ]
+    $or: [{ projectId: { $exists: false } }, { projectId: null }]
   });
   console.log(`Found ${assessments.length} assessments without a project.`);
   const cache = new Map();
+  let linkedCount = 0;
 
   for (const assessment of assessments) {
     const key = assessment.userId.toString();
@@ -72,7 +88,7 @@ async function migrate() {
 
       if (!project) {
         const payload = buildDefaultProjectPayload(assessment);
-        if (DRY_RUN) {
+        if (dryRun) {
           project = new Project(payload);
           console.log(`[dry-run] Would create default project for user ${key}`);
         } else {
@@ -86,7 +102,7 @@ async function migrate() {
       cache.set(key, project);
     }
 
-    if (DRY_RUN) {
+    if (dryRun) {
       console.log(`[dry-run] Would link assessment ${assessment._id} to project ${project._id}`);
       continue;
     }
@@ -94,16 +110,24 @@ async function migrate() {
     assessment.projectId = project._id;
     assessment.projectSnapshot = project.public();
     await assessment.save();
+    linkedCount += 1;
     console.log(`Linked assessment ${assessment._id} to project ${project._id}`);
   }
 
-  await mongoose.disconnect();
+  if (shouldDisconnect) {
+    await mongoose.disconnect();
+  }
   console.log('Migration complete.');
+  return { processed: assessments.length, linked: linkedCount, dryRun };
 }
 
-migrate()
-  .then(() => process.exit(0))
-  .catch(err => {
-    console.error('Migration failed', err);
-    process.exit(1);
-  });
+if (require.main === module) {
+  migrate({ dryRun: CLI_DRY_RUN })
+    .then(() => process.exit(0))
+    .catch(err => {
+      console.error('Migration failed', err);
+      process.exit(1);
+    });
+} else {
+  module.exports = { migrate };
+}

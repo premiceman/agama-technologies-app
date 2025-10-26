@@ -317,6 +317,15 @@
     const tabPanels = document.querySelectorAll('.tab-panel');
 
     let currentRfpDraftId = null;
+    const tierLabels = {
+      free: 'Insight Pulse',
+      strategic: 'Strategic',
+      command: 'Command'
+    };
+
+    if (unlockBtn) {
+      unlockBtn.addEventListener('click', () => handleUnlock());
+    }
 
     const setText = (id, value, fallback = '—') => {
       const el = document.getElementById(id);
@@ -966,7 +975,10 @@
       if (overview.organisation) {
         setText('reportTitle', `${overview.organisation} — Executive report`);
       }
-      setText('reportStatus', report.paid ? 'Premium' : 'Preview');
+      const accessTier = String(report.access?.tier || 'free').toLowerCase();
+      const tierLabel = tierLabels[accessTier] || accessTier;
+      const statusText = report.access?.hasPremium ? `${tierLabel} access` : `${tierLabel} preview`;
+      setText('reportStatus', statusText);
       if (report.createdAt) {
         const date = new Date(report.createdAt);
         setText('reportDate', date.toLocaleString());
@@ -1021,6 +1033,16 @@
             query: report.summary?.slice(0, 120)
           })
         });
+        if (res.status === 403) {
+          setText('vendorContext', 'Upgrade required');
+          const empty = document.getElementById('vendorEmpty');
+          if (empty) {
+            empty.textContent = 'Upgrade to Strategic intelligence to unlock curated vendor shortlists.';
+          }
+          renderVendorShortlist([]);
+          renderVendorInsights([]);
+          return;
+        }
         if (!res.ok) throw new Error('Vendor search failed');
         const json = await res.json();
         const matches = Array.isArray(json.matches) ? json.matches : [];
@@ -1054,6 +1076,18 @@
             assessmentId: report.assessmentId
           })
         });
+        if (res.status === 403) {
+          renderRfpDraft(null);
+          const meta = document.getElementById('rfpMeta');
+          if (meta) {
+            meta.textContent = 'Upgrade to Strategic intelligence to unlock AI-authored RFP packages.';
+          }
+          if (exportRfpBtn) {
+            exportRfpBtn.classList.add('d-none');
+          }
+          currentRfpDraftId = null;
+          return;
+        }
         if (!res.ok) throw new Error('Unable to generate RFP draft');
         const json = await res.json();
         const draft = json.draft;
@@ -1075,23 +1109,36 @@
       }
     };
 
-    const handleUnlock = async (reportId) => {
+    const handleUnlock = async () => {
       try {
-        const res = await fetch('/api/payments/mock/checkout', {
+        const res = await fetch('/api/payments/checkout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ reportId })
+          body: JSON.stringify({ tier: 'strategic' })
         });
-        const json = await res.json();
-        if (!res.ok || !json.ok) {
-          alert(json.error || 'Unable to unlock report at this time.');
+        let json = {};
+        try {
+          json = await res.json();
+        } catch (err) {
+          json = {};
+        }
+        if (res.status === 503) {
+          alert('Payments are not enabled for this environment. Contact your workspace admin to grant access.');
           return;
         }
-        location.reload();
+        if (!res.ok || !json.ok) {
+          alert(json.error || 'Unable to start checkout at this time.');
+          return;
+        }
+        if (json.checkoutUrl) {
+          window.location.href = json.checkoutUrl;
+          return;
+        }
+        alert('Checkout session created. Follow the Stripe flow to complete your upgrade.');
       } catch (err) {
         console.error(err);
-        alert('Unable to unlock report at this time.');
+        alert('Unable to start checkout at this time.');
       }
     };
 
@@ -1112,28 +1159,60 @@
         }
         const report = json.report;
 
+        const hasPremium = Boolean(report?.access?.hasPremium);
+
         if (exportBtn) {
-          exportBtn.addEventListener('click', () => {
-            window.location.href = `/api/reports/${encodeURIComponent(report._id)}/export`;
-          });
+          if (hasPremium) {
+            exportBtn.classList.remove('d-none');
+            exportBtn.onclick = () => {
+              window.location.href = `/api/reports/${encodeURIComponent(report._id)}/export`;
+            };
+          } else {
+            exportBtn.classList.add('d-none');
+            exportBtn.onclick = null;
+          }
         }
         if (unlockBtn) {
-          unlockBtn.addEventListener('click', () => handleUnlock(report._id));
+          if (hasPremium) {
+            unlockBtn.classList.add('d-none');
+          } else {
+            unlockBtn.classList.remove('d-none');
+          }
         }
-        if (premiumIntake && report.assessmentId) {
-          premiumIntake.classList.remove('d-none');
-          premiumIntake.href = `/premium-assessment.html?id=${encodeURIComponent(report.assessmentId)}`;
-        }
-        if (!report.paid) {
-          unlockBtn?.classList.remove('d-none');
+        if (premiumIntake) {
+          if (report.assessmentId && hasPremium) {
+            premiumIntake.classList.remove('d-none');
+            premiumIntake.href = `/premium-assessment.html?id=${encodeURIComponent(report.assessmentId)}`;
+          } else {
+            premiumIntake.classList.add('d-none');
+          }
         }
 
         renderReport(report);
         if (exportRfpBtn) {
           exportRfpBtn.classList.add('d-none');
         }
-        loadVendorData(report);
-        loadRfpDraft(report);
+        if (hasPremium) {
+          loadVendorData(report);
+          loadRfpDraft(report);
+        } else {
+          setText('vendorContext', 'Upgrade required');
+          renderVendorShortlist([]);
+          renderVendorInsights([]);
+          const vendorEmpty = document.getElementById('vendorEmpty');
+          if (vendorEmpty) {
+            vendorEmpty.textContent = 'Upgrade to Strategic intelligence to unlock curated vendor shortlists.';
+          }
+          renderRfpDraft(null);
+          const meta = document.getElementById('rfpMeta');
+          if (meta) {
+            meta.textContent = 'Upgrade to Strategic intelligence to unlock AI-authored RFP packages.';
+          }
+          if (exportRfpBtn) {
+            exportRfpBtn.classList.add('d-none');
+          }
+          currentRfpDraftId = null;
+        }
         loadingEl.classList.add('d-none');
         contentEl.classList.remove('d-none');
       } catch (err) {

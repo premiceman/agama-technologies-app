@@ -15,6 +15,7 @@ beforeAll(async () => {
   mongoServer = await MongoMemoryServer.create();
   process.env.MONGODB_URI = mongoServer.getUri();
   app = require('../index');
+  await app.ensureMongoConnection();
 });
 
 afterAll(async () => {

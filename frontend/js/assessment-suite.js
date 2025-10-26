@@ -68,6 +68,14 @@ const projectGovernanceInput = document.getElementById('projectGovernance');
 const projectDiscoveryInput = document.getElementById('projectDiscovery');
 const projectPersonasInput = document.getElementById('projectPersonas');
 
+const tierBadgeEl = document.getElementById('tierBadge');
+const tierLabels = {
+  free: 'Insight Pulse',
+  strategic: 'Strategic',
+  command: 'Command'
+};
+let currentEntitlement = null;
+
 const formCompanySizeTiles = document.getElementById('formCompanySizeTiles');
 const formRegionTiles = document.getElementById('formRegionTiles');
 const formStageTiles = document.getElementById('formStageTiles');
@@ -79,6 +87,22 @@ const compactCurrency = typeof Intl !== 'undefined'
 const compactNumber = typeof Intl !== 'undefined'
   ? new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 })
   : null;
+
+function applyEntitlement(entitlement) {
+  if (!entitlement) return;
+  currentEntitlement = entitlement;
+  if (tierBadgeEl) {
+    const tier = String(entitlement.tier || 'free').toLowerCase();
+    const label = tierLabels[tier] || tier;
+    tierBadgeEl.textContent = `${label} tier`;
+    if (entitlement.expiresAt) {
+      const expires = new Date(entitlement.expiresAt);
+      tierBadgeEl.title = `Access until ${expires.toLocaleDateString()}`;
+    } else {
+      tierBadgeEl.removeAttribute('title');
+    }
+  }
+}
 
 function showAnalyticsMessage(message) {
   if (!analyticsEmptyState || !analyticsContent) return;
@@ -1106,6 +1130,7 @@ async function loadProjects() {
     const res = await fetch('/api/projects', { credentials: 'include' });
     if (!res.ok) throw new Error('Unable to fetch projects');
     const json = await res.json();
+    if (json.entitlement) applyEntitlement(json.entitlement);
     projects = Array.isArray(json.projects) ? json.projects : [];
   } catch (err) {
     console.error(err);
@@ -1915,6 +1940,7 @@ async function init() {
       return;
     }
     const authJson = await authRes.json();
+    if (authJson.entitlement) applyEntitlement(authJson.entitlement);
     me = authJson.user;
   } catch (err) {
     console.error(err);
