@@ -12,113 +12,371 @@
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
       <div>
         <span class="eyebrow">Client workspace</span>
-        <h1 class="h3 mb-0">Your assessments</h1>
+        <h1 class="h3 mb-0">Projects &amp; assessments</h1>
       </div>
       <div class="d-flex gap-2">
-        <a class="btn btn-outline-light" href="/assessment.html">New assessment</a>
+        <a class="btn btn-outline-light" href="/assessment.html">New project</a>
         <button class="btn btn-primary" id="logout">Logout</button>
       </div>
     </div>
 
-    <div class="card glass p-4 mb-4">
-      <div class="d-flex flex-wrap justify-content-between gap-3 mb-4 align-items-center">
-        <div>
-          <h5 class="mb-1">Assessment intelligence tiers</h5>
-          <p class="text-fg-3 mb-0">Choose the depth of consultancy required. Each tier unlocks richer OpenAI-guided analysis, vendor orchestration, and delivery direction.</p>
-        </div>
-        <a class="btn btn-outline-light" href="/assessment.html">View full experience</a>
-      </div>
-      <div class="row g-3" id="dashboardTiers">
-        <div class="col-md-4">
-          <div class="tier-card h-100">
-            <div class="tier-card__header">
-              <h6 class="m-0">Insight Pulse</h6>
-              <span class="price-tag">Free</span>
+    <div class="row g-4">
+      <div class="col-lg-8 d-flex flex-column gap-4">
+        <div class="card glass p-4">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <h5 class="mb-1">Projects</h5>
+              <p class="text-fg-3 mb-0">Every assessment belongs to a project workspace. Capture organisation context once, then layer capability-specific assessments.</p>
             </div>
-            <p class="text-fg-3 small">Generate an executive-ready preview with baseline maturity and persona guidance.</p>
-            <ul class="tier-card__list">
-              <li>Strategic focus wizard</li>
-              <li>Persona briefings</li>
-              <li>Preview maturity radar</li>
-            </ul>
-            <button class="btn btn-primary w-100" data-launch-stage="insight">Start Insight Pulse</button>
+            <a class="btn btn-outline-light" href="/assessment.html">Create project</a>
           </div>
+          <div id="projectList" class="project-list"></div>
+          <div id="projectEmpty" class="project-empty">Start by creating a project workspace to house your assessments.</div>
         </div>
-        <div class="col-md-4">
-          <div class="tier-card h-100">
-            <div class="tier-card__header">
-              <h6 class="m-0">Industry Accelerator</h6>
-              <span class="price-tag">$250</span>
-            </div>
-            <p class="text-fg-3 small">Unlock industry heatmaps, investment cases, and vendor interrogation playbooks.</p>
-            <ul class="tier-card__list">
-              <li>Industry-specific maturity map</li>
-              <li>Investment & ROI scenarios</li>
-              <li>Vendor negotiation questions</li>
-            </ul>
-            <button class="btn btn-outline-light w-100" data-launch-stage="strategic">Upgrade to Accelerator</button>
-          </div>
-        </div>
-        <div class="col-md-4">
-          <div class="tier-card h-100">
-            <div class="tier-card__header">
-              <h6 class="m-0">Command Blueprint</h6>
-              <span class="price-tag">$2,500</span>
-            </div>
-            <p class="text-fg-3 small">Commission the full board-ready consultancy with architecture analysis and vendor orchestration.</p>
-            <ul class="tier-card__list">
-              <li>Architecture & resilience directives</li>
-              <li>Vendor orchestration & POC scopes</li>
-              <li>Board-level delivery timeline</li>
-            </ul>
-            <button class="btn btn-outline-light w-100" data-launch-stage="command">Book Command Blueprint</button>
-          </div>
-        </div>
-      </div>
-    </div>
 
-    <div class="card glass p-4 mb-4">
-      <h5 class="mb-3">Latest activity</h5>
-      <div id="reports" class="d-flex flex-column gap-3"></div>
-      <div id="emptyState" class="text-fg-3">Run your first assessment to generate a maturity report.</div>
+        <div class="card glass p-4">
+          <div class="d-flex flex-wrap justify-content-between gap-3 mb-4 align-items-center">
+            <div>
+              <h5 class="mb-1">Assessment intelligence tiers</h5>
+              <p class="text-fg-3 mb-0">Choose the depth of consultancy required. Each tier unlocks richer OpenAI-guided analysis, vendor orchestration, and delivery direction.</p>
+            </div>
+            <a class="btn btn-outline-light" href="/assessment.html">View full experience</a>
+          </div>
+          <div class="row g-3" id="dashboardTiers">
+            <div class="col-md-4">
+              <div class="tier-card h-100">
+                <div class="tier-card__header">
+                  <h6 class="m-0">Insight Pulse</h6>
+                  <span class="price-tag">Free</span>
+                </div>
+                <p class="text-fg-3 small">Generate an executive-ready preview with baseline maturity and persona guidance.</p>
+                <ul class="tier-card__list">
+                  <li>Strategic focus wizard</li>
+                  <li>Persona briefings</li>
+                  <li>Preview maturity radar</li>
+                </ul>
+                <button class="btn btn-primary w-100" data-launch-stage="insight">Start Insight Pulse</button>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="tier-card h-100">
+                <div class="tier-card__header">
+                  <h6 class="m-0">Industry Accelerator</h6>
+                  <span class="price-tag">$250</span>
+                </div>
+                <p class="text-fg-3 small">Unlock industry heatmaps, investment cases, and vendor interrogation playbooks.</p>
+                <ul class="tier-card__list">
+                  <li>Industry-specific maturity map</li>
+                  <li>Investment &amp; ROI scenarios</li>
+                  <li>Vendor negotiation questions</li>
+                </ul>
+                <button class="btn btn-outline-light w-100" data-launch-stage="strategic">Upgrade to Accelerator</button>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="tier-card h-100">
+                <div class="tier-card__header">
+                  <h6 class="m-0">Command Blueprint</h6>
+                  <span class="price-tag">$2,500</span>
+                </div>
+                <p class="text-fg-3 small">Commission the full board-ready consultancy with architecture analysis and vendor orchestration.</p>
+                <ul class="tier-card__list">
+                  <li>Architecture &amp; resilience directives</li>
+                  <li>Vendor orchestration &amp; POC scopes</li>
+                  <li>Board-level delivery timeline</li>
+                </ul>
+                <button class="btn btn-outline-light w-100" data-launch-stage="command">Book Command Blueprint</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card glass p-4">
+          <h5 class="mb-3">Latest activity</h5>
+          <div id="reports" class="d-flex flex-column gap-3"></div>
+          <div id="activityEmpty" class="project-empty">Run your first assessment to generate a maturity report.</div>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="card glass p-4">
+          <div class="mb-3">
+            <h5 class="mb-1">Profile</h5>
+            <p class="text-fg-3 mb-0 small">Update how we personalise your workspace across projects.</p>
+          </div>
+          <form id="profileForm" class="profile-form" novalidate>
+            <div>
+              <label class="form-label" for="profileName">Name</label>
+              <input type="text" class="form-control" id="profileName" name="name" autocomplete="name">
+            </div>
+            <div>
+              <label class="form-label" for="profileCompany">Company</label>
+              <input type="text" class="form-control" id="profileCompany" name="company" autocomplete="organization">
+            </div>
+            <div>
+              <label class="form-label" for="profileRole">Role</label>
+              <input type="text" class="form-control" id="profileRole" name="role" autocomplete="organization-title">
+            </div>
+            <div>
+              <label class="form-label" for="profileIndustry">Industry</label>
+              <input type="text" class="form-control" id="profileIndustry" name="industry" autocomplete="organization">
+            </div>
+            <div>
+              <label class="form-label" for="profileEmail">Email</label>
+              <input type="email" class="form-control" id="profileEmail" name="email" autocomplete="email" readonly>
+              <div class="form-text">Email is managed by Agama support.</div>
+            </div>
+            <div class="profile-form__actions">
+              <button type="submit" class="btn btn-primary" id="profileSave">Save changes</button>
+              <span id="profileFeedback" class="profile-feedback"></span>
+            </div>
+            <div class="danger-zone">
+              <p>Deleting your profile removes all saved projects, assessments, and reports.</p>
+              <button type="button" class="btn btn-outline-danger btn-sm" id="profileDelete">Delete profile</button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   </div>
 
   <script>
-    document.getElementById('logout').onclick = async () => {
-      await fetch('/api/auth/logout', { method:'POST', credentials:'include' });
-      location.href = '/';
-    };
+    const logoutBtn = document.getElementById('logout');
+    if (logoutBtn) {
+      logoutBtn.onclick = async () => {
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+        location.href = '/';
+      };
+    }
 
-    async function loadReports() {
-      const res = await fetch('/api/reports', { credentials:'include' });
+    const projectListEl = document.getElementById('projectList');
+    const projectEmptyEl = document.getElementById('projectEmpty');
+    const reportsEl = document.getElementById('reports');
+    const activityEmptyEl = document.getElementById('activityEmpty');
+    const profileForm = document.getElementById('profileForm');
+    const profileFeedbackEl = document.getElementById('profileFeedback');
+    const deleteProfileBtn = document.getElementById('profileDelete');
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function ensureAuth(res) {
       if (res.status === 401) {
         location.href = '/login.html';
+        return false;
+      }
+      return true;
+    }
+
+    function renderProjects(projects) {
+      if (!projectListEl || !projectEmptyEl) return;
+      projectListEl.innerHTML = '';
+      if (!Array.isArray(projects) || projects.length === 0) {
+        projectEmptyEl.style.display = 'block';
+        projectEmptyEl.textContent = 'Start by creating a project workspace to house your assessments.';
         return;
       }
-      const json = await res.json();
-      if (!json.ok) return;
-      const container = document.getElementById('reports');
-      container.innerHTML = '';
-      if ((json.reports || []).length === 0) {
-        document.getElementById('emptyState').style.display = 'block';
+      projectEmptyEl.style.display = 'none';
+      projects.forEach(project => {
+        const analytics = project.analytics || {};
+        const readiness = Number.isFinite(analytics.readinessScore) ? Math.round(analytics.readinessScore) : '--';
+        const clarity = Number.isFinite(analytics.clarityScore) ? Math.round(analytics.clarityScore) : '--';
+        const focus = typeof analytics.focusCount === 'number'
+          ? analytics.focusCount
+          : Array.isArray(project.capabilityFocus) ? project.capabilityFocus.length : 0;
+        const contextParts = [project.industry, project.region, project.companySize]
+          .filter(Boolean)
+          .map(escapeHtml);
+        const updatedDate = project.updatedAt || project.createdAt;
+        const updatedLabel = updatedDate ? escapeHtml(new Date(updatedDate).toLocaleDateString()) : '';
+        const updatedStamp = updatedLabel ? ` · Updated ${updatedLabel}` : '';
+        const fallbackMeta = updatedLabel ? `Updated ${updatedLabel}` : 'Project workspace context will appear here.';
+        const meta = contextParts.length ? contextParts.join(' · ') + updatedStamp : fallbackMeta;
+        const stage = project.stage ? `<span class="badge-soft">${escapeHtml(project.stage)}</span>` : '';
+        const risk = project.riskAppetite ? `<span class="badge-soft">${escapeHtml(project.riskAppetite)}</span>` : '';
+        const item = document.createElement('article');
+        item.className = 'project-item';
+        item.innerHTML = `
+          <div class="project-item__header">
+            <div>
+              <h6 class="mb-1">${escapeHtml(project.name || 'Untitled project')}</h6>
+              <div class="project-item__meta">${meta}</div>
+            </div>
+            <div class="project-item__metrics">
+              <div class="project-metric">
+                <span>Readiness</span>
+                <strong>${readiness}</strong>
+              </div>
+              <div class="project-metric">
+                <span>Clarity</span>
+                <strong>${clarity}</strong>
+              </div>
+              <div class="project-metric">
+                <span>Focus domains</span>
+                <strong>${focus}</strong>
+              </div>
+            </div>
+          </div>
+          <div class="project-item__footer">
+            <div class="d-flex flex-wrap gap-2">
+              ${stage || '<span class="badge-soft">Stage not set</span>'}
+              ${risk}
+            </div>
+            <a class="btn btn-outline-light btn-sm" href="/assessment.html?projectId=${encodeURIComponent(project.id)}">Open workspace</a>
+          </div>
+        `;
+        projectListEl.appendChild(item);
+      });
+    }
+
+    async function loadProjects() {
+      try {
+        const res = await fetch('/api/projects', { credentials: 'include' });
+        if (!ensureAuth(res)) return;
+        const json = await res.json();
+        if (!json.ok) throw new Error('Unable to load projects');
+        renderProjects(json.projects || []);
+      } catch (err) {
+        console.error(err);
+        if (projectEmptyEl) {
+          projectEmptyEl.style.display = 'block';
+          projectEmptyEl.textContent = 'Unable to load projects right now. Please try again shortly.';
+        }
+      }
+    }
+
+    function renderReports(reports) {
+      if (!reportsEl || !activityEmptyEl) return;
+      reportsEl.innerHTML = '';
+      if (!Array.isArray(reports) || reports.length === 0) {
+        activityEmptyEl.style.display = 'block';
         return;
       }
-      document.getElementById('emptyState').style.display = 'none';
-      json.reports.forEach(rep => {
+      activityEmptyEl.style.display = 'none';
+      reports.forEach(rep => {
         const card = document.createElement('div');
         card.className = 'notice';
         card.innerHTML = `
           <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
             <div>
-              <div class="small text-fg-3">${new Date(rep.createdAt).toLocaleString()}</div>
-              <div><strong>${rep.vertical}</strong> · Score <span class="grad">${rep.headlineScore}</span></div>
+              <div class="small text-fg-3">${escapeHtml(new Date(rep.createdAt).toLocaleString())}</div>
+              <div><strong>${escapeHtml(rep.vertical)}</strong> · Score <span class="grad">${escapeHtml(rep.headlineScore)}</span></div>
             </div>
             <div class="d-flex gap-2">
-              <a class="btn btn-primary btn-sm" href="/report.html?id=${rep._id}">${rep.paid ? 'View full report' : 'View preview'}</a>
+              <a class="btn btn-primary btn-sm" href="/report.html?id=${encodeURIComponent(rep._id)}">${rep.paid ? 'View full report' : 'View preview'}</a>
             </div>
           </div>`;
-        container.appendChild(card);
+        reportsEl.appendChild(card);
+      });
+    }
+
+    async function loadReports() {
+      try {
+        const res = await fetch('/api/reports', { credentials: 'include' });
+        if (!ensureAuth(res)) return;
+        const json = await res.json();
+        if (!json.ok) throw new Error('Unable to load reports');
+        renderReports(json.reports || []);
+      } catch (err) {
+        console.error(err);
+        if (activityEmptyEl) {
+          activityEmptyEl.style.display = 'block';
+          activityEmptyEl.textContent = 'Unable to load recent activity right now.';
+        }
+      }
+    }
+
+    async function loadProfile() {
+      if (!profileForm) return;
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        if (!ensureAuth(res)) return;
+        const json = await res.json();
+        if (!json.ok) throw new Error('Unable to load profile');
+        const user = json.user || {};
+        profileForm.elements.name.value = user.name || '';
+        profileForm.elements.company.value = user.company || '';
+        profileForm.elements.role.value = user.role || '';
+        profileForm.elements.industry.value = user.industry || '';
+        profileForm.elements.email.value = user.email || '';
+      } catch (err) {
+        console.error(err);
+        if (profileFeedbackEl) {
+          profileFeedbackEl.className = 'profile-feedback error';
+          profileFeedbackEl.textContent = 'Unable to load your profile.';
+        }
+      }
+    }
+
+    if (profileForm) {
+      profileForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        if (profileFeedbackEl) {
+          profileFeedbackEl.className = 'profile-feedback';
+          profileFeedbackEl.textContent = '';
+        }
+        const submitBtn = document.getElementById('profileSave');
+        if (submitBtn) submitBtn.disabled = true;
+        try {
+          const payload = {
+            name: profileForm.elements.name.value.trim(),
+            company: profileForm.elements.company.value.trim(),
+            role: profileForm.elements.role.value.trim(),
+            industry: profileForm.elements.industry.value.trim()
+          };
+          const res = await fetch('/api/auth/me', {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (!ensureAuth(res)) return;
+          const json = await res.json();
+          if (!res.ok || !json.ok) throw new Error(json.error || 'Unable to update profile');
+          if (profileFeedbackEl) {
+            profileFeedbackEl.className = 'profile-feedback success';
+            profileFeedbackEl.textContent = 'Profile updated.';
+          }
+        } catch (err) {
+          console.error(err);
+          if (profileFeedbackEl) {
+            profileFeedbackEl.className = 'profile-feedback error';
+            profileFeedbackEl.textContent = err.message || 'Unable to update profile.';
+          }
+        } finally {
+          if (submitBtn) submitBtn.disabled = false;
+        }
+      });
+    }
+
+    if (deleteProfileBtn) {
+      deleteProfileBtn.addEventListener('click', async () => {
+        if (!confirm('Deleting your profile will permanently remove all projects, assessments, and reports. Continue?')) {
+          return;
+        }
+        const originalLabel = deleteProfileBtn.textContent;
+        deleteProfileBtn.disabled = true;
+        deleteProfileBtn.textContent = 'Deleting…';
+        try {
+          const res = await fetch('/api/auth/me', { method: 'DELETE', credentials: 'include' });
+          if (!ensureAuth(res)) return;
+          const json = await res.json();
+          if (!res.ok || !json.ok) throw new Error(json.error || 'Unable to delete profile');
+          location.href = '/signup.html';
+        } catch (err) {
+          console.error(err);
+          deleteProfileBtn.disabled = false;
+          deleteProfileBtn.textContent = originalLabel;
+          if (profileFeedbackEl) {
+            profileFeedbackEl.className = 'profile-feedback error';
+            profileFeedbackEl.textContent = err.message || 'Unable to delete profile.';
+          }
+        }
       });
     }
 
@@ -129,6 +387,8 @@
       });
     });
 
+    loadProfile();
+    loadProjects();
     loadReports();
   </script>
 </body>

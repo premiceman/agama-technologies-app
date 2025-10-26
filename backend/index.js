@@ -170,6 +170,44 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
   res.json({ ok: true, user: user.public() });
 });
 
+app.put('/api/auth/me', requireAuth, async (req, res) => {
+  try {
+    const updates = {};
+    const payload = req.body || {};
+    ['name', 'company', 'role', 'industry'].forEach(field => {
+      if (payload[field] !== undefined) {
+        const value = String(payload[field] ?? '').trim();
+        updates[field] = value;
+      }
+    });
+
+    const user = await User.findByIdAndUpdate(req.auth.uid, updates, { new: true });
+    if (!user) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true, user: user.public() });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to update profile' });
+  }
+});
+
+app.delete('/api/auth/me', requireAuth, async (req, res) => {
+  try {
+    const userId = req.auth.uid;
+    await Promise.all([
+      Assessment.deleteMany({ userId }),
+      Project.deleteMany({ userId }),
+      Report.deleteMany({ userId }),
+      Payment.deleteMany({ userId })
+    ]);
+    await User.deleteOne({ _id: userId });
+    clearTokenCookie(res);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to delete profile' });
+  }
+});
+
 // Projects
 app.get('/api/projects', requireAuth, async (req, res) => {
   const projects = await Project.find({ userId: req.auth.uid }).sort({ updatedAt: -1 });
