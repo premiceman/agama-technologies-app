@@ -76,11 +76,59 @@ app.get('/api/csrf-token', (req, res) => {
 const defaultAllowedOrigins = isProduction
   ? []
   : ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5173', 'http://127.0.0.1:5173'];
-const allowedOrigins = new Set(
-  [...defaultAllowedOrigins, ...(process.env.ALLOWED_ORIGINS || '').split(',')]
-    .map(origin => origin.trim())
-    .filter(Boolean)
-);
+
+function normaliseOrigin(origin) {
+  if (!origin) return '';
+  const trimmed = origin.trim();
+  if (!trimmed) return '';
+  try {
+    const url = new URL(trimmed);
+    return `${url.protocol}//${url.host}`;
+  } catch (err) {
+    return trimmed.replace(/\/$/, '');
+  }
+}
+
+function expandOriginVariants(origin) {
+  const variants = new Set();
+  const normalised = normaliseOrigin(origin);
+  if (!normalised) {
+    return variants;
+  }
+
+  variants.add(normalised);
+
+  try {
+    const url = new URL(normalised);
+    const hostname = url.hostname;
+    if (hostname.startsWith('www.')) {
+      variants.add(`${url.protocol}//${hostname.replace(/^www\./, '')}`);
+    } else if (hostname.split('.').length === 2) {
+      variants.add(`${url.protocol}//www.${hostname}`);
+    }
+  } catch (err) {
+    // Ignore invalid URLs; they were already added in their original form.
+  }
+
+  return variants;
+}
+
+const envOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean);
+if (process.env.RENDER_EXTERNAL_URL) {
+  envOrigins.push(process.env.RENDER_EXTERNAL_URL);
+}
+if (process.env.PRIMARY_DOMAIN) {
+  envOrigins.push(`https://${process.env.PRIMARY_DOMAIN}`);
+}
+
+const allowedOrigins = new Set();
+for (const origin of [...defaultAllowedOrigins, ...envOrigins]) {
+  for (const variant of expandOriginVariants(origin)) {
+    allowedOrigins.add(variant);
+  }
+}
+
+app.set('trust proxy', 1);
 const corsInstance = cors({
   origin(origin, callback) {
     if (!origin) return callback(null, true);
