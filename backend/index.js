@@ -56,7 +56,9 @@ const csrfProtection = csrf({
   }
 });
 const csrfExemptPaths = ['/api/payments/webhook'];
+const csrfDisabled = process.env.NODE_ENV === 'test';
 app.use((req, res, next) => {
+  if (csrfDisabled) return next();
   if (csrfExemptPaths.some(prefix => req.originalUrl.startsWith(prefix))) {
     return next();
   }
@@ -204,7 +206,45 @@ const File = require('./models/File');
 const Job = require('./models/Job');
 const AuditLog = require('./models/AuditLog');
 
-const { requireAuth, issueTokenCookie, clearTokenCookie } = require('./middleware/auth');
+const {
+  requireAuth,
+  issueTokenCookie,
+  clearTokenCookie,
+  issueChallengeToken,
+  verifyChallengeToken
+} = require('./middleware/auth');
+const { generateSecret: generateTotpSecret, keyUri: totpKeyUri, verifyToken: verifyTotpToken } = require('./utils/totp');
+
+async function recordLoginEvent(userId, req, status, detail = '') {
+  try {
+    const ipHeader = req.headers['x-forwarded-for'] || '';
+    const ip = Array.isArray(ipHeader)
+      ? ipHeader[0]
+      : ipHeader.split(',').map(part => part.trim()).filter(Boolean)[0] || req.ip;
+    const userAgent = String(req.headers['user-agent'] || '').slice(0, 300);
+    await User.updateOne(
+      { _id: userId },
+      {
+        $push: {
+          loginAudit: {
+            $each: [
+              {
+                at: new Date(),
+                ip,
+                userAgent,
+                status,
+                detail: detail ? detail.slice(0, 200) : undefined
+              }
+            ],
+            $slice: -30
+          }
+        }
+      }
+    ).exec();
+  } catch (err) {
+    console.warn('Failed to record login audit', err);
+  }
+}
 const { requireProjectOwnership } = require('./middleware/project');
 const { validateBody } = require('./middleware/validation');
 const { computeReport } = require('./utils/scoring');
@@ -277,9 +317,45 @@ const signupSchema = z.object({
   industry: z.string().trim().max(160).optional()
 });
 
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8)
+const sixDigitCode = z
+  .string()
+  .trim()
+  .regex(/^\d{6}$/);
+
+const loginSchema = z
+  .object({
+    stage: z.enum(['password', 'challenge']).optional(),
+    email: z.string().email().optional(),
+    password: z.string().min(8).optional(),
+    challengeToken: z.string().min(10).optional(),
+    otp: sixDigitCode.optional(),
+    rememberDevice: z.boolean().optional()
+  })
+  .superRefine((data, ctx) => {
+    const stage = data.stage || 'password';
+    if (stage === 'challenge') {
+      if (!data.challengeToken) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'challengeToken required', path: ['challengeToken'] });
+      }
+      if (!data.otp) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'otp required', path: ['otp'] });
+      }
+    } else {
+      if (!data.email) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'email required', path: ['email'] });
+      }
+      if (!data.password) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'password required', path: ['password'] });
+      }
+    }
+  });
+
+const totpVerifySchema = z.object({
+  code: sixDigitCode
+});
+
+const totpDisableSchema = z.object({
+  code: sixDigitCode.optional()
 });
 
 const profileUpdateSchema = z.object({
@@ -641,13 +717,64 @@ app.post('/api/auth/signup', validateBody(signupSchema), async (req, res) => {
 
 app.post('/api/auth/login', validateBody(loginSchema), async (req, res) => {
   try {
-    const { email, password } = req.validatedBody;
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    const body = req.validatedBody;
+
+    if (body.stage === 'challenge') {
+      const decoded = verifyChallengeToken(body.challengeToken);
+      if (!decoded?.uid) {
+        return res.status(401).json({ error: 'Challenge expired. Please sign in again.' });
+      }
+      const user = await User.findById(decoded.uid).select('+totp.secret');
+      if (!user || !user.totp?.enabled || !user.totp.secret) {
+        return res.status(401).json({ error: 'Multi-factor authentication is not active for this account.' });
+      }
+      const otpValid = verifyTotpToken({ token: body.otp, secret: user.totp.secret });
+      if (!otpValid) {
+        await recordLoginEvent(user._id, req, 'failed', 'otp');
+        return res.status(401).json({ error: 'Invalid verification code' });
+      }
+
+      user.lastLoginAt = new Date();
+      await user.save({ validateBeforeSave: false });
+      await recordLoginEvent(user._id, req, 'success', 'otp');
+      const token = issueTokenCookie(res, { uid: user._id.toString() });
+      return res.json({ ok: true, user: user.public(), token });
+    }
+
+    const { email, password, otp } = body;
+    const user = await User.findOne({ email: email.toLowerCase().trim() }).select('+totp.secret');
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
     const valid = await user.verifyPassword(password);
-    if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!valid) {
+      await recordLoginEvent(user._id, req, 'failed', 'password');
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const requiresOtp = Boolean(user.totp?.enabled && user.totp.secret);
+    if (requiresOtp) {
+      if (otp) {
+        const otpValid = verifyTotpToken({ token: otp, secret: user.totp.secret });
+        if (!otpValid) {
+          await recordLoginEvent(user._id, req, 'failed', 'otp');
+          return res.status(401).json({ error: 'Invalid verification code' });
+        }
+      } else {
+        const challengeToken = issueChallengeToken({ uid: user._id.toString(), email: user.email });
+        await recordLoginEvent(user._id, req, 'challenge', 'totp');
+        return res.json({
+          ok: true,
+          status: 'OTP_REQUIRED',
+          challengeToken,
+          factors: { totp: true }
+        });
+      }
+    }
+
+    user.lastLoginAt = new Date();
+    await user.save({ validateBeforeSave: false });
+    await recordLoginEvent(user._id, req, 'success', requiresOtp ? 'password+otp' : 'password');
     const token = issueTokenCookie(res, { uid: user._id.toString() });
-    res.json({ ok: true, user: user.public(), token });
+    return res.json({ ok: true, user: user.public(), token });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -657,6 +784,93 @@ app.post('/api/auth/login', validateBody(loginSchema), async (req, res) => {
 app.post('/api/auth/logout', requireAuth, (req, res) => {
   clearTokenCookie(res);
   res.json({ ok: true });
+});
+
+app.get('/api/auth/mfa', requireAuth, async (req, res) => {
+  const user = await User.findById(req.auth.uid).select('+totp.pendingSecret');
+  if (!user) return res.status(404).json({ error: 'Not found' });
+  res.json({
+    ok: true,
+    totp: {
+      enabled: Boolean(user.totp?.enabled),
+      enrollmentPending: Boolean(user.totp?.pendingSecret),
+      activatedAt: user.totp?.activatedAt || null
+    }
+  });
+});
+
+app.post('/api/auth/mfa/enroll', requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.auth.uid).select('+totp.pendingSecret +totp.secret');
+    if (!user) return res.status(404).json({ error: 'Not found' });
+
+    const secret = generateTotpSecret();
+    if (!user.totp) user.totp = {};
+    user.totp.pendingSecret = secret;
+    user.totp.enabled = false;
+    await user.save({ validateBeforeSave: false });
+
+    const issuer = process.env.MFA_ISSUER || 'Agama Technologies';
+    const otpauth = totpKeyUri(user.email, issuer, secret);
+
+    res.json({ ok: true, secret, otpauth });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to start MFA enrollment' });
+  }
+});
+
+app.post('/api/auth/mfa/verify', requireAuth, validateBody(totpVerifySchema), async (req, res) => {
+  try {
+    const { code } = req.validatedBody;
+    const user = await User.findById(req.auth.uid).select('+totp.pendingSecret +totp.secret');
+    if (!user) return res.status(404).json({ error: 'Not found' });
+
+    const pendingSecret = user.totp?.pendingSecret;
+    const activeSecret = user.totp?.secret;
+    const secretToTest = pendingSecret || activeSecret;
+
+    if (!secretToTest) {
+      return res.status(400).json({ error: 'No MFA enrollment in progress.' });
+    }
+
+    const valid = verifyTotpToken({ token: code, secret: secretToTest });
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid verification code' });
+    }
+
+    user.totp.secret = secretToTest;
+    user.totp.pendingSecret = undefined;
+    user.totp.enabled = true;
+    user.totp.activatedAt = new Date();
+    await user.save({ validateBeforeSave: false });
+
+    res.json({ ok: true, totp: { enabled: true } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to verify MFA' });
+  }
+});
+
+app.delete('/api/auth/mfa', requireAuth, validateBody(totpDisableSchema), async (req, res) => {
+  try {
+    const { code } = req.validatedBody;
+    const user = await User.findById(req.auth.uid).select('+totp.secret');
+    if (!user) return res.status(404).json({ error: 'Not found' });
+
+    if (user.totp?.enabled && user.totp.secret) {
+      if (!code || !verifyTotpToken({ token: code, secret: user.totp.secret })) {
+        return res.status(401).json({ error: 'Verification code required to disable MFA' });
+      }
+    }
+
+    user.totp = { enabled: false };
+    await user.save({ validateBeforeSave: false });
+    res.json({ ok: true, totp: { enabled: false } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to disable MFA' });
+  }
 });
 
 app.get('/api/auth/me', requireAuth, async (req, res) => {
@@ -749,6 +963,51 @@ app.post('/api/projects', requireAuth, validateBody(projectCreateSchema), async 
       techLandscape: payload.techLandscape || {},
       personas: Array.isArray(payload.personas) ? payload.personas.slice(0, 12) : []
     };
+
+    const hasProfile = projectData.companyProfile && Object.keys(projectData.companyProfile).length > 0;
+    const orgTarget =
+      projectData.companyProfile?.canonicalName ||
+      projectData.companyProfile?.legalName ||
+      projectData.companyDomain ||
+      projectData.name;
+    let organizationIntel = null;
+    if (!hasProfile && orgTarget) {
+      try {
+        const assessmentFocus = Array.isArray(projectData.capabilityFocus) && projectData.capabilityFocus.length
+          ? projectData.capabilityFocus[0]
+          : 'Business Value Transformation';
+        organizationIntel = await fetchOrganizationIntel({
+          organization: orgTarget,
+          assessmentType: assessmentFocus,
+          industry: projectData.industry
+        });
+      } catch (err) {
+        console.warn('Organisation enrichment failed', err.message || err);
+      }
+    }
+
+    if (organizationIntel) {
+      const existingProfile = projectData.companyProfile || {};
+      const profileIntel = organizationIntel.profile || {};
+      projectData.companyProfile = {
+        ...existingProfile,
+        summary: existingProfile.summary || organizationIntel.summary,
+        canonicalName: existingProfile.canonicalName || profileIntel.canonicalName,
+        classification: existingProfile.classification || profileIntel.classification,
+        industryTags: Array.from(
+          new Set([...(existingProfile.industryTags || []), ...(profileIntel.industryTags || [])])
+        ),
+        headcountEstimate: existingProfile.headcountEstimate || profileIntel.headcountEstimate,
+        annualRevenueEstimate: existingProfile.annualRevenueEstimate || profileIntel.annualRevenueEstimate,
+        fundingRounds: existingProfile.fundingRounds || profileIntel.fundingRounds || [],
+        investmentHighlights: existingProfile.investmentHighlights || profileIntel.investmentHighlights || [],
+        keyInitiatives: existingProfile.keyInitiatives || profileIntel.keyInitiatives || [],
+        intel: organizationIntel
+      };
+      if (!projectData.overview && organizationIntel.summary) {
+        projectData.overview = organizationIntel.summary.slice(0, 500);
+      }
+    }
 
     const snapshot = computeProjectAnalyticsSnapshot(projectData);
     const now = new Date();

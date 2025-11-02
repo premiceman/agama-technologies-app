@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const COOKIE = process.env.JWT_COOKIE_NAME || 'at_session';
 const DAYS = parseInt(process.env.JWT_EXPIRES_DAYS || '7', 10);
 const SECRET = process.env.JWT_SECRET;
+const CHALLENGE_EXPIRY_MINUTES = parseInt(process.env.LOGIN_CHALLENGE_MINUTES || '10', 10);
 
 if (!SECRET) {
   throw new Error('JWT_SECRET environment variable is required for authentication middleware.');
@@ -38,4 +39,25 @@ function requireAuth(req, res, next) {
   }
 }
 
-module.exports = { requireAuth, issueTokenCookie, clearTokenCookie };
+function issueChallengeToken(payload, options = {}) {
+  const expiresIn = options.expiresIn || `${CHALLENGE_EXPIRY_MINUTES}m`;
+  return jwt.sign({ ...payload, challenge: true }, SECRET, { expiresIn });
+}
+
+function verifyChallengeToken(token) {
+  try {
+    const decoded = jwt.verify(token, SECRET);
+    if (!decoded.challenge) return null;
+    return decoded;
+  } catch (err) {
+    return null;
+  }
+}
+
+module.exports = {
+  requireAuth,
+  issueTokenCookie,
+  clearTokenCookie,
+  issueChallengeToken,
+  verifyChallengeToken
+};
