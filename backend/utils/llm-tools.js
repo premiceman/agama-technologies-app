@@ -179,27 +179,29 @@ function calcFinancials(args = {}) {
 }
 
 const ragToolSchema = z.object({
-  projectId: z.string(),
+  projectId: z.string().optional(),
   query: z.string(),
   filters: z.record(z.any()).optional()
 });
 
 let ragQueryImpl;
-async function ragQuery(args = {}) {
+function ragQuery(args = {}) {
   const parsed = ragToolSchema.parse(args);
+  if (!parsed.projectId) {
+    return [];
+  }
   if (!ragQueryImpl) {
     ({ executeRagQuery: ragQueryImpl } = require('./openai'));
   }
-  const results = await ragQueryImpl({
+  return ragQueryImpl({
     projectId: parsed.projectId,
     query: parsed.query,
     filters: parsed.filters || {}
-  });
-  return {
+  }).then(results => ({
     query: parsed.query,
     projectId: parsed.projectId,
     results
-  };
+  }));
 }
 
 const toolRegistry = {

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Agama Technologies — AI, Security & Observability Consulting</title>
+  <title>Agama Technologies — Enterprise Transformation Control Center</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
@@ -17,6 +17,7 @@
     <div class="blob blob-teal"></div>
     <div class="blob blob-magenta"></div>
   </div>
+
   <nav class="navbar navbar-expand-lg sticky-top bg-glass border-bottom">
     <div class="container">
       <a class="navbar-brand d-flex align-items-center gap-2" href="/">
@@ -27,47 +28,71 @@
       <div class="collapse navbar-collapse" id="nav">
         <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-3">
           <li class="nav-item"><a href="#capabilities" class="nav-link">Expertise</a></li>
-          <li class="nav-item"><a href="#approach" class="nav-link">Approach</a></li>
-          <li class="nav-item"><a href="#insights" class="nav-link">Insights</a></li>
-          <li class="nav-item"><a href="/assessment.html" class="btn btn-primary">Free Assessment</a></li>
-          <li class="nav-item"><a href="/login.html" class="btn btn-outline-light">Client login</a></li>
+          <li class="nav-item"><a href="#secure-access" class="nav-link">Secure access</a></li>
+          <li class="nav-item"><a href="#workspace" class="nav-link">Workspaces</a></li>
+          <li class="nav-item"><a href="#marketplace" class="nav-link">Assessments</a></li>
+          <li class="nav-item"><button type="button" class="btn btn-primary" data-login-trigger>Launch console</button></li>
         </ul>
       </div>
     </div>
   </nav>
 
-  <header class="hero container">
+  <header class="hero container enterprise-hero">
     <div class="row align-items-center g-5 py-5">
       <div class="col-lg-6" data-aos="fade-right">
-        <div class="eyebrow">Full-stack AI, Security & Observability</div>
-        <h1 class="display-4 fw-bold my-3">Modernise your stack with measurable <span class="grad">95% cost optimisation</span>.</h1>
-        <p class="lead text-fg mb-4">
-          Agama Technologies unlocks resilient, AI-driven platforms. Our consultants bring over 100 years of combined delivery
-          experience across AI, cyber security, and observability — tailored to your industry and growth stage.
-        </p>
+        <div class="eyebrow">Full-stack AI, Security, Observability &amp; Business Value</div>
+        <h1 class="display-4 fw-bold my-3">Orchestrate measurable transformation with an <span class="grad">enterprise-grade command center</span>.</h1>
+        <p class="lead text-fg mb-4">Agama Technologies unifies consulting expertise, AI intelligence, and secure collaboration. Launch a workspace, run guided assessments, and convert insight into action with executive-ready artefacts.</p>
         <div class="d-flex flex-wrap gap-3">
-          <a class="btn btn-primary btn-lg" href="/assessment.html">Start free assessment</a>
-          <a class="btn btn-outline-light btn-lg" href="#case-studies">See success stories</a>
+          <button type="button" class="btn btn-primary btn-lg" data-login-trigger data-tour="login">Secure client login</button>
+          <a class="btn btn-outline-light btn-lg" href="#quick-pulse" data-tour="pulse">Run free readiness pulse</a>
         </div>
-        <div class="d-flex align-items-center gap-3 mt-4 text-fg small">
-          <i class="bi bi-patch-check"></i> Technology agnostic, outcome obsessed.
-          <i class="bi bi-shield-lock"></i> Trusted by security-first teams.
+        <div class="d-flex flex-wrap align-items-center gap-4 mt-4 text-fg small">
+          <span class="d-flex align-items-center gap-2"><i class="bi bi-shield-lock"></i>MFA, device trust &amp; audit analytics</span>
+          <span class="d-flex align-items-center gap-2"><i class="bi bi-person-video3"></i>Guided onboarding tour</span>
         </div>
       </div>
       <div class="col-lg-6" data-aos="fade-left">
-        <div class="card glass panel-elevated pad-md">
+        <div class="card glass panel-elevated pad-md" id="quick-pulse" data-tour-step="pulse">
           <div class="panel-content">
-            <div class="badge-pill text-fg-2">EXECUTIVE INSIGHT PREVIEW</div>
-
-            <!-- Make this title more legible on dark glass -->
-            <h3 class="mt-3 panel-title-strong text-contrast-high">AI-led modernisation blueprint</h3>
-
-            <ul class="panel-list">
-              <li>Comparative maturity vs. industry leaders</li>
-              <li>Security posture, observability depth, AIOps readiness</li>
-              <li>Recommended tech stack aligned to budget horizons</li>
-              <li>Actionable roadmap with 30/90/180 day milestones</li>
-            </ul>
+            <div class="badge-pill text-fg-2">Instant maturity preview</div>
+            <h3 class="mt-3 panel-title-strong text-contrast-high">90-second business value pulse</h3>
+            <form id="quickPulseForm" class="stack gap-3">
+              <div>
+                <label class="form-label" for="pulseFocus">Priority domain</label>
+                <select class="form-select" id="pulseFocus" name="focus" required>
+                  <option value="">Select domain</option>
+                  <option value="data">Modern data &amp; analytics</option>
+                  <option value="observability">Observability &amp; resilience</option>
+                  <option value="security">Cyber security &amp; Zero Trust</option>
+                  <option value="ml">Machine learning &amp; AIOps</option>
+                  <option value="genai">LLM &amp; generative AI delivery</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label" for="pulseUrgency">Transformation urgency</label>
+                <div class="btn-group w-100" role="group" id="pulseUrgency">
+                  <input type="radio" class="btn-check" name="urgency" id="urgency0" value="stabilise" required>
+                  <label class="btn btn-outline-light" for="urgency0">Stabilise</label>
+                  <input type="radio" class="btn-check" name="urgency" id="urgency1" value="accelerate">
+                  <label class="btn btn-outline-light" for="urgency1">Accelerate</label>
+                  <input type="radio" class="btn-check" name="urgency" id="urgency2" value="disrupt">
+                  <label class="btn btn-outline-light" for="urgency2">Disrupt</label>
+                </div>
+              </div>
+              <div>
+                <label class="form-label" for="pulseInvestment">Available investment</label>
+                <select class="form-select" id="pulseInvestment" name="investment" required>
+                  <option value="">Select range</option>
+                  <option value="<$250k">&lt;$250k</option>
+                  <option value="$250k-$1m">$250k–$1m</option>
+                  <option value="$1m-$5m">$1m–$5m</option>
+                  <option value=">$5m">&gt;$5m</option>
+                </select>
+              </div>
+              <button type="submit" class="btn btn-primary w-100">Generate preview</button>
+            </form>
+            <div id="quickPulseResult" class="mt-4 d-none" aria-live="polite"></div>
           </div>
         </div>
       </div>
@@ -79,89 +104,319 @@
       <div class="col-6 col-md-3" data-aos="fade-up"><div class="metric">95%<span>Cost optimisation</span></div></div>
       <div class="col-6 col-md-3" data-aos="fade-up" data-aos-delay="50"><div class="metric">100+<span>Years combined expertise</span></div></div>
       <div class="col-6 col-md-3" data-aos="fade-up" data-aos-delay="100"><div class="metric">30+<span>Industries transformed</span></div></div>
-      <div class="col-6 col-md-3" data-aos="fade-up" data-aos-delay="150"><div class="metric">3x<span>Deployment speed uplift</span></div></div>
+      <div class="col-6 col-md-3" data-aos="fade-up" data-aos-delay="150"><div class="metric">3×<span>Deployment speed uplift</span></div></div>
     </div>
   </section>
 
-  <section id="capabilities" class="container py-5">
+  <section id="secure-access" class="container py-5">
+    <div class="row g-4 align-items-center">
+      <div class="col-lg-5" data-aos="fade-right">
+        <span class="eyebrow">Secure client access</span>
+        <h2 class="fw-bold">Enterprise-grade login with layered defence</h2>
+        <p class="text-fg">Built-in multi-factor authentication, device trust, and continuous session analytics keep sensitive engagement data locked down without slowing executives.</p>
+        <ul class="text-fg-3 list-unstyled stack-sm" data-tour-step="login">
+          <li><i class="bi bi-shield-check me-2"></i>Time-based OTP with hardware-token support</li>
+          <li><i class="bi bi-journal-text me-2"></i>Real-time login audit trails &amp; anomaly alerting</li>
+          <li><i class="bi bi-link-45deg me-2"></i>SSO-friendly architecture with CSRF hardened APIs</li>
+        </ul>
+        <div class="d-flex gap-3">
+          <button type="button" class="btn btn-outline-light" data-login-trigger>Sign in</button>
+          <a href="/signup.html" class="btn btn-outline-light">Request access</a>
+        </div>
+      </div>
+      <div class="col-lg-7" data-aos="fade-left">
+        <div class="card glass p-4 secure-access-card">
+          <div class="row g-4">
+            <div class="col-sm-6">
+              <h5>Session health</h5>
+              <p class="text-fg-3 mb-1">Adaptive risk scoring reviews device fingerprint, IP reputation, and behaviour analytics.</p>
+              <div class="badge-pill">Continuously evaluated</div>
+            </div>
+            <div class="col-sm-6">
+              <h5>Executive control</h5>
+              <p class="text-fg-3 mb-1">Administrators can revoke sessions, enforce MFA policies, and export audit evidence instantly.</p>
+              <div class="badge-pill">SOC2-ready evidence</div>
+            </div>
+            <div class="col-12">
+              <div class="timeline compact">
+                <div class="timeline-item">
+                  <div class="timeline-dot"></div>
+                  <div>
+                    <h6>Credential pre-flight</h6>
+                    <p class="text-fg-3">Rate limited, geo-aware login attempt validation.</p>
+                  </div>
+                </div>
+                <div class="timeline-item">
+                  <div class="timeline-dot"></div>
+                  <div>
+                    <h6>MFA challenge</h6>
+                    <p class="text-fg-3">OTP or hardware key enforcement with 10 minute challenge window.</p>
+                  </div>
+                </div>
+                <div class="timeline-item">
+                  <div class="timeline-dot"></div>
+                  <div>
+                    <h6>Workspace hand-off</h6>
+                    <p class="text-fg-3">Session cookie issued with continuous monitoring hooks.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="capabilities" class="container py-5 bg-surface rounded-4">
     <div class="text-center mb-5" data-aos="fade-up">
-      <span class="eyebrow">What we do</span>
-      <h2 class="fw-bold">Full-stack AI consulting with security and observability at the core</h2>
-      <p class="text-fg">We architect measurable change — from AI opportunity framing through to secure, observable, data-driven operations.</p>
+      <span class="eyebrow">What we orchestrate</span>
+      <h2 class="fw-bold">Business value consulting powered by AI guidance</h2>
+      <p class="text-fg">Accelerate strategy, delivery, and procurement negotiations with domain-specific journeys across the full modernisation stack.</p>
     </div>
     <div class="row g-4">
       <div class="col-md-6 col-xl-3" data-aos="zoom-in">
-        <div class="card h-100 glass service-card">
+        <div class="card glass service-card h-100">
           <div class="card-body">
             <i class="bi bi-cpu display-6"></i>
-            <h5 class="mt-3">AI Strategy & Delivery</h5>
-            <p class="text-fg-3">Value mapping, model lifecycle design, and AI platform engineering tailored to your industry and constraints.</p>
+            <h5 class="mt-3">AI strategy &amp; delivery</h5>
+            <p class="text-fg-3">Portfolio rationalisation, model lifecycle governance, and value-backed experimentation playbooks.</p>
           </div>
         </div>
       </div>
       <div class="col-md-6 col-xl-3" data-aos="zoom-in" data-aos-delay="50">
-        <div class="card h-100 glass service-card">
+        <div class="card glass service-card h-100">
           <div class="card-body">
             <i class="bi bi-eye display-6"></i>
-            <h5 class="mt-3">Observability & AIOps</h5>
-            <p class="text-fg-3">SLO-based operating models, telemetry pipelines, intelligent alerting, and incident automation.</p>
+            <h5 class="mt-3">Observability &amp; resilience</h5>
+            <p class="text-fg-3">Telemetry economics, SLO blueprints, and automation patterns tuned for hybrid cloud.</p>
           </div>
         </div>
       </div>
       <div class="col-md-6 col-xl-3" data-aos="zoom-in" data-aos-delay="100">
-        <div class="card h-100 glass service-card">
+        <div class="card glass service-card h-100">
           <div class="card-body">
             <i class="bi bi-shield-check display-6"></i>
-            <h5 class="mt-3">Cyber Security Advisory</h5>
-            <p class="text-fg-3">Zero Trust roadmaps, detection engineering, DevSecOps and compliance acceleration.</p>
+            <h5 class="mt-3">Security &amp; trust</h5>
+            <p class="text-fg-3">Zero Trust maturity acceleration, detection engineering, and regulatory observability.</p>
           </div>
         </div>
       </div>
       <div class="col-md-6 col-xl-3" data-aos="zoom-in" data-aos-delay="150">
-        <div class="card h-100 glass service-card">
+        <div class="card glass service-card h-100">
           <div class="card-body">
-            <i class="bi bi-bar-chart display-6"></i>
-            <h5 class="mt-3">Analytics & Insights</h5>
-            <p class="text-fg-3">Modern data stacks, governed self-serve analytics, and AI-assisted decision intelligence.</p>
+            <i class="bi bi-diagram-3 display-6"></i>
+            <h5 class="mt-3">Modern platform operating models</h5>
+            <p class="text-fg-3">Product-centric ways of working, FinOps guardrails, and capability uplift across delivery teams.</p>
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <section class="bg-surface py-5" id="experience">
+  <section id="workspace" class="container py-5">
+    <div class="row g-4 align-items-start">
+      <div class="col-lg-5" data-aos="fade-right">
+        <span class="eyebrow">Engagement workspaces</span>
+        <h2 class="fw-bold">Launch an intelligent workspace with enriched context</h2>
+        <p class="text-fg">Define global variables once and re-use across every assessment, report, and vendor interaction. OpenAI-backed enrichment brings funding, headcount, initiatives, and stakeholder maps directly into your console.</p>
+        <ul class="text-fg-3 list-unstyled stack-sm">
+          <li><i class="bi bi-building me-2"></i>Auto-fetch corporate footprint, funding and leadership signals</li>
+          <li><i class="bi bi-people me-2"></i>Map executive sponsors, squads, and procurement stakeholders</li>
+          <li><i class="bi bi-kanban me-2"></i>Coordinate strategic drivers, capability focus, and transformation cadence</li>
+        </ul>
+      </div>
+      <div class="col-lg-7" data-aos="fade-left">
+        <div class="card glass workspace-card" data-tour-step="workspace">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <div class="badge-pill">Workspace builder</div>
+                <h5 class="mt-2">Define your operating context</h5>
+              </div>
+              <div class="workspace-progress"><span id="workspaceStepLabel">Step 1 of 3</span></div>
+            </div>
+            <form id="workspaceBuilder" class="stack gap-4" novalidate>
+              <div class="workspace-step" data-step="1">
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <label class="form-label" for="workspaceName">Workspace name</label>
+                    <input class="form-control" id="workspaceName" name="name" placeholder="North America modernisation" required>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label" for="workspaceCompany">Company or domain</label>
+                    <input class="form-control" id="workspaceCompany" name="companyDomain" placeholder="example.com" required>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label" for="workspaceIndustry">Industry</label>
+                    <select class="form-select" id="workspaceIndustry" name="industry" required>
+                      <option value="">Select industry</option>
+                      <option value="Financial Services">Financial Services</option>
+                      <option value="Technology">Technology</option>
+                      <option value="Healthcare">Healthcare</option>
+                      <option value="Energy">Energy</option>
+                      <option value="Retail">Retail &amp; Consumer</option>
+                      <option value="Public Sector">Public Sector</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label" for="workspaceRegion">Primary region</label>
+                    <select class="form-select" id="workspaceRegion" name="region" required>
+                      <option value="">Select region</option>
+                      <option value="North America">North America</option>
+                      <option value="EMEA">EMEA</option>
+                      <option value="APAC">APAC</option>
+                      <option value="LATAM">LATAM</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div class="workspace-step d-none" data-step="2">
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <label class="form-label" for="workspaceCompanySize">Company size</label>
+                    <select class="form-select" id="workspaceCompanySize" name="companySize" required>
+                      <option value="">Select size</option>
+                      <option value="Startup">Startup (1-200)</option>
+                      <option value="Scale-up">Scale-up (200-1000)</option>
+                      <option value="Enterprise">Enterprise (1000-10k)</option>
+                      <option value="Global">Global (10k+)</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label" for="workspaceStage">Transformation stage</label>
+                    <select class="form-select" id="workspaceStage" name="stage">
+                      <option value="Discovery">Discovery</option>
+                      <option value="Pilot">Pilot</option>
+                      <option value="Scaling">Scaling</option>
+                      <option value="Optimising">Optimising</option>
+                    </select>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label" for="workspaceDrivers">Strategic drivers</label>
+                    <input class="form-control" id="workspaceDrivers" name="strategicDrivers" placeholder="Comma separated — e.g. Resilience, FinOps, Customer experience">
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label" for="workspaceCapabilities">Capability focus</label>
+                    <input class="form-control" id="workspaceCapabilities" name="capabilityFocus" placeholder="Observability, Data governance, Zero Trust">
+                  </div>
+                </div>
+              </div>
+              <div class="workspace-step d-none" data-step="3">
+                <div class="bg-surface rounded-4 p-3" id="workspaceIntel">
+                  <h6 class="text-uppercase small mb-2">OpenAI enrichment</h6>
+                  <div class="text-fg-3 small" id="workspaceIntelBody">Gathering corporate intelligence…</div>
+                </div>
+                <div class="form-check mt-3">
+                  <input class="form-check-input" type="checkbox" value="1" id="workspaceConfirm" required>
+                  <label class="form-check-label" for="workspaceConfirm">I confirm these details can be shared with Agama Technologies for consulting purposes.</label>
+                </div>
+              </div>
+              <div class="d-flex justify-content-between align-items-center">
+                <button type="button" class="btn btn-outline-light" id="workspaceBack" disabled>Back</button>
+                <button type="button" class="btn btn-primary" id="workspaceNext">Next</button>
+              </div>
+            </form>
+            <div id="workspaceStatus" class="mt-3 small text-fg-3" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="marketplace" class="bg-surface py-5">
     <div class="container">
-      <div class="row g-4 align-items-center">
-        <div class="col-lg-6" data-aos="fade-right">
-          <h2 class="fw-bold">Trusted specialists with a century of combined delivery</h2>
-          <p class="text-fg">Our senior consultants have modernised critical systems for global banks, high-growth SaaS scale-ups, digital natives, and regulated enterprises. We partner with teams to accelerate value, not vendor lock-in.</p>
-          <ul class="list-unstyled text-fg-2">
-            <li>• AI platform migrations and inference optimisation</li>
-            <li>• SOC and observability fusion centres</li>
-            <li>• Secure-by-design platform foundations</li>
-            <li>• Analytics programmes that connect to business outcomes</li>
+      <div class="text-center mb-5" data-aos="fade-up">
+        <span class="eyebrow">Assessment marketplace</span>
+        <h2 class="fw-bold">Curated journeys to accelerate value realisation</h2>
+        <p class="text-fg">Mix and match guided assessments for every layer of your stack. Unlock premium tiers for cross-domain benchmarking, vendor negotiation packs, and AI-generated execution plans.</p>
+      </div>
+      <div class="row g-4">
+        <div class="col-md-6 col-xl-4" data-aos="zoom-in">
+          <div class="card glass h-100 assessment-card">
+            <div class="card-body">
+              <div class="badge-pill">Free tier</div>
+              <h5 class="mt-3">Executive maturity pulse</h5>
+              <p class="text-fg-3">Baseline readiness across people, process, and platforms in minutes. Export summary slides to socialise urgency.</p>
+              <button class="btn btn-outline-light mt-3" data-open-assessment="free">Start pulse</button>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-xl-4" data-aos="zoom-in" data-aos-delay="50">
+          <div class="card glass h-100 assessment-card">
+            <div class="card-body">
+              <div class="badge-pill">Business value consulting</div>
+              <h5 class="mt-3">Transformation blueprint</h5>
+              <p class="text-fg-3">Deep-dive into AI, security, observability, and data. Includes ROI models, KPI ladders, and vendor landscape briefs.</p>
+              <a class="btn btn-outline-light mt-3" href="/premium-assessment.html">Explore tiers</a>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-xl-4" data-aos="zoom-in" data-aos-delay="100">
+          <div class="card glass h-100 assessment-card">
+            <div class="card-body">
+              <div class="badge-pill">Command tier</div>
+              <h5 class="mt-3">Procurement &amp; sourcing cockpit</h5>
+              <p class="text-fg-3">Craft negotiation scripts, RFP artefacts, and target discounts backed by telemetry, initiatives, and OpenAI analytics.</p>
+              <a class="btn btn-outline-light mt-3" href="/assessment.html">See full experience</a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row g-4 mt-2">
+        <div class="col-md-4" data-aos="fade-up">
+          <div class="card glass h-100 p-4">
+            <h6>Data platform &amp; governance</h6>
+            <p class="text-fg-3">Assess ingestion, modelling, quality, privacy, and AI readiness.</p>
+          </div>
+        </div>
+        <div class="col-md-4" data-aos="fade-up" data-aos-delay="50">
+          <div class="card glass h-100 p-4">
+            <h6>Observability &amp; AIOps</h6>
+            <p class="text-fg-3">Stress-test telemetry pipelines, response automation, and FinOps hygiene.</p>
+          </div>
+        </div>
+        <div class="col-md-4" data-aos="fade-up" data-aos-delay="100">
+          <div class="card glass h-100 p-4">
+            <h6>LLM &amp; GenAI lifecycle</h6>
+            <p class="text-fg-3">Benchmark foundation model strategy, risk controls, and product integration patterns.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="container py-5" id="insights">
+    <div class="row g-4 align-items-center">
+      <div class="col-lg-6" data-aos="fade-right">
+        <h2 class="fw-bold">Trusted specialists with a century of delivery</h2>
+        <p class="text-fg">Our senior consultants blend operating-model change with hands-on engineering. We partner with banks, healthcare pioneers, scale-ups, and public sector leaders to deliver measurable outcomes.</p>
+        <ul class="list-unstyled text-fg-2">
+          <li>• AI platform migrations and model operations</li>
+          <li>• SOC &amp; observability fusion centres</li>
+          <li>• Zero Trust &amp; privacy-by-design transformations</li>
+          <li>• Analytics programmes tied to board-level KPIs</li>
+        </ul>
+      </div>
+      <div class="col-lg-6" data-aos="fade-left">
+        <div class="card glass p-4">
+          <h5>Recent outcomes</h5>
+          <ul class="text-fg-3 small mb-0">
+            <li><strong>Global FinServ:</strong> Reduced incident MTTR by 72% via unified telemetry and AI-assisted playbooks.</li>
+            <li><strong>Cloud SaaS:</strong> 95% platform cost optimisation through GPU right-sizing and observability-driven FinOps.</li>
+            <li><strong>Healthcare:</strong> Zero Trust rollout with real-time anomaly detection across clinical systems.</li>
           </ul>
         </div>
-        <div class="col-lg-6" data-aos="fade-left">
-          <div class="card glass p-4">
-            <h5>Highlighted outcomes</h5>
-            <ul class="text-fg-3 small mb-0">
-              <li><strong>Global FinServ:</strong> Reduced incident MTTR by 72% with unified telemetry and AI-assisted playbooks.</li>
-              <li><strong>Cloud SaaS:</strong> 95% platform cost optimisation via GPU right-sizing and observability-driven FinOps.</li>
-              <li><strong>Healthcare:</strong> Zero Trust implementation with real-time anomaly detection across clinical apps.</li>
-            </ul>
-          </div>
-        </div>
       </div>
     </div>
   </section>
 
-  <section id="approach" class="container py-5">
+  <section class="container py-5" id="approach">
     <div class="row g-4 align-items-center">
       <div class="col-lg-5" data-aos="fade-right">
-        <span class="eyebrow">Engagement model</span>
-        <h2 class="fw-bold">From discovery to sustained optimisation</h2>
-        <p class="text-fg">We co-create the operating model and accelerate outcomes via a structured, insight-led approach.</p>
+        <span class="eyebrow">Guided delivery approach</span>
+        <h2 class="fw-bold">From diagnostic to accelerated execution</h2>
+        <p class="text-fg">Every assessment fuels a living roadmap. We embed pods that pair consultants with engineering leaders to deliver value in weeks—not quarters.</p>
       </div>
       <div class="col-lg-7" data-aos="fade-left">
         <div class="timeline">
@@ -169,128 +424,30 @@
             <div class="timeline-dot"></div>
             <div>
               <h6>Diagnostic sprints</h6>
-              <p class="text-fg-3">Rapid interviews, telemetry reviews, security posture scoring, and AI opportunity framing.</p>
+              <p class="text-fg-3">Stakeholder interviews, telemetry reviews, and AI opportunity framing.</p>
             </div>
           </div>
           <div class="timeline-item">
             <div class="timeline-dot"></div>
             <div>
-              <h6>Blueprint & prioritised roadmap</h6>
-              <p class="text-fg-3">Data-driven maturity baselines, benchmark comparisons, and a 30/90/180 day action plan.</p>
+              <h6>Blueprint &amp; roadmap</h6>
+              <p class="text-fg-3">Benchmark positioning, business case modelling, and 30/90/180-day plays.</p>
             </div>
           </div>
           <div class="timeline-item">
             <div class="timeline-dot"></div>
             <div>
               <h6>Execution pods</h6>
-              <p class="text-fg-3">Cross-functional delivery pods with embedded SMEs in AI, security, data, and reliability.</p>
+              <p class="text-fg-3">Cross-functional squads delivering AI, data, security, and observability outcomes.</p>
             </div>
           </div>
           <div class="timeline-item">
             <div class="timeline-dot"></div>
             <div>
               <h6>Continuous optimisation</h6>
-              <p class="text-fg-3">AIOps and analytics loops, cost-performance tuning, and playbooks for sustainable change.</p>
+              <p class="text-fg-3">AIOps loops, KPI tracking, and procurement intelligence to sustain impact.</p>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section id="insights" class="container py-5">
-    <div class="row g-4">
-      <div class="col-lg-6" data-aos="fade-right">
-        <h2 class="fw-bold">See where you stand instantly</h2>
-        <p class="text-fg">Complete the free assessment to unlock a tailored maturity snapshot. You will see part of your executive report instantly and can purchase the full insights when ready.</p>
-        <div class="card glass p-4">
-          <h5 class="mb-3">Your complimentary preview includes:</h5>
-          <ul class="text-fg-3">
-            <li>Overall maturity score and pillar breakdown</li>
-            <li>Competitive percentile positioning</li>
-            <li>Targeted recommendations and quick wins</li>
-          </ul>
-          <p class="text-fg-3 mb-0">Upgrade to the full report to get investment scenarios, technology radar, detailed benchmarking, and roadmap sequencing.</p>
-        </div>
-      </div>
-      <div class="col-lg-6" data-aos="fade-left">
-        <div class="card glass p-4">
-          <h5 class="mb-3">Modern, data-driven insights</h5>
-          <div class="d-flex flex-column gap-3">
-            <div class="insight-line">
-              <span>Industry benchmark deltas</span>
-              <strong>± 27 pts</strong>
-            </div>
-            <div class="insight-line">
-              <span>Automation opportunity</span>
-              <strong>Up to 95% cost optimisation</strong>
-            </div>
-            <div class="insight-line">
-              <span>Security incident reduction</span>
-              <strong>3.4× fewer priority incidents</strong>
-            </div>
-            <div class="insight-line">
-              <span>Analytics ROI uplift</span>
-              <strong>2.6× faster insight-to-action</strong>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section id="case-studies" class="bg-surface py-5">
-    <div class="container">
-      <div class="text-center mb-5" data-aos="fade-up">
-        <span class="eyebrow">Success stories</span>
-        <h2 class="fw-bold">AI-driven transformations delivered with confidence</h2>
-      </div>
-      <div class="row g-4">
-        <div class="col-lg-4" data-aos="zoom-in">
-          <div class="card glass h-100 p-4">
-            <h5>Global SaaS Platform</h5>
-            <p class="text-fg-3">Consolidated observability stack and launched closed-loop remediation. Achieved 55% alert noise reduction and 95% infra cost optimisation.</p>
-            <div class="badge-pill">Observability & FinOps</div>
-          </div>
-        </div>
-        <div class="col-lg-4" data-aos="zoom-in" data-aos-delay="75">
-          <div class="card glass h-100 p-4">
-            <h5>Regulated Financial Institution</h5>
-            <p class="text-fg-3">Implemented Zero Trust, AI-assisted fraud detection, and regulatory observability. MTTR improved by 72% with resilient automation.</p>
-            <div class="badge-pill">Security & AIOps</div>
-          </div>
-        </div>
-        <div class="col-lg-4" data-aos="zoom-in" data-aos-delay="150">
-          <div class="card glass h-100 p-4">
-            <h5>Next-gen Healthcare Network</h5>
-            <p class="text-fg-3">Unified data platform with governed analytics and privacy-preserving machine learning for diagnostics.</p>
-            <div class="badge-pill">Analytics & AI</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="container py-5">
-    <div class="row g-4 align-items-center">
-      <div class="col-lg-7" data-aos="fade-right">
-        <h2 class="fw-bold">Ready for a deeper partnership?</h2>
-        <p class="text-fg">Engage Agama Technologies for tailored consulting. Receive a bespoke roadmap, technology recommendations, and actionable playbooks anchored in measurable results.</p>
-        <div class="d-flex flex-wrap gap-3">
-          <a class="btn btn-primary" href="/assessment.html">Launch free assessment</a>
-          <a class="btn btn-outline-light" href="mailto:hello@agamatechnologies.com">Speak to an expert</a>
-          <a class="btn btn-outline-light" href="/downloads/agama-technologies-site.zip">Download site package (ZIP)</a>
-        </div>
-      </div>
-      <div class="col-lg-5" data-aos="fade-left">
-        <div class="card glass p-4">
-          <h5>What you'll receive</h5>
-          <ul class="text-fg-3 small mb-0">
-            <li>Executive-ready maturity report</li>
-            <li>Benchmarks vs. competitors and industry leaders</li>
-            <li>Investment scenarios aligned to budget horizons</li>
-            <li>Technology radar with vendor-neutral recommendations</li>
-          </ul>
         </div>
       </div>
     </div>
@@ -301,14 +458,90 @@
       <div>© <span id="year"></span> Agama Technologies. All rights reserved.</div>
       <div class="d-flex gap-3 small">
         <a href="mailto:hello@agamatechnologies.com">hello@agamatechnologies.com</a>
-        <a href="/login.html">Client login</a>
+        <button type="button" class="btn btn-link p-0 text-decoration-none" data-login-trigger>Client login</button>
         <a href="/signup.html">Create account</a>
       </div>
     </div>
   </footer>
 
+  <div class="modal fade" id="loginModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content glass-modal">
+        <div class="modal-header border-0">
+          <div>
+            <h5 class="modal-title">Secure client login</h5>
+            <p class="text-fg-3 mb-0">Authenticate with email and password. Multi-factor authentication is required for all accounts.</p>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-4">
+            <div class="col-lg-6 border-lg-end">
+              <form id="loginForm" class="stack gap-3" autocomplete="off" novalidate>
+                <div class="login-stage" data-stage="password">
+                  <div class="mb-3">
+                    <label class="form-label" for="loginEmail">Work email</label>
+                    <input type="email" class="form-control" id="loginEmail" name="email" autocomplete="username" required>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label" for="loginPassword">Password</label>
+                    <input type="password" class="form-control" id="loginPassword" name="password" autocomplete="current-password" required>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" value="1" id="rememberDevice" name="rememberDevice">
+                    <label class="form-check-label" for="rememberDevice">Remember this device for 7 days</label>
+                  </div>
+                  <button type="submit" class="btn btn-primary w-100 mt-2">Continue</button>
+                </div>
+                <div class="login-stage d-none" data-stage="challenge">
+                  <div class="mb-3">
+                    <label class="form-label" for="loginOtp">Enter verification code</label>
+                    <input type="text" class="form-control" id="loginOtp" name="otp" inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code" required>
+                    <div class="form-text">6-digit code from your authenticator device.</div>
+                  </div>
+                  <button type="submit" class="btn btn-primary w-100">Verify &amp; sign in</button>
+                  <button type="button" class="btn btn-link w-100 mt-2" id="loginRestart">Start over</button>
+                </div>
+              </form>
+              <div id="loginFeedback" class="small mt-3" aria-live="polite"></div>
+            </div>
+            <div class="col-lg-6">
+              <div class="stack gap-3">
+                <div class="badge-pill">Why it matters</div>
+                <p class="text-fg">Every login is monitored by our threat-aware gateway. Device posture, geolocation, and behavioural signals continuously update risk scores.</p>
+                <ul class="text-fg-3 list-unstyled stack-sm">
+                  <li><i class="bi bi-activity me-2"></i>Session analytics surface anomalous activity immediately.</li>
+                  <li><i class="bi bi-key-fill me-2"></i>Hardware token &amp; authenticator app support out of the box.</li>
+                  <li><i class="bi bi-people me-2"></i>Admins manage MFA policies, audit logs, and workspace roles centrally.</li>
+                </ul>
+                <a href="/signup.html" class="btn btn-outline-light">Need an account? Request onboarding</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tourOverlay" class="tour-overlay d-none" aria-hidden="true">
+    <div class="tour-backdrop"></div>
+    <div class="tour-panel" role="dialog" aria-modal="true" aria-live="polite">
+      <div class="tour-step-label"></div>
+      <div class="tour-step-body"></div>
+      <div class="tour-controls">
+        <button type="button" class="btn btn-outline-light btn-sm" data-tour-action="skip">Skip tour</button>
+        <div class="ms-auto d-flex gap-2">
+          <button type="button" class="btn btn-outline-light btn-sm" data-tour-action="prev">Back</button>
+          <button type="button" class="btn btn-primary btn-sm" data-tour-action="next">Next</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+  <script src="/js/csrf.js" defer></script>
+  <script src="/js/landing.js" defer></script>
   <script src="/js/main.js" defer></script>
 </body>
 </html>
