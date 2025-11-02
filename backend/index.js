@@ -73,9 +73,11 @@ app.get('/api/csrf-token', (req, res) => {
   }
 });
 
+const defaultAllowedOrigins = isProduction
+  ? []
+  : ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5173', 'http://127.0.0.1:5173'];
 const allowedOrigins = new Set(
-  (process.env.ALLOWED_ORIGINS || '')
-    .split(',')
+  [...defaultAllowedOrigins, ...(process.env.ALLOWED_ORIGINS || '').split(',')]
     .map(origin => origin.trim())
     .filter(Boolean)
 );
