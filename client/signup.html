@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Create account | Agama</title>
+    <link rel="stylesheet" href="css/styles.v2.css" />
+  </head>
+  <body class="bg-body">
+    <div class="liquid-bg">
+      <div class="blob blob-blue"></div>
+      <div class="blob blob-teal"></div>
+      <div class="blob blob-magenta"></div>
+    </div>
+    <nav class="navbar navbar-expand-lg navbar-dark px-4 py-3">
+      <a class="navbar-brand" href="index.html">Agama</a>
+    </nav>
+    <main class="container py-5">
+      <div class="row justify-content-center">
+        <div class="col-lg-5">
+          <div class="card glass p-5">
+            <h1 class="h3 mb-3">Join Agama</h1>
+            <p class="text-fg-3 mb-4">Create an account to start projects, launch assessments, and collaborate with copilots.</p>
+            <form id="signup-form" class="d-grid gap-3">
+              <div>
+                <label class="form-label" for="signup-name">Full name</label>
+                <input class="form-control" id="signup-name" name="name" required />
+              </div>
+              <div>
+                <label class="form-label" for="signup-email">Email</label>
+                <input class="form-control" id="signup-email" name="email" type="email" required />
+              </div>
+              <div>
+                <label class="form-label" for="signup-password">Password</label>
+                <input class="form-control" id="signup-password" name="password" type="password" required />
+              </div>
+              <div id="signup-error" class="text-danger" hidden>Unable to create account. Please try again.</div>
+              <button class="btn btn-primary" type="submit">Create account</button>
+            </form>
+            <p class="text-fg-3 mt-4 mb-0">Already have an account? <a href="login.html">Sign in</a>.</p>
+          </div>
+        </div>
+      </div>
+    </main>
+    <script src="js/auth.js"></script>
+  </body>
+</html>

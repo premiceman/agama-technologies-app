@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>New Assessment | Agama</title>
+    <link rel="stylesheet" href="css/styles.v2.css" />
+  </head>
+  <body class="bg-body">
+    <div class="liquid-bg">
+      <div class="blob blob-blue"></div>
+      <div class="blob blob-teal"></div>
+      <div class="blob blob-magenta"></div>
+    </div>
+    <nav class="navbar navbar-expand-lg navbar-dark px-4 py-3">
+      <a class="navbar-brand" href="index.html">Agama</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item"><a class="nav-link" href="projects.html">Projects</a></li>
+          <li class="nav-item"><a class="nav-link" href="assessment-new.html">Assessments</a></li>
+          <li class="nav-item"><a class="nav-link" href="rfx-new.html">RFX</a></li>
+          <li class="nav-item"><a class="nav-link" href="comparison-new.html">Comparisons</a></li>
+          <li class="nav-item"><a class="nav-link" href="roadmap.html">Roadmaps</a></li>
+          <li class="nav-item"><a class="nav-link" href="consulting.html">Consulting</a></li>
+          <li class="nav-item"><a class="nav-link" href="projects.html#admin">Admin</a></li>
+          <li class="nav-item"><a class="nav-link" href="vendor.html">Vendor</a></li>
+        </ul>
+      </div>
+    </nav>
+
+    <main class="container py-5">
+      <div class="row g-4">
+        <aside class="col-lg-3">
+          <div class="card glass p-4 sticky-top" style="top: 6rem;">
+            <h2 class="h5 mb-3">Assessment types</h2>
+            <div id="model-list" class="d-grid gap-2"></div>
+            <button class="btn btn-outline-light mt-3" id="generate-model">Generate with AI</button>
+          </div>
+        </aside>
+        <section class="col-lg-9">
+          <div class="card glass p-4">
+            <h1 class="h4 mb-3">Launch assessment</h1>
+            <p class="text-fg-3">Select an assessment schema, capture responses, and Agama will automatically score by section and overall maturity.</p>
+            <form id="assessment-form" class="d-grid gap-4" hidden>
+              <input type="hidden" id="assessment-project" name="projectId" />
+              <input type="hidden" id="assessment-type" name="type" />
+              <input type="hidden" id="assessment-version" name="modelVersion" />
+              <div>
+                <label class="form-label" for="assessment-project-select">Project</label>
+                <select class="form-select" id="assessment-project-select"></select>
+              </div>
+              <div id="assessment-schema" class="d-grid gap-4"></div>
+              <button class="btn btn-primary" type="submit">Submit assessment</button>
+            </form>
+            <div id="assessment-empty" class="text-fg-3">Choose a maturity model to begin.</div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script src="js/nav.js"></script>
+    <script src="js/assessment.js"></script>
+  </body>
+</html>
