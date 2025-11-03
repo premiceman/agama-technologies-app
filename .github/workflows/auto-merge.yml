@@ -1,0 +1,57 @@
+name: Automated conflict resolver
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: "Branch that should receive the merge commit"
+        required: true
+      base_branch:
+        description: "Branch to merge from (defaults to main)"
+        required: false
+        default: "main"
+      strategy:
+        description: "Conflict resolution preference"
+        required: false
+        default: "ours"
+        type: choice
+        options:
+          - ours
+          - theirs
+
+permissions:
+  contents: write
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_branch }}
+          fetch-depth: 0
+
+      - name: Configure git user
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+
+      - name: Fetch base branch
+        run: git fetch origin ${{ inputs.base_branch }}
+
+      - name: Merge base into target with selected strategy
+        env:
+          STRATEGY: ${{ inputs.strategy }}
+          BASE_BRANCH: ${{ inputs.base_branch }}
+        run: |
+          if [ "$STRATEGY" = "theirs" ]; then
+            git merge origin/$BASE_BRANCH -X theirs --no-edit
+          else
+            git merge origin/$BASE_BRANCH -X ours --no-edit
+          fi
+
+      - name: Push merge commit
+        env:
+          TARGET_BRANCH: ${{ inputs.target_branch }}
+        run: git push origin HEAD:$TARGET_BRANCH

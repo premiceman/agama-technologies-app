@@ -117,6 +117,21 @@ The included `render.yaml` blueprint provisions a single Node web service:
 During the build step the wrapper forwards dependency installation to `/server`, and the start command launches `server/index.
 js`. Static assets under `/client` are served directly by the Express app, so no extra CDN or build service is required.
 
+## Resolve GitHub Merge Conflicts from the UI
+
+Large structural changes between this refactor branch and `main` can overwhelm GitHub’s in-browser conflict editor. To resolve merges without touching the command line, trigger the **Automated conflict resolver** workflow:
+
+1. Open the **Actions** tab in GitHub and select **Automated conflict resolver**.
+2. Click **Run workflow**.
+3. Provide the branch you want to update in **target_branch** (e.g. `your-feature-branch`).
+4. Leave **base_branch** as `main` unless you need to merge from another branch.
+5. Pick the conflict strategy:
+   - `ours` keeps the target branch’s version whenever a conflict is detected (useful when this refactor should replace older files).
+   - `theirs` prefers the base branch’s version.
+6. Submit the form—the workflow checks out the branch, performs the merge with the chosen preference, and pushes the merge commit back to the branch using the built-in `GITHUB_TOKEN`.
+
+After the workflow completes, refresh your pull request; conflicts should be cleared automatically.
+
 ## Roadmap Highlights
 
 Near-term backlog includes:
