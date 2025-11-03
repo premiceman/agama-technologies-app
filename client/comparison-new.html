@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vendor Comparison | Agama</title>
+    <link rel="stylesheet" href="css/styles.v2.css" />
+  </head>
+  <body class="bg-body">
+    <div class="liquid-bg">
+      <div class="blob blob-blue"></div>
+      <div class="blob blob-teal"></div>
+      <div class="blob blob-magenta"></div>
+    </div>
+    <nav class="navbar navbar-expand-lg navbar-dark px-4 py-3">
+      <a class="navbar-brand" href="index.html">Agama</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item"><a class="nav-link" href="projects.html">Projects</a></li>
+          <li class="nav-item"><a class="nav-link" href="assessment-new.html">Assessments</a></li>
+          <li class="nav-item"><a class="nav-link" href="rfx-new.html">RFX</a></li>
+          <li class="nav-item"><a class="nav-link" href="comparison-new.html">Comparisons</a></li>
+          <li class="nav-item"><a class="nav-link" href="roadmap.html">Roadmaps</a></li>
+          <li class="nav-item"><a class="nav-link" href="consulting.html">Consulting</a></li>
+          <li class="nav-item"><a class="nav-link" href="projects.html#admin">Admin</a></li>
+          <li class="nav-item"><a class="nav-link" href="vendor.html">Vendor</a></li>
+        </ul>
+      </div>
+    </nav>
+
+    <main class="container py-5">
+      <div class="card glass p-4">
+        <h1 class="h4 mb-3">Run comparison</h1>
+        <p class="text-fg-3">Select the RFX, choose vendors to include, and configure weighting presets. Agama will autoscore using the submitted responses and surface explainable deltas.</p>
+        <form id="comparison-form" class="d-grid gap-4">
+          <div>
+            <label class="form-label" for="comparison-project">Project</label>
+            <select class="form-select" id="comparison-project" required></select>
+          </div>
+          <div>
+            <label class="form-label" for="comparison-rfx">RFX</label>
+            <select class="form-select" id="comparison-rfx" required></select>
+          </div>
+          <div>
+            <label class="form-label">Vendors</label>
+            <div id="comparison-vendors" class="d-grid gap-2"></div>
+          </div>
+          <div>
+            <label class="form-label" for="comparison-method">Weighting preset</label>
+            <select class="form-select" id="comparison-method">
+              <option value="value">Value (Balanced)</option>
+              <option value="risk">Risk-weighted</option>
+              <option value="fit">Capability fit</option>
+              <option value="tco">Total cost of ownership</option>
+            </select>
+          </div>
+          <div class="d-flex justify-content-end">
+            <button class="btn btn-primary" type="submit">Create comparison</button>
+          </div>
+        </form>
+        <div id="comparison-summary" class="mt-4" hidden></div>
+      </div>
+    </main>
+
+    <script src="js/nav.js"></script>
+    <script src="js/comparison.js"></script>
+  </body>
+</html>
