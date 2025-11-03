@@ -65,7 +65,7 @@ const loadAssessments = async () => {
   elements.assessmentList.innerHTML = '<p class="text-fg-3">Loading assessments…</p>';
   try {
     const { assessments } = await fetchJSON('/api/assessments');
-    const filtered = (assessments || []).filter((item) => item.projectId === projectId);
+    const filtered = (assessments || []).filter((item) => String(item.projectId) === String(projectId));
     if (filtered.length === 0) {
       elements.assessmentList.innerHTML =
         '<div class="glass p-4">No assessments yet. Launch one to benchmark maturity.</div>';
@@ -99,8 +99,8 @@ const loadRfx = async () => {
   elements.rfxList.innerHTML = '<p class="text-fg-3">Loading RFX…</p>';
   try {
     const { rfx } = await fetchJSON('/api/rfx');
-    const filtered = (rfx || []).filter((item) => item.projectId === projectId);
-    state.rfxIds = filtered.map((entry) => entry._id.toString());
+    const filtered = (rfx || []).filter((item) => String(item.projectId) === String(projectId));
+    state.rfxIds = filtered.map((entry) => String(entry._id));
     if (filtered.length === 0) {
       elements.rfxList.innerHTML = '<div class="glass p-4">No RFX packages created yet.</div>';
       return;
@@ -129,7 +129,10 @@ const loadComparisons = async () => {
   elements.comparisonList.innerHTML = '<p class="text-fg-3">Loading comparisons…</p>';
   try {
     const { comparisons } = await fetchJSON('/api/comparisons');
-    const filtered = (comparisons || []).filter((entry) => state.rfxIds.includes((entry.rfxId || '').toString()));
+    const filtered = (comparisons || []).filter((entry) => {
+      const rfxId = entry.rfxId != null ? String(entry.rfxId) : '';
+      return state.rfxIds.includes(rfxId);
+    });
     if (filtered.length === 0) {
       elements.comparisonList.innerHTML = '<div class="glass p-4">No comparisons generated yet.</div>';
       return;
