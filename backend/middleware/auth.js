@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const COOKIE = process.env.JWT_COOKIE_NAME || 'at_session';
 const DAYS = parseInt(process.env.JWT_EXPIRES_DAYS || '7', 10);
 const SECRET = process.env.JWT_SECRET;
+const SECURE_COOKIE = process.env.NODE_ENV === 'production';
 
 if (!SECRET) {
   throw new Error('JWT_SECRET environment variable is required for authentication middleware.');
@@ -12,7 +13,7 @@ function issueTokenCookie(res, payload) {
   const token = jwt.sign(payload, SECRET, { expiresIn: `${DAYS}d` });
   res.cookie(COOKIE, token, {
     httpOnly: true,
-    secure: true,
+    secure: SECURE_COOKIE,
     sameSite: 'lax',
     maxAge: DAYS * 24 * 60 * 60 * 1000,
     path: '/'
@@ -21,7 +22,7 @@ function issueTokenCookie(res, payload) {
 }
 
 function clearTokenCookie(res) {
-  res.cookie(COOKIE, '', { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 1, path: '/' });
+  res.cookie(COOKIE, '', { httpOnly: true, secure: SECURE_COOKIE, sameSite: 'lax', maxAge: 1, path: '/' });
 }
 
 function requireAuth(req, res, next) {

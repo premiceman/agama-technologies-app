@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Workspace — Agama Technologies</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/css/styles.v2.css">
+</head>
+<body class="bg-body">
+  <div class="liquid-bg" aria-hidden="true">
+    <div class="blob blob-blue"></div>
+    <div class="blob blob-teal"></div>
+    <div class="blob blob-magenta"></div>
+  </div>
+
+  <div class="container py-5">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+      <div>
+        <span class="eyebrow">Agama workspace</span>
+        <h1 class="h3 mb-0" id="workspaceGreeting">Loading workspace...</h1>
+      </div>
+      <div class="d-flex gap-2">
+        <a class="btn btn-outline-light" href="/">Back to site</a>
+        <button class="btn btn-primary" id="logoutButton">Logout</button>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-lg-8 d-flex flex-column gap-4">
+        <div class="card glass p-4" id="licenseCard">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <h2 class="h5 mb-1">License tier &amp; platform access</h2>
+              <p class="text-fg-3 mb-0 small">Switch between personal and business licensing and choose which platforms your organisation can access.</p>
+            </div>
+            <span class="badge-soft" id="licenseStatus"></span>
+          </div>
+          <form id="licenseForm" class="row g-4">
+            <div class="col-md-6">
+              <h3 class="h6 mb-3">License tier</h3>
+              <div class="card glass p-3 mb-3">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="licenseTier" id="workspaceLicensePersonal" value="personal">
+                  <label class="form-check-label" for="workspaceLicensePersonal">
+                    Personal Navigator access
+                    <span class="d-block text-fg-3 small">ValueSphere Navigator assessments for individual operators.</span>
+                  </label>
+                </div>
+              </div>
+              <div class="card glass p-3">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="licenseTier" id="workspaceLicenseBusiness" value="business">
+                  <label class="form-check-label" for="workspaceLicenseBusiness">
+                    Business license
+                    <span class="d-block text-fg-3 small">Full suite access: ValueSphere Catalyst, ProcurePath, and RevenueForge.</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <h3 class="h6 mb-3">Platform access</h3>
+              <p class="text-fg-3 small">Personal licenses are restricted to ValueSphere Navigator. Business licenses can enable every platform.</p>
+              <div class="card glass p-3 mb-3">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="platformAccess" id="workspacePlatformValuesphere" value="valuesphere">
+                  <label class="form-check-label" for="workspacePlatformValuesphere">
+                    ValueSphere Consulting
+                    <span class="d-block text-fg-3 small">Navigator assessments and Catalyst advisory tracks.</span>
+                  </label>
+                </div>
+              </div>
+              <div class="card glass p-3 mb-3">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="platformAccess" id="workspacePlatformProcurepath" value="procurepath" data-business-only="true">
+                  <label class="form-check-label" for="workspacePlatformProcurepath">
+                    ProcurePath Control Tower
+                    <span class="d-block text-fg-3 small">Vendor intelligence, contracts, and negotiation operations.</span>
+                  </label>
+                </div>
+              </div>
+              <div class="card glass p-3">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="platformAccess" id="workspacePlatformRevenueforge" value="revenueforge" data-business-only="true">
+                  <label class="form-check-label" for="workspacePlatformRevenueforge">
+                    RevenueForge AI Studio
+                    <span class="d-block text-fg-3 small">AI-led sales cycles, qualification prompts, and lead dossiers.</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button class="btn btn-primary" type="submit" id="licenseSubmit">Update licensing</button>
+            </div>
+            <div class="col-12">
+              <div class="form-text" id="licenseFeedback"></div>
+            </div>
+          </form>
+        </div>
+
+        <div class="card glass p-4" id="platformOverview">
+          <h2 class="h5 mb-3">Platform overview</h2>
+          <div class="row g-3" id="platformCards"></div>
+        </div>
+      </div>
+
+      <div class="col-lg-4 d-flex flex-column gap-4">
+        <div class="card glass p-4">
+          <h2 class="h6 mb-3">Profile</h2>
+          <form id="profileForm" class="d-flex flex-column gap-3">
+            <div>
+              <label class="form-label" for="profileName">Name</label>
+              <input type="text" class="form-control" id="profileName" name="name" autocomplete="name">
+            </div>
+            <div>
+              <label class="form-label" for="profileCompany">Organisation</label>
+              <input type="text" class="form-control" id="profileCompany" name="company" autocomplete="organization">
+            </div>
+            <div>
+              <label class="form-label" for="profileRole">Role</label>
+              <input type="text" class="form-control" id="profileRole" name="role" autocomplete="organization-title">
+            </div>
+            <div>
+              <label class="form-label" for="profileIndustry">Industry</label>
+              <input type="text" class="form-control" id="profileIndustry" name="industry">
+            </div>
+            <button type="submit" class="btn btn-outline-light" id="profileSubmit">Save profile</button>
+            <div class="form-text" id="profileFeedback"></div>
+          </form>
+        </div>
+        <div class="card glass p-4">
+          <h2 class="h6 mb-3">Danger zone</h2>
+          <p class="text-fg-3 small">Deleting your account removes all licensing selections and access. You can recreate an account at any time.</p>
+          <button class="btn btn-outline-danger w-100" id="deleteAccount">Delete account</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const workspaceState = {
+      user: null,
+      platforms: []
+    };
+
+    async function fetchWorkspace() {
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        if (res.status === 401) {
+          window.location.href = '/login.html';
+          return;
+        }
+        const json = await res.json();
+        workspaceState.user = json.user;
+        workspaceState.platforms = json.platforms || [];
+        renderWorkspace();
+      } catch (err) {
+        document.getElementById('workspaceGreeting').textContent = 'Unable to load workspace';
+      }
+    }
+
+    function renderWorkspace() {
+      const { user, platforms } = workspaceState;
+      if (!user) return;
+      document.getElementById('workspaceGreeting').textContent = `Welcome, ${user.name || user.email}`;
+      document.getElementById('licenseStatus').textContent = user.licenseTier === 'business' ? 'Business license' : 'Personal license';
+
+      document.getElementById('workspaceLicensePersonal').checked = user.licenseTier === 'personal';
+      document.getElementById('workspaceLicenseBusiness').checked = user.licenseTier === 'business';
+
+      const activeSet = new Set(user.platformAccess || []);
+      const platformCheckboxes = document.querySelectorAll('#licenseForm input[name="platformAccess"]');
+      platformCheckboxes.forEach(cb => {
+        cb.checked = activeSet.has(cb.value);
+      });
+      syncLicenseAvailability();
+
+      document.getElementById('profileName').value = user.name || '';
+      document.getElementById('profileCompany').value = user.company || '';
+      document.getElementById('profileRole').value = user.role || '';
+      document.getElementById('profileIndustry').value = user.industry || '';
+
+      const container = document.getElementById('platformCards');
+      container.innerHTML = '';
+      platforms.forEach(platform => {
+        const isActive = activeSet.has(platform.id);
+        const col = document.createElement('div');
+        col.className = 'col-md-6';
+        col.innerHTML = `
+          <div class="card glass h-100 p-3">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div>
+                <h3 class="h6 mb-1">${platform.name}</h3>
+                <p class="text-fg-3 small mb-2">${platform.summary}</p>
+              </div>
+              <span class="badge-soft">${isActive ? 'Active' : 'Not enabled'}</span>
+            </div>
+            <p class="text-fg-2 small mb-0">${platform.strapline}</p>
+          </div>
+        `;
+        container.appendChild(col);
+      });
+    }
+
+    function syncLicenseAvailability() {
+      const tier = document.querySelector('#licenseForm input[name="licenseTier"]:checked')?.value || 'personal';
+      const platformCheckboxes = document.querySelectorAll('#licenseForm input[name="platformAccess"]');
+      platformCheckboxes.forEach(cb => {
+        const businessOnly = cb.dataset.businessOnly === 'true';
+        if (tier === 'personal') {
+          cb.checked = cb.value === 'valuesphere';
+          cb.disabled = businessOnly || cb.value !== 'valuesphere';
+        } else {
+          cb.disabled = false;
+          if (cb.value === 'valuesphere') cb.checked = true;
+        }
+      });
+    }
+
+    document.querySelectorAll('#licenseForm input[name="licenseTier"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        syncLicenseAvailability();
+      });
+    });
+
+    const licenseForm = document.getElementById('licenseForm');
+    if (licenseForm) {
+      licenseForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = document.getElementById('licenseSubmit');
+        const feedback = document.getElementById('licenseFeedback');
+        feedback.textContent = '';
+        if (submitBtn) submitBtn.disabled = true;
+        const formData = new FormData(licenseForm);
+        const payload = {
+          licenseTier: formData.get('licenseTier'),
+          platformAccess: formData.getAll('platformAccess')
+        };
+        try {
+          const res = await fetch('/api/auth/me', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload)
+          });
+          const json = await res.json();
+          if (res.ok && json.ok) {
+            workspaceState.user = json.user;
+            renderWorkspace();
+            feedback.textContent = 'License updated successfully.';
+          } else {
+            feedback.textContent = json.error || 'Unable to update license.';
+          }
+        } catch (err) {
+          feedback.textContent = 'Network error. Please try again.';
+        } finally {
+          if (submitBtn) submitBtn.disabled = false;
+        }
+      });
+    }
+
+    const profileForm = document.getElementById('profileForm');
+    if (profileForm) {
+      profileForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = document.getElementById('profileSubmit');
+        const feedback = document.getElementById('profileFeedback');
+        feedback.textContent = '';
+        if (submitBtn) submitBtn.disabled = true;
+        const formData = new FormData(profileForm);
+        const payload = {
+          name: formData.get('name') || undefined,
+          company: formData.get('company') || undefined,
+          role: formData.get('role') || undefined,
+          industry: formData.get('industry') || undefined
+        };
+        try {
+          const res = await fetch('/api/auth/me', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload)
+          });
+          const json = await res.json();
+          if (res.ok && json.ok) {
+            workspaceState.user = json.user;
+            renderWorkspace();
+            feedback.textContent = 'Profile updated.';
+          } else {
+            feedback.textContent = json.error || 'Unable to update profile.';
+          }
+        } catch (err) {
+          feedback.textContent = 'Network error. Please try again.';
+        } finally {
+          if (submitBtn) submitBtn.disabled = false;
+        }
+      });
+    }
+
+    const logoutButton = document.getElementById('logoutButton');
+    if (logoutButton) {
+      logoutButton.addEventListener('click', async () => {
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+        window.location.href = '/';
+      });
+    }
+
+    const deleteButton = document.getElementById('deleteAccount');
+    if (deleteButton) {
+      deleteButton.addEventListener('click', async () => {
+        if (!confirm('Are you sure you want to delete your account?')) return;
+        await fetch('/api/auth/me', { method: 'DELETE', credentials: 'include' });
+        window.location.href = '/';
+      });
+    }
+
+    fetchWorkspace();
+  </script>
+</body>
+</html>
