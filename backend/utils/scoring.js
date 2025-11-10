@@ -1,12 +1,14 @@
 export const scoreAssessment = (model, responses = []) => {
-  if (!model?.schema?.sections) {
+  const definition =
+    model?.definition || (Array.isArray(model?.schema?.sections) ? model.schema : null);
+  if (!definition?.sections) {
     return { bySection: {}, overall: 0 };
   }
   const sectionScores = {};
   let totalWeight = 0;
   let weightedScore = 0;
 
-  model.schema.sections.forEach((section) => {
+  definition.sections.forEach((section) => {
     const sectionWeight = section.weight || 1;
     const questionScores = section.questions.map((question) => {
       const response = responses.find((r) => r.questionId === question.id);

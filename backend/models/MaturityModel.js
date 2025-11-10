@@ -22,16 +22,32 @@ const SectionSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const DefinitionSchema = new mongoose.Schema(
+  {
+    sections: [SectionSchema]
+  },
+  { _id: false }
+);
+
 const MaturityModelSchema = new mongoose.Schema(
   {
     type: { type: String, required: true },
     version: { type: String, required: true },
-    schema: {
-      sections: [SectionSchema]
-    }
+    definition: DefinitionSchema
   },
   { timestamps: true }
 );
+
+const applySchemaTransform = (doc, ret) => {
+  if (ret.definition !== undefined) {
+    ret.schema = ret.definition;
+    delete ret.definition;
+  }
+  return ret;
+};
+
+MaturityModelSchema.set('toJSON', { transform: applySchemaTransform });
+MaturityModelSchema.set('toObject', { transform: applySchemaTransform });
 
 MaturityModelSchema.index({ type: 1, version: 1 }, { unique: true });
 

@@ -14,6 +14,8 @@ const state = {
   projects: []
 };
 
+const getSchemaDefinition = (model) => model?.schema || model?.definition || null;
+
 const fetchJson = async (url, options = {}) => {
   const res = await fetch(url, {
     credentials: 'include',
@@ -64,7 +66,8 @@ const selectModel = (model) => {
   assessmentForm.hidden = false;
   emptyState.hidden = true;
   schemaContainer.innerHTML = '';
-  (model.schema?.sections || []).forEach((section) => {
+  const schema = getSchemaDefinition(model);
+  (schema?.sections || []).forEach((section) => {
     const sectionBlock = document.createElement('div');
     sectionBlock.className = 'glass p-4';
     sectionBlock.innerHTML = `<h3 class="h5 mb-3">${section.title}</h3>`;
@@ -110,7 +113,10 @@ const loadData = async () => {
       fetchJson('/api/maturity-models'),
       fetchJson('/api/projects')
     ]);
-    state.models = modelResponse.models || [];
+    state.models = (modelResponse.models || []).map((model) => ({
+      ...model,
+      schema: getSchemaDefinition(model)
+    }));
     state.projects = projectResponse.projects || [];
     renderModelList();
     renderProjects();
@@ -124,7 +130,8 @@ assessmentForm?.addEventListener('submit', async (event) => {
   if (!state.selectedModel) return;
   const formData = new FormData(assessmentForm);
   const responses = [];
-  (state.selectedModel.schema?.sections || []).forEach((section) => {
+  const schema = getSchemaDefinition(state.selectedModel);
+  (schema?.sections || []).forEach((section) => {
     (section.questions || []).forEach((question) => {
       const fieldId = `question-${question.id}`;
       const raw = formData.get(fieldId);
