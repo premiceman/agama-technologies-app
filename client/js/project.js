@@ -38,9 +38,12 @@ const loadProject = async () => {
   try {
     const { project } = await fetchJSON(`/api/projects/${projectId}`);
     elements.name.textContent = project.name;
-    elements.purpose.textContent = project.purpose || 'No summary provided yet.';
+    elements.purpose.textContent =
+      project.purpose || 'No summary provided yet.';
     elements.tags.innerHTML = (project.tags || [])
-      .map((tag) => `<span class="badge bg-secondary text-uppercase">${tag}</span>`)
+      .map(
+        (tag) => `<span class="badge bg-secondary text-uppercase">${tag}</span>`
+      )
       .join('');
     const metaHtml = `
       <dt class="col-5 text-fg-3">Organisation</dt>
@@ -62,10 +65,13 @@ const loadProject = async () => {
 
 const loadAssessments = async () => {
   if (!elements.assessmentList) return;
-  elements.assessmentList.innerHTML = '<p class="text-fg-3">Loading assessments…</p>';
+  elements.assessmentList.innerHTML =
+    '<p class="text-fg-3">Loading assessments…</p>';
   try {
     const { assessments } = await fetchJSON('/api/assessments');
-    const filtered = (assessments || []).filter((item) => String(item.projectId) === String(projectId));
+    const filtered = (assessments || []).filter(
+      (item) => String(item.projectId) === String(projectId)
+    );
     if (filtered.length === 0) {
       elements.assessmentList.innerHTML =
         '<div class="glass p-4">No assessments yet. Launch one to benchmark maturity.</div>';
@@ -86,7 +92,8 @@ const loadAssessments = async () => {
       .join('');
   } catch (err) {
     console.error(err);
-    elements.assessmentList.innerHTML = '<p class="text-danger">Unable to load assessments.</p>';
+    elements.assessmentList.innerHTML =
+      '<p class="text-danger">Unable to load assessments.</p>';
   }
 };
 
@@ -99,10 +106,13 @@ const loadRfx = async () => {
   elements.rfxList.innerHTML = '<p class="text-fg-3">Loading RFX…</p>';
   try {
     const { rfx } = await fetchJSON('/api/rfx');
-    const filtered = (rfx || []).filter((item) => String(item.projectId) === String(projectId));
+    const filtered = (rfx || []).filter(
+      (item) => String(item.projectId) === String(projectId)
+    );
     state.rfxIds = filtered.map((entry) => String(entry._id));
     if (filtered.length === 0) {
-      elements.rfxList.innerHTML = '<div class="glass p-4">No RFX packages created yet.</div>';
+      elements.rfxList.innerHTML =
+        '<div class="glass p-4">No RFX packages created yet.</div>';
       return;
     }
     elements.rfxList.innerHTML = filtered
@@ -120,13 +130,15 @@ const loadRfx = async () => {
       .join('');
   } catch (err) {
     console.error(err);
-    elements.rfxList.innerHTML = '<p class="text-danger">Unable to load RFX data.</p>';
+    elements.rfxList.innerHTML =
+      '<p class="text-danger">Unable to load RFX data.</p>';
   }
 };
 
 const loadComparisons = async () => {
   if (!elements.comparisonList) return;
-  elements.comparisonList.innerHTML = '<p class="text-fg-3">Loading comparisons…</p>';
+  elements.comparisonList.innerHTML =
+    '<p class="text-fg-3">Loading comparisons…</p>';
   try {
     const { comparisons } = await fetchJSON('/api/comparisons');
     const filtered = (comparisons || []).filter((entry) => {
@@ -134,13 +146,17 @@ const loadComparisons = async () => {
       return state.rfxIds.includes(rfxId);
     });
     if (filtered.length === 0) {
-      elements.comparisonList.innerHTML = '<div class="glass p-4">No comparisons generated yet.</div>';
+      elements.comparisonList.innerHTML =
+        '<div class="glass p-4">No comparisons generated yet.</div>';
       return;
     }
     elements.comparisonList.innerHTML = filtered
       .map((entry) => {
         const results = (entry.results || [])
-          .map((result) => `<li>Vendor ${result.vendorId}: ${result.score.toFixed(2)} (Rank ${result.rank})</li>`) // eslint-disable-line
+          .map(
+            (result) =>
+              `<li>Vendor ${result.vendorId}: ${result.score.toFixed(2)} (Rank ${result.rank})</li>`
+          ) // eslint-disable-line
           .join('');
         return `
           <div class="glass p-4">
@@ -152,17 +168,20 @@ const loadComparisons = async () => {
       .join('');
   } catch (err) {
     console.error(err);
-    elements.comparisonList.innerHTML = '<p class="text-danger">Unable to load comparisons.</p>';
+    elements.comparisonList.innerHTML =
+      '<p class="text-danger">Unable to load comparisons.</p>';
   }
 };
 
 const loadRoadmap = async () => {
   if (!elements.roadmapSummary) return;
-  elements.roadmapSummary.innerHTML = '<p class="text-fg-3">Loading roadmap…</p>';
+  elements.roadmapSummary.innerHTML =
+    '<p class="text-fg-3">Loading roadmap…</p>';
   try {
     const { roadmap } = await fetchJSON(`/api/roadmaps/project/${projectId}`);
     if (!roadmap || (roadmap.initiatives || []).length === 0) {
-      elements.roadmapSummary.innerHTML = '<div class="glass p-4">Roadmap not generated yet.</div>';
+      elements.roadmapSummary.innerHTML =
+        '<div class="glass p-4">Roadmap not generated yet.</div>';
       return;
     }
     elements.roadmapSummary.innerHTML = (roadmap.initiatives || [])
@@ -172,15 +191,16 @@ const loadRoadmap = async () => {
             <h3 class="h6 mb-1">${item.title}</h3>
             <p class="text-fg-3 mb-2">${item.description || ''}</p>
             <small class="text-fg-3">${item.start ? new Date(item.start).toLocaleDateString() : 'TBD'} → ${
-          item.end ? new Date(item.end).toLocaleDateString() : 'TBD'
-        }</small>
+              item.end ? new Date(item.end).toLocaleDateString() : 'TBD'
+            }</small>
           </div>
         `
       )
       .join('');
   } catch (err) {
     console.error(err);
-    elements.roadmapSummary.innerHTML = '<p class="text-danger">Unable to load roadmap.</p>';
+    elements.roadmapSummary.innerHTML =
+      '<p class="text-danger">Unable to load roadmap.</p>';
   }
 };
 
@@ -188,9 +208,12 @@ const loadSessions = async () => {
   if (!elements.sessionList) return;
   elements.sessionList.innerHTML = '<p class="text-fg-3">Loading sessions…</p>';
   try {
-    const { sessions } = await fetchJSON(`/api/consulting-sessions?projectId=${projectId}`);
+    const { sessions } = await fetchJSON(
+      `/api/consulting-sessions?projectId=${projectId}`
+    );
     if (!sessions || sessions.length === 0) {
-      elements.sessionList.innerHTML = '<div class="glass p-4">No consulting sessions recorded yet.</div>';
+      elements.sessionList.innerHTML =
+        '<div class="glass p-4">No consulting sessions recorded yet.</div>';
       return;
     }
     elements.sessionList.innerHTML = sessions
@@ -206,7 +229,8 @@ const loadSessions = async () => {
       .join('');
   } catch (err) {
     console.error(err);
-    elements.sessionList.innerHTML = '<p class="text-danger">Unable to load sessions.</p>';
+    elements.sessionList.innerHTML =
+      '<p class="text-danger">Unable to load sessions.</p>';
   }
 };
 
@@ -220,7 +244,8 @@ const refreshCopilot = async () => {
     });
     const initiatives = roadmap?.initiatives || [];
     if (initiatives.length === 0) {
-      elements.copilot.innerHTML = '<p class="text-fg-3">No recommendations yet. Generate an assessment to unlock insights.</p>';
+      elements.copilot.innerHTML =
+        '<p class="text-fg-3">No recommendations yet. Generate an assessment to unlock insights.</p>';
       return;
     }
     elements.copilot.innerHTML = initiatives
@@ -236,7 +261,8 @@ const refreshCopilot = async () => {
       .join('');
   } catch (err) {
     console.error(err);
-    elements.copilot.innerHTML = '<p class="text-danger">Copilot is unavailable right now.</p>';
+    elements.copilot.innerHTML =
+      '<p class="text-danger">Copilot is unavailable right now.</p>';
   }
 };
 
@@ -266,7 +292,9 @@ elements.settingsForm?.addEventListener('submit', async (event) => {
 
 const initTabs = () => {
   if (!elements.tabs) return;
-  const buttons = Array.from(elements.tabs.querySelectorAll('button[data-tab]'));
+  const buttons = Array.from(
+    elements.tabs.querySelectorAll('button[data-tab]')
+  );
   buttons.forEach((button) => {
     button.addEventListener('click', () => {
       const tabName = button.dataset.tab;
@@ -281,7 +309,13 @@ const initTabs = () => {
 const bootstrap = async () => {
   initTabs();
   await loadProject();
-  await Promise.all([loadAssessments(), loadRfx(), loadComparisons(), loadRoadmap(), loadSessions()]);
+  await Promise.all([
+    loadAssessments(),
+    loadRfx(),
+    loadComparisons(),
+    loadRoadmap(),
+    loadSessions()
+  ]);
   refreshCopilot();
 };
 

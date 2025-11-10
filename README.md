@@ -86,19 +86,19 @@ Credentials created by the seed script:
 
 ## API Surface
 
-| Route | Description |
-|-------|-------------|
-| `POST /api/auth/register` / `POST /api/auth/login` | Email/password authentication with session cookies. |
-| `GET/POST/PUT/DELETE /api/orgs` | Organisation CRUD with audit logging; nested `/api/orgs/:id/bus` manages business units. |
-| `GET/POST/PUT/DELETE /api/projects` | Project workspace management with RBAC enforcement. |
-| `GET /api/maturity-models` | List schema-driven assessment templates. |
-| `POST /api/assessments` | Create assessments and auto-score against the active model. |
-| `POST /api/rfx` | Create structured RFX packages; `/invite` adds vendors. |
-| `POST /api/vendor-responses` | Vendor portal endpoints for drafting and submitting responses. |
-| `POST /api/comparisons` | Aggregate vendor scores and capture comparison commentary. |
-| `POST /api/roadmaps/create-from-assessments` | Compose initiatives from assessment gaps via AI. |
-| `POST /api/consulting-sessions` | Log consulting sessions and transform notes into actions/risks/decisions. |
-| `POST /api/ai/*` | Deterministic OpenAI helpers for schema drafting, RFX generation, scoring, comparisons, roadmaps, and consulting copilot. |
+| Route                                              | Description                                                                                                               |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/auth/register` / `POST /api/auth/login` | Email/password authentication with session cookies.                                                                       |
+| `GET/POST/PUT/DELETE /api/orgs`                    | Organisation CRUD with audit logging; nested `/api/orgs/:id/bus` manages business units.                                  |
+| `GET/POST/PUT/DELETE /api/projects`                | Project workspace management with RBAC enforcement.                                                                       |
+| `GET /api/maturity-models`                         | List schema-driven assessment templates.                                                                                  |
+| `POST /api/assessments`                            | Create assessments and auto-score against the active model.                                                               |
+| `POST /api/rfx`                                    | Create structured RFX packages; `/invite` adds vendors.                                                                   |
+| `POST /api/vendor-responses`                       | Vendor portal endpoints for drafting and submitting responses.                                                            |
+| `POST /api/comparisons`                            | Aggregate vendor scores and capture comparison commentary.                                                                |
+| `POST /api/roadmaps/create-from-assessments`       | Compose initiatives from assessment gaps via AI.                                                                          |
+| `POST /api/consulting-sessions`                    | Log consulting sessions and transform notes into actions/risks/decisions.                                                 |
+| `POST /api/ai/*`                                   | Deterministic OpenAI helpers for schema drafting, RFX generation, scoring, comparisons, roadmaps, and consulting copilot. |
 
 All mutating operations emit `AuditEvent` records for downstream analytics and compliance.
 
@@ -123,4 +123,3 @@ Near-term backlog includes:
 - Evidence locker with integrity hashing and provenance.
 
 Mid-term and long-term goals cover scenario planning, compliance packs, vendor benchmarking, portfolio heatmaps, and the full Agama Vendor portal GA launch with contract intelligence and integration graph analytics.
-

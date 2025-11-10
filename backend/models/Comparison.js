@@ -2,7 +2,11 @@ import mongoose from 'mongoose';
 
 const ResultSchema = new mongoose.Schema(
   {
-    vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'VendorProfile', required: true },
+    vendorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'VendorProfile',
+      required: true
+    },
     score: { type: Number, required: true },
     rank: { type: Number, required: true }
   },

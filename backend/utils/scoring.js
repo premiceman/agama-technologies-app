@@ -1,6 +1,7 @@
 export const scoreAssessment = (model, responses = []) => {
   const definition =
-    model?.definition || (Array.isArray(model?.schema?.sections) ? model.schema : null);
+    model?.definition ||
+    (Array.isArray(model?.schema?.sections) ? model.schema : null);
   if (!definition?.sections) {
     return { bySection: {}, overall: 0 };
   }
@@ -12,12 +13,14 @@ export const scoreAssessment = (model, responses = []) => {
     const sectionWeight = section.weight || 1;
     const questionScores = section.questions.map((question) => {
       const response = responses.find((r) => r.questionId === question.id);
-      const numericValue = typeof response?.value === 'number' ? response.value : 0;
+      const numericValue =
+        typeof response?.value === 'number' ? response.value : 0;
       return numericValue;
     });
     const avg =
       questionScores.length > 0
-        ? questionScores.reduce((sum, value) => sum + value, 0) / questionScores.length
+        ? questionScores.reduce((sum, value) => sum + value, 0) /
+          questionScores.length
         : 0;
     sectionScores[section.id] = {
       title: section.title,

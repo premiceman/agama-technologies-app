@@ -42,7 +42,9 @@ router.get('/:orgId', requireAuth, async (req, res, next) => {
     if (!organisation) {
       return res.status(404).json({ message: 'Organisation not found' });
     }
-    const hasAccess = req.user.org_roles?.some((role) => role.orgId?.toString() === organisation._id.toString());
+    const hasAccess = req.user.org_roles?.some(
+      (role) => role.orgId?.toString() === organisation._id.toString()
+    );
     if (!hasAccess) {
       return res.status(403).json({ message: 'No organisation access' });
     }
@@ -54,11 +56,17 @@ router.get('/:orgId', requireAuth, async (req, res, next) => {
 
 router.put('/:orgId', requireAuth, async (req, res, next) => {
   try {
-    const hasAccess = req.user.org_roles?.some((role) => role.orgId?.toString() === req.params.orgId);
+    const hasAccess = req.user.org_roles?.some(
+      (role) => role.orgId?.toString() === req.params.orgId
+    );
     if (!hasAccess) {
       return res.status(403).json({ message: 'No organisation access' });
     }
-    const organisation = await Organisation.findByIdAndUpdate(req.params.orgId, req.body, { new: true });
+    const organisation = await Organisation.findByIdAndUpdate(
+      req.params.orgId,
+      req.body,
+      { new: true }
+    );
     if (!organisation) {
       return res.status(404).json({ message: 'Organisation not found' });
     }
@@ -77,7 +85,9 @@ router.put('/:orgId', requireAuth, async (req, res, next) => {
 
 router.delete('/:orgId', requireAuth, async (req, res, next) => {
   try {
-    const hasAccess = req.user.org_roles?.some((role) => role.orgId?.toString() === req.params.orgId);
+    const hasAccess = req.user.org_roles?.some(
+      (role) => role.orgId?.toString() === req.params.orgId
+    );
     if (!hasAccess) {
       return res.status(403).json({ message: 'No organisation access' });
     }
@@ -100,7 +110,9 @@ router.delete('/:orgId', requireAuth, async (req, res, next) => {
 
 router.get('/:orgId/bus', requireAuth, async (req, res, next) => {
   try {
-    const hasAccess = req.user.org_roles?.some((role) => role.orgId?.toString() === req.params.orgId);
+    const hasAccess = req.user.org_roles?.some(
+      (role) => role.orgId?.toString() === req.params.orgId
+    );
     if (!hasAccess) {
       return res.status(403).json({ message: 'No organisation access' });
     }
@@ -113,11 +125,16 @@ router.get('/:orgId/bus', requireAuth, async (req, res, next) => {
 
 router.post('/:orgId/bus', requireAuth, async (req, res, next) => {
   try {
-    const hasAccess = req.user.org_roles?.some((role) => role.orgId?.toString() === req.params.orgId);
+    const hasAccess = req.user.org_roles?.some(
+      (role) => role.orgId?.toString() === req.params.orgId
+    );
     if (!hasAccess) {
       return res.status(403).json({ message: 'No organisation access' });
     }
-    const unit = await BusinessUnit.create({ orgId: req.params.orgId, ...req.body });
+    const unit = await BusinessUnit.create({
+      orgId: req.params.orgId,
+      ...req.body
+    });
     await recordAuditEvent({
       actorId: req.user._id || req.user.id,
       entityType: 'businessUnit',
@@ -133,11 +150,17 @@ router.post('/:orgId/bus', requireAuth, async (req, res, next) => {
 
 router.put('/:orgId/bus/:buId', requireAuth, async (req, res, next) => {
   try {
-    const hasAccess = req.user.org_roles?.some((role) => role.orgId?.toString() === req.params.orgId);
+    const hasAccess = req.user.org_roles?.some(
+      (role) => role.orgId?.toString() === req.params.orgId
+    );
     if (!hasAccess) {
       return res.status(403).json({ message: 'No organisation access' });
     }
-    const unit = await BusinessUnit.findByIdAndUpdate(req.params.buId, req.body, { new: true });
+    const unit = await BusinessUnit.findByIdAndUpdate(
+      req.params.buId,
+      req.body,
+      { new: true }
+    );
     if (!unit) {
       return res.status(404).json({ message: 'Business unit not found' });
     }
@@ -156,7 +179,9 @@ router.put('/:orgId/bus/:buId', requireAuth, async (req, res, next) => {
 
 router.delete('/:orgId/bus/:buId', requireAuth, async (req, res, next) => {
   try {
-    const hasAccess = req.user.org_roles?.some((role) => role.orgId?.toString() === req.params.orgId);
+    const hasAccess = req.user.org_roles?.some(
+      (role) => role.orgId?.toString() === req.params.orgId
+    );
     if (!hasAccess) {
       return res.status(403).json({ message: 'No organisation access' });
     }

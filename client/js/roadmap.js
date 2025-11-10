@@ -23,7 +23,8 @@ const fetchJson = async (url, options = {}) => {
 const renderInitiatives = () => {
   initiativesContainer.innerHTML = '';
   if (!state.roadmap || (state.roadmap.initiatives || []).length === 0) {
-    initiativesContainer.innerHTML = '<div class="glass p-4">No initiatives yet. Generate from assessments or add manually.</div>';
+    initiativesContainer.innerHTML =
+      '<div class="glass p-4">No initiatives yet. Generate from assessments or add manually.</div>';
     return;
   }
   state.roadmap.initiatives.forEach((initiative, index) => {
@@ -51,13 +52,17 @@ const renderInitiatives = () => {
           <div class="col-md-4">
             <label class="form-label" for="initiative-start-${initiative.id}">Start</label>
             <input class="form-control" id="initiative-start-${initiative.id}" type="date" value="${
-              initiative.start ? new Date(initiative.start).toISOString().slice(0, 10) : ''
+              initiative.start
+                ? new Date(initiative.start).toISOString().slice(0, 10)
+                : ''
             }" />
           </div>
           <div class="col-md-4">
             <label class="form-label" for="initiative-end-${initiative.id}">End</label>
             <input class="form-control" id="initiative-end-${initiative.id}" type="date" value="${
-              initiative.end ? new Date(initiative.end).toISOString().slice(0, 10) : ''
+              initiative.end
+                ? new Date(initiative.end).toISOString().slice(0, 10)
+                : ''
             }" />
           </div>
         </div>
@@ -75,34 +80,54 @@ const renderInitiatives = () => {
     `;
     initiativesContainer.appendChild(card);
 
-    card.querySelector(`#initiative-title-${initiative.id}`).addEventListener('input', (event) => {
-      initiative.title = event.target.value;
-    });
-    card.querySelector(`#initiative-desc-${initiative.id}`).addEventListener('input', (event) => {
-      initiative.description = event.target.value;
-    });
-    card.querySelector(`#initiative-owner-${initiative.id}`).addEventListener('input', (event) => {
-      initiative.owner = event.target.value;
-    });
-    card.querySelector(`#initiative-start-${initiative.id}`).addEventListener('change', (event) => {
-      initiative.start = event.target.value ? new Date(event.target.value).toISOString() : null;
-    });
-    card.querySelector(`#initiative-end-${initiative.id}`).addEventListener('change', (event) => {
-      initiative.end = event.target.value ? new Date(event.target.value).toISOString() : null;
-    });
-    card.querySelector(`#initiative-risk-${initiative.id}`).addEventListener('input', (event) => {
-      initiative.risk = event.target.value;
-    });
-    card.querySelector(`#initiative-kpi-${initiative.id}`).addEventListener('input', (event) => {
-      initiative.kpis = event.target.value
-        .split(',')
-        .map((entry) => entry.trim())
-        .filter(Boolean);
-    });
-    card.querySelector(`[data-remove="${initiative.id}"]`).addEventListener('click', () => {
-      state.roadmap.initiatives.splice(index, 1);
-      renderInitiatives();
-    });
+    card
+      .querySelector(`#initiative-title-${initiative.id}`)
+      .addEventListener('input', (event) => {
+        initiative.title = event.target.value;
+      });
+    card
+      .querySelector(`#initiative-desc-${initiative.id}`)
+      .addEventListener('input', (event) => {
+        initiative.description = event.target.value;
+      });
+    card
+      .querySelector(`#initiative-owner-${initiative.id}`)
+      .addEventListener('input', (event) => {
+        initiative.owner = event.target.value;
+      });
+    card
+      .querySelector(`#initiative-start-${initiative.id}`)
+      .addEventListener('change', (event) => {
+        initiative.start = event.target.value
+          ? new Date(event.target.value).toISOString()
+          : null;
+      });
+    card
+      .querySelector(`#initiative-end-${initiative.id}`)
+      .addEventListener('change', (event) => {
+        initiative.end = event.target.value
+          ? new Date(event.target.value).toISOString()
+          : null;
+      });
+    card
+      .querySelector(`#initiative-risk-${initiative.id}`)
+      .addEventListener('input', (event) => {
+        initiative.risk = event.target.value;
+      });
+    card
+      .querySelector(`#initiative-kpi-${initiative.id}`)
+      .addEventListener('input', (event) => {
+        initiative.kpis = event.target.value
+          .split(',')
+          .map((entry) => entry.trim())
+          .filter(Boolean);
+      });
+    card
+      .querySelector(`[data-remove="${initiative.id}"]`)
+      .addEventListener('click', () => {
+        state.roadmap.initiatives.splice(index, 1);
+        renderInitiatives();
+      });
   });
 };
 
@@ -143,10 +168,13 @@ const generateRoadmap = async () => {
   const projectId = projectSelect.value;
   if (!projectId) return;
   try {
-    const { roadmap } = await fetchJson('/api/roadmaps/create-from-assessments', {
-      method: 'POST',
-      body: JSON.stringify({ projectId, targets: {} })
-    });
+    const { roadmap } = await fetchJson(
+      '/api/roadmaps/create-from-assessments',
+      {
+        method: 'POST',
+        body: JSON.stringify({ projectId, targets: {} })
+      }
+    );
     state.roadmap = roadmap;
     renderInitiatives();
     loadCopilot(projectId);
@@ -173,10 +201,17 @@ const saveRoadmap = async () => {
         body: JSON.stringify(payload)
       });
     } else {
-      const { roadmap } = await fetchJson('/api/roadmaps/create-from-assessments', {
-        method: 'POST',
-        body: JSON.stringify({ projectId, targets: {}, initiatives: payload.initiatives })
-      });
+      const { roadmap } = await fetchJson(
+        '/api/roadmaps/create-from-assessments',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            projectId,
+            targets: {},
+            initiatives: payload.initiatives
+          })
+        }
+      );
       state.roadmap = roadmap;
     }
   } catch (err) {
@@ -196,7 +231,8 @@ const loadCopilot = async (projectId) => {
     });
     const initiatives = roadmap?.initiatives || [];
     if (initiatives.length === 0) {
-      copilotContainer.innerHTML = '<p class="text-fg-3">No suggestions yet.</p>';
+      copilotContainer.innerHTML =
+        '<p class="text-fg-3">No suggestions yet.</p>';
       return;
     }
     copilotContainer.innerHTML = initiatives
@@ -212,7 +248,8 @@ const loadCopilot = async (projectId) => {
       .join('');
   } catch (err) {
     console.error('Failed to load copilot insights', err);
-    copilotContainer.innerHTML = '<p class="text-danger">Copilot unavailable.</p>';
+    copilotContainer.innerHTML =
+      '<p class="text-danger">Copilot unavailable.</p>';
   }
 };
 

@@ -31,25 +31,39 @@ router.post('/rfx/draft', requireAuth, async (req, res, next) => {
   }
 });
 
-router.post('/vendor-responses/:responseId/autoscore', requireAuth, async (req, res, next) => {
-  try {
-    const { rfxId } = req.body;
-    const scores = await autoscoreVendorResponse(rfxId, req.params.responseId);
-    res.json({ scores });
-  } catch (err) {
-    next(err);
+router.post(
+  '/vendor-responses/:responseId/autoscore',
+  requireAuth,
+  async (req, res, next) => {
+    try {
+      const { rfxId } = req.body;
+      const scores = await autoscoreVendorResponse(
+        rfxId,
+        req.params.responseId
+      );
+      res.json({ scores });
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
-router.post('/comparisons/:comparisonId/narrative', requireAuth, async (req, res, next) => {
-  try {
-    const { rfxId } = req.body;
-    const narrative = await composeComparisonNarrative(rfxId, req.params.comparisonId);
-    res.json({ narrative });
-  } catch (err) {
-    next(err);
+router.post(
+  '/comparisons/:comparisonId/narrative',
+  requireAuth,
+  async (req, res, next) => {
+    try {
+      const { rfxId } = req.body;
+      const narrative = await composeComparisonNarrative(
+        rfxId,
+        req.params.comparisonId
+      );
+      res.json({ narrative });
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
 router.post('/roadmaps/compose', requireAuth, async (req, res, next) => {
   try {
@@ -61,13 +75,17 @@ router.post('/roadmaps/compose', requireAuth, async (req, res, next) => {
   }
 });
 
-router.post('/consulting/:sessionId/structure', requireAuth, async (req, res, next) => {
-  try {
-    const structured = await structureConsultingNotes(req.params.sessionId);
-    res.json({ structured });
-  } catch (err) {
-    next(err);
+router.post(
+  '/consulting/:sessionId/structure',
+  requireAuth,
+  async (req, res, next) => {
+    try {
+      const structured = await structureConsultingNotes(req.params.sessionId);
+      res.json({ structured });
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
 export default router;

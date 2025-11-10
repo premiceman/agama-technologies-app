@@ -39,7 +39,8 @@ const loadProjects = async () => {
 const renderSessions = () => {
   historyContainer.innerHTML = '';
   if (!state.sessions.length) {
-    historyContainer.innerHTML = '<div class="glass p-4">No sessions logged yet.</div>';
+    historyContainer.innerHTML =
+      '<div class="glass p-4">No sessions logged yet.</div>';
     copilotContainer.innerHTML = '';
     return;
   }
@@ -77,8 +78,12 @@ const renderSessions = () => {
 
 const loadSessions = async (projectId) => {
   try {
-    const { sessions } = await fetchJson(`/api/consulting-sessions?projectId=${projectId}`);
-    state.sessions = (sessions || []).sort((a, b) => new Date(b.date) - new Date(a.date));
+    const { sessions } = await fetchJson(
+      `/api/consulting-sessions?projectId=${projectId}`
+    );
+    state.sessions = (sessions || []).sort(
+      (a, b) => new Date(b.date) - new Date(a.date)
+    );
     renderSessions();
   } catch (err) {
     console.error('Failed to load sessions', err);

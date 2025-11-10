@@ -45,29 +45,32 @@ export const generateAssessmentModel = async (industry, size, domains = []) => {
     domains
   )}.`;
   const result = await invokeModel(systemPrompt, userPrompt);
-  return result || fallback({
-    type: 'custom',
-    version: 'draft-1',
-    schema: {
-      sections: domains.map((domain, index) => ({
-        id: `${domain.toLowerCase()}-${index + 1}`,
-        title: domain,
-        weight: 1,
-        questions: [
-          {
-            id: `${domain.toLowerCase()}-q1`,
-            type: 'scale',
-            text: `Rate ${domain} maturity (1-5)` ,
-            weight: 1,
-            level_map: {
-              '1': 'Initial',
-              '5': 'Optimised'
+  return (
+    result ||
+    fallback({
+      type: 'custom',
+      version: 'draft-1',
+      schema: {
+        sections: domains.map((domain, index) => ({
+          id: `${domain.toLowerCase()}-${index + 1}`,
+          title: domain,
+          weight: 1,
+          questions: [
+            {
+              id: `${domain.toLowerCase()}-q1`,
+              type: 'scale',
+              text: `Rate ${domain} maturity (1-5)`,
+              weight: 1,
+              level_map: {
+                1: 'Initial',
+                5: 'Optimised'
+              }
             }
-          }
-        ]
-      }))
-    }
-  });
+          ]
+        }))
+      }
+    })
+  );
 };
 
 export const draftRfx = async (projectId, contextIds = []) => {
@@ -83,7 +86,12 @@ export const draftRfx = async (projectId, contextIds = []) => {
           id: 'business-context',
           title: 'Business Context',
           questions: [
-            { id: 'bc-1', type: 'text', text: 'Describe your current state.', weight: 1 }
+            {
+              id: 'bc-1',
+              type: 'text',
+              text: 'Describe your current state.',
+              weight: 1
+            }
           ]
         }
       ],
@@ -113,7 +121,8 @@ export const composeComparisonNarrative = async (rfxId, comparisonId) => {
   );
   return (
     result || {
-      narrative: 'Vendor A leads due to stronger alignment with weighted requirements.',
+      narrative:
+        'Vendor A leads due to stronger alignment with weighted requirements.',
       highlights: ['Vendor A excels in integration readiness.']
     }
   );

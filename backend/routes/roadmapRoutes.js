@@ -10,7 +10,9 @@ const router = Router();
 router.get('/project/:projectId', requireAuth, async (req, res, next) => {
   try {
     const { projectId } = req.params;
-    const hasAccess = req.user.project_roles?.some((role) => role.projectId?.toString() === projectId?.toString());
+    const hasAccess = req.user.project_roles?.some(
+      (role) => role.projectId?.toString() === projectId?.toString()
+    );
     if (!hasAccess) {
       return res.status(403).json({ message: 'No project access' });
     }
@@ -28,7 +30,9 @@ router.post('/create-from-assessments', requireAuth, async (req, res, next) => {
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
-    const hasAccess = req.user.project_roles?.some((role) => role.projectId?.toString() === projectId?.toString());
+    const hasAccess = req.user.project_roles?.some(
+      (role) => role.projectId?.toString() === projectId?.toString()
+    );
     if (!hasAccess) {
       return res.status(403).json({ message: 'No project access' });
     }
@@ -59,7 +63,9 @@ router.put('/:roadmapId', requireAuth, async (req, res, next) => {
     if (!roadmap) {
       return res.status(404).json({ message: 'Roadmap not found' });
     }
-    const hasAccess = req.user.project_roles?.some((role) => role.projectId?.toString() === roadmap.projectId.toString());
+    const hasAccess = req.user.project_roles?.some(
+      (role) => role.projectId?.toString() === roadmap.projectId.toString()
+    );
     if (!hasAccess) {
       return res.status(403).json({ message: 'No project access' });
     }

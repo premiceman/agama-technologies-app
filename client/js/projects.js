@@ -35,7 +35,9 @@ const renderProjects = () => {
       ? project.name.toLowerCase().includes(filters.search) ||
         (project.purpose || '').toLowerCase().includes(filters.search)
       : true;
-    const matchesBu = filters.buIds.size === 0 || (project.buId && filters.buIds.has(project.buId));
+    const matchesBu =
+      filters.buIds.size === 0 ||
+      (project.buId && filters.buIds.has(project.buId));
     const matchesTags =
       filters.tags.size === 0 ||
       (project.tags || []).some((tag) => filters.tags.has(tag.toLowerCase()));
@@ -61,7 +63,10 @@ const renderProjects = () => {
         <p class="text-fg-3 flex-grow-1">${project.purpose || 'No summary provided yet.'}</p>
         <div class="d-flex flex-wrap gap-2 mt-3">
           ${(project.tags || [])
-            .map((tag) => `<span class="badge bg-secondary text-uppercase">${tag}</span>`)
+            .map(
+              (tag) =>
+                `<span class="badge bg-secondary text-uppercase">${tag}</span>`
+            )
             .join('')}
         </div>
       </div>
@@ -94,7 +99,9 @@ const renderFilters = () => {
   });
 
   const tags = new Set();
-  state.projects.forEach((project) => (project.tags || []).forEach((tag) => tags.add(tag)));
+  state.projects.forEach((project) =>
+    (project.tags || []).forEach((tag) => tags.add(tag))
+  );
   tagContainer.innerHTML = '';
   Array.from(tags).forEach((tag) => {
     const button = document.createElement('button');
@@ -131,7 +138,9 @@ const populateOrgSelectors = () => {
     buSelect.innerHTML = '<option value="">Select business unit</option>';
     if (!orgId) return;
     try {
-      const res = await fetch(`/api/orgs/${orgId}/bus`, { credentials: 'include' });
+      const res = await fetch(`/api/orgs/${orgId}/bus`, {
+        credentials: 'include'
+      });
       if (!res.ok) return;
       const data = await res.json();
       state.businessUnits[orgId] = data.businessUnits;

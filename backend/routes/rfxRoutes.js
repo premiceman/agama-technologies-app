@@ -10,7 +10,9 @@ const router = Router();
 
 router.get('/', requireAuth, async (req, res, next) => {
   try {
-    const projectIds = (req.user.project_roles || []).map((role) => role.projectId);
+    const projectIds = (req.user.project_roles || []).map(
+      (role) => role.projectId
+    );
     const rfxList = await Rfx.find({ projectId: { $in: projectIds } }).lean();
     res.json({ rfx: rfxList });
   } catch (err) {
@@ -21,7 +23,9 @@ router.get('/', requireAuth, async (req, res, next) => {
 router.post('/', requireAuth, async (req, res, next) => {
   try {
     const { projectId } = req.body;
-    const hasAccess = req.user.project_roles?.some((role) => role.projectId?.toString() === projectId?.toString());
+    const hasAccess = req.user.project_roles?.some(
+      (role) => role.projectId?.toString() === projectId?.toString()
+    );
     if (!hasAccess) {
       return res.status(403).json({ message: 'No project access' });
     }
@@ -49,7 +53,9 @@ router.post('/:rfxId/invite', requireAuth, async (req, res, next) => {
     if (!rfx) {
       return res.status(404).json({ message: 'RFX not found' });
     }
-    const hasAccess = req.user.project_roles?.some((role) => role.projectId?.toString() === rfx.projectId.toString());
+    const hasAccess = req.user.project_roles?.some(
+      (role) => role.projectId?.toString() === rfx.projectId.toString()
+    );
     if (!hasAccess) {
       return res.status(403).json({ message: 'No project access' });
     }
@@ -58,7 +64,9 @@ router.post('/:rfxId/invite', requireAuth, async (req, res, next) => {
     if (!vendor) {
       return res.status(404).json({ message: 'Vendor not found' });
     }
-    rfx.invitedVendorIds = Array.from(new Set([...(rfx.invitedVendorIds || []), vendorId]));
+    rfx.invitedVendorIds = Array.from(
+      new Set([...(rfx.invitedVendorIds || []), vendorId])
+    );
     await rfx.save();
     await recordAuditEvent({
       actorId: req.user._id || req.user.id,
@@ -79,7 +87,9 @@ router.get('/:rfxId', requireAuth, async (req, res, next) => {
     if (!rfx) {
       return res.status(404).json({ message: 'RFX not found' });
     }
-    const hasAccess = req.user.project_roles?.some((role) => role.projectId?.toString() === rfx.projectId.toString());
+    const hasAccess = req.user.project_roles?.some(
+      (role) => role.projectId?.toString() === rfx.projectId.toString()
+    );
     if (!hasAccess) {
       return res.status(403).json({ message: 'No project access' });
     }
@@ -93,7 +103,9 @@ router.post('/:projectId/generate', requireAuth, async (req, res, next) => {
   try {
     const { projectId } = req.params;
     const { contextIds } = req.body;
-    const hasAccess = req.user.project_roles?.some((role) => role.projectId?.toString() === projectId?.toString());
+    const hasAccess = req.user.project_roles?.some(
+      (role) => role.projectId?.toString() === projectId?.toString()
+    );
     if (!hasAccess) {
       return res.status(403).json({ message: 'No project access' });
     }

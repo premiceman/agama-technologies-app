@@ -23,7 +23,11 @@ const SectionSchema = new mongoose.Schema(
 
 const RfxSchema = new mongoose.Schema(
   {
-    projectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },
+    projectId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Project',
+      required: true
+    },
     title: { type: String, required: true },
     sections: [SectionSchema],
     weights: { type: mongoose.Schema.Types.Mixed, default: {} },

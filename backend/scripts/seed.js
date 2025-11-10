@@ -14,7 +14,15 @@ dotenv.config();
 
 const MONGO_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/agama';
 
-const maturityDomains = ['Data', 'AI/ML', 'Security', 'Observability', 'Infrastructure', 'Application', 'Network'];
+const maturityDomains = [
+  'Data',
+  'AI/ML',
+  'Security',
+  'Observability',
+  'Infrastructure',
+  'Application',
+  'Network'
+];
 
 const createMaturityModels = async () => {
   const promises = maturityDomains.map((domain) =>
@@ -36,11 +44,11 @@ const createMaturityModels = async () => {
                   text: `How mature is your ${domain} capability (1-5)?`,
                   weight: 1,
                   level_map: {
-                    '1': 'Initial',
-                    '2': 'Emerging',
-                    '3': 'Defined',
-                    '4': 'Managed',
-                    '5': 'Optimised'
+                    1: 'Initial',
+                    2: 'Emerging',
+                    3: 'Defined',
+                    4: 'Managed',
+                    5: 'Optimised'
                   }
                 },
                 {
@@ -90,17 +98,29 @@ const seed = async () => {
     console.log('Created demo organisation');
   }
 
-  if (!user.org_roles.some((role) => role.orgId?.toString() === organisation._id.toString())) {
+  if (
+    !user.org_roles.some(
+      (role) => role.orgId?.toString() === organisation._id.toString()
+    )
+  ) {
     user.org_roles.push({ orgId: organisation._id, role: 'owner' });
     await user.save();
   }
 
-  let businessUnit = await BusinessUnit.findOne({ orgId: organisation._id, name: 'Core Platforms' });
+  let businessUnit = await BusinessUnit.findOne({
+    orgId: organisation._id,
+    name: 'Core Platforms'
+  });
   if (!businessUnit) {
-    businessUnit = await BusinessUnit.create({ orgId: organisation._id, name: 'Core Platforms' });
+    businessUnit = await BusinessUnit.create({
+      orgId: organisation._id,
+      name: 'Core Platforms'
+    });
   }
 
-  let project = await Project.findOne({ name: 'Observability Modernisation 2026' });
+  let project = await Project.findOne({
+    name: 'Observability Modernisation 2026'
+  });
   if (!project) {
     project = await Project.create({
       orgId: organisation._id,
@@ -113,7 +133,11 @@ const seed = async () => {
     console.log('Created demo project');
   }
 
-  if (!user.project_roles.some((role) => role.projectId?.toString() === project._id.toString())) {
+  if (
+    !user.project_roles.some(
+      (role) => role.projectId?.toString() === project._id.toString()
+    )
+  ) {
     user.project_roles.push({ projectId: project._id, role: 'admin' });
     await user.save();
   }
@@ -122,7 +146,13 @@ const seed = async () => {
   if (!vendor) {
     vendor = await VendorProfile.create({
       orgName: 'Vendor One',
-      contacts: [{ name: 'Ava Vendor', email: 'ava@vendorone.com', role: 'Account Executive' }],
+      contacts: [
+        {
+          name: 'Ava Vendor',
+          email: 'ava@vendorone.com',
+          role: 'Account Executive'
+        }
+      ],
       capabilities: ['Observability Platform'],
       integrations: ['ServiceNow', 'PagerDuty'],
       certifications: ['ISO 27001'],

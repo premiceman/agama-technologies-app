@@ -10,9 +10,16 @@ const router = Router();
 
 router.get('/', requireAuth, async (req, res, next) => {
   try {
-    const projectIds = (req.user.project_roles || []).map((role) => role.projectId);
-    const rfxDocs = await Rfx.find({ projectId: { $in: projectIds } }, { _id: 1 }).lean();
-    const comparisons = await Comparison.find({ rfxId: { $in: rfxDocs.map((doc) => doc._id) } }).lean();
+    const projectIds = (req.user.project_roles || []).map(
+      (role) => role.projectId
+    );
+    const rfxDocs = await Rfx.find(
+      { projectId: { $in: projectIds } },
+      { _id: 1 }
+    ).lean();
+    const comparisons = await Comparison.find({
+      rfxId: { $in: rfxDocs.map((doc) => doc._id) }
+    }).lean();
     res.json({ comparisons });
   } catch (err) {
     next(err);
@@ -26,7 +33,9 @@ router.post('/', requireAuth, async (req, res, next) => {
     if (!rfx) {
       return res.status(404).json({ message: 'RFX not found' });
     }
-    const hasAccess = req.user.project_roles?.some((role) => role.projectId?.toString() === rfx.projectId.toString());
+    const hasAccess = req.user.project_roles?.some(
+      (role) => role.projectId?.toString() === rfx.projectId.toString()
+    );
     if (!hasAccess) {
       return res.status(403).json({ message: 'No project access' });
     }
@@ -42,13 +51,17 @@ router.post('/', requireAuth, async (req, res, next) => {
       }))
       .sort((a, b) => b.score - a.score)
       .map((entry, index) => ({ ...entry, rank: index + 1 }));
-    const narrative = await composeComparisonNarrative(rfxId.toString(), 'preview');
+    const narrative = await composeComparisonNarrative(
+      rfxId.toString(),
+      'preview'
+    );
     const comparison = await Comparison.create({
       rfxId,
       method,
       weights,
       results,
-      commentary: typeof narrative === 'string' ? narrative : JSON.stringify(narrative)
+      commentary:
+        typeof narrative === 'string' ? narrative : JSON.stringify(narrative)
     });
     await recordAuditEvent({
       actorId: req.user._id || req.user.id,
@@ -65,12 +78,16 @@ router.post('/', requireAuth, async (req, res, next) => {
 
 router.get('/:comparisonId', requireAuth, async (req, res, next) => {
   try {
-    const comparison = await Comparison.findById(req.params.comparisonId).lean();
+    const comparison = await Comparison.findById(
+      req.params.comparisonId
+    ).lean();
     if (!comparison) {
       return res.status(404).json({ message: 'Comparison not found' });
     }
     const rfx = await Rfx.findById(comparison.rfxId);
-    const hasAccess = req.user.project_roles?.some((role) => role.projectId?.toString() === rfx.projectId.toString());
+    const hasAccess = req.user.project_roles?.some(
+      (role) => role.projectId?.toString() === rfx.projectId.toString()
+    );
     if (!hasAccess) {
       return res.status(403).json({ message: 'No project access' });
     }

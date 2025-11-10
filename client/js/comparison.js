@@ -59,10 +59,13 @@ const loadRfx = async (projectId) => {
 const loadVendorResponses = async (rfxId) => {
   try {
     const { responses } = await fetchJson('/api/vendor-responses');
-    state.vendorResponses = (responses || []).filter((response) => response.rfxId === rfxId);
+    state.vendorResponses = (responses || []).filter(
+      (response) => response.rfxId === rfxId
+    );
     vendorContainer.innerHTML = '';
     if (state.vendorResponses.length === 0) {
-      vendorContainer.innerHTML = '<div class="glass p-3">No vendor responses submitted yet.</div>';
+      vendorContainer.innerHTML =
+        '<div class="glass p-3">No vendor responses submitted yet.</div>';
       return;
     }
     state.vendorResponses.forEach((response) => {
@@ -111,7 +114,9 @@ comparisonForm?.addEventListener('submit', async (event) => {
   event.preventDefault();
   const rfxId = rfxSelect.value;
   if (!rfxId) return;
-  const vendorIds = Array.from(vendorContainer.querySelectorAll('input[type="checkbox"]'))
+  const vendorIds = Array.from(
+    vendorContainer.querySelectorAll('input[type="checkbox"]')
+  )
     .filter((input) => input.checked)
     .map((input) => input.value);
   const weights = {};
@@ -123,7 +128,12 @@ comparisonForm?.addEventListener('submit', async (event) => {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rfxId, method: methodSelect.value, weights, vendorIds })
+      body: JSON.stringify({
+        rfxId,
+        method: methodSelect.value,
+        weights,
+        vendorIds
+      })
     });
     if (!res.ok) throw new Error('Comparison failed');
     const { comparison } = await res.json();
