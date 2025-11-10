@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Agama Technologies — AI, Security & Observability Consulting</title>
+  <title>Agama Technologies — ValueSphere, ProcurePath & RevenueForge</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
@@ -17,6 +17,7 @@
     <div class="blob blob-teal"></div>
     <div class="blob blob-magenta"></div>
   </div>
+
   <nav class="navbar navbar-expand-lg sticky-top bg-glass border-bottom">
     <div class="container">
       <a class="navbar-brand d-flex align-items-center gap-2" href="/">
@@ -26,47 +27,51 @@
       <button class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#nav"><span class="navbar-toggler-icon"></span></button>
       <div class="collapse navbar-collapse" id="nav">
         <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-3">
-          <li class="nav-item"><a href="#capabilities" class="nav-link">Expertise</a></li>
-          <li class="nav-item"><a href="#approach" class="nav-link">Approach</a></li>
-          <li class="nav-item"><a href="#insights" class="nav-link">Insights</a></li>
-          <li class="nav-item"><a href="/assessment.html" class="btn btn-primary">Free Assessment</a></li>
+          <li class="nav-item"><a href="#platforms" class="nav-link">Platforms</a></li>
+          <li class="nav-item"><a href="#licenses" class="nav-link">Licensing</a></li>
+          <li class="nav-item"><a href="/valuesphere.html" class="nav-link">ValueSphere</a></li>
+          <li class="nav-item"><a href="/procurepath.html" class="nav-link">ProcurePath</a></li>
+          <li class="nav-item"><a href="/revenueforge.html" class="nav-link">RevenueForge</a></li>
+          <li class="nav-item"><a href="/signup.html" class="btn btn-primary">Create account</a></li>
           <li class="nav-item"><a href="/login.html" class="btn btn-outline-light">Client login</a></li>
         </ul>
       </div>
     </div>
   </nav>
 
-  <header class="hero container">
+  <header class="hero container" id="platforms">
     <div class="row align-items-center g-5 py-5">
-      <div class="col-lg-6" data-aos="fade-right">
-        <div class="eyebrow">Full-stack AI, Security & Observability</div>
-        <h1 class="display-4 fw-bold my-3">Modernise your stack with measurable <span class="grad">95% cost optimisation</span>.</h1>
-        <p class="lead text-fg mb-4">
-          Agama Technologies unlocks resilient, AI-driven platforms. Our consultants bring over 100 years of combined delivery
-          experience across AI, cyber security, and observability — tailored to your industry and growth stage.
+      <div class="col-xl-6" data-aos="fade-right">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3" role="group" aria-label="Select platform focus">
+          <button class="btn btn-outline-light active" data-platform-switch="valuesphere">Business Value Consulting</button>
+          <button class="btn btn-outline-light" data-platform-switch="procurepath">Procurement Control Tower</button>
+          <button class="btn btn-outline-light" data-platform-switch="revenueforge">AI Sales Studio</button>
+        </div>
+        <div class="eyebrow" id="platformEyebrow">ValueSphere Consulting Suite</div>
+        <h1 class="display-4 fw-bold my-3" id="platformHeroTitle">
+          Reimagine value creation across consulting, procurement, and revenue orchestration.
+        </h1>
+        <p class="lead text-fg mb-4" id="platformHeroDescription">
+          ValueSphere Consulting combines Navigator assessments for individuals with Catalyst advisory squads for enterprises. It anchors the Agama platform suite.
         </p>
         <div class="d-flex flex-wrap gap-3">
-          <a class="btn btn-primary btn-lg" href="/assessment.html">Start free assessment</a>
-          <a class="btn btn-outline-light btn-lg" href="#case-studies">See success stories</a>
+          <a class="btn btn-primary btn-lg" id="platformPrimaryCta" href="/valuesphere.html">Explore ValueSphere</a>
+          <a class="btn btn-outline-light btn-lg" id="platformSecondaryCta" href="/signup.html">Launch your workspace</a>
         </div>
-        <div class="d-flex align-items-center gap-3 mt-4 text-fg small">
-          <i class="bi bi-patch-check"></i> Technology agnostic, outcome obsessed.
-          <i class="bi bi-shield-lock"></i> Trusted by security-first teams.
+        <div class="d-flex align-items-center gap-3 mt-4 text-fg small" id="platformHeroBadges">
+          <span><i class="bi bi-buildings"></i> Business &amp; personal licenses</span>
+          <span><i class="bi bi-stars"></i> Enterprise-grade glass design</span>
         </div>
       </div>
-      <div class="col-lg-6" data-aos="fade-left">
+      <div class="col-xl-6" data-aos="fade-left">
         <div class="card glass panel-elevated pad-md">
           <div class="panel-content">
-            <div class="badge-pill text-fg-2">EXECUTIVE INSIGHT PREVIEW</div>
-
-            <!-- Make this title more legible on dark glass -->
-            <h3 class="mt-3 panel-title-strong text-contrast-high">AI-led modernisation blueprint</h3>
-
-            <ul class="panel-list">
-              <li>Comparative maturity vs. industry leaders</li>
-              <li>Security posture, observability depth, AIOps readiness</li>
-              <li>Recommended tech stack aligned to budget horizons</li>
-              <li>Actionable roadmap with 30/90/180 day milestones</li>
+            <div class="badge-pill text-fg-2" id="platformHighlightTitle">VALUESPHERE HIGHLIGHTS</div>
+            <h3 class="mt-3 panel-title-strong text-contrast-high" id="platformHighlightHeading">Navigator &amp; Catalyst programs</h3>
+            <ul class="panel-list" id="platformHighlights">
+              <li>Personalised Navigator diagnostics for individual leaders.</li>
+              <li>Catalyst advisory guilds co-delivering measurable change.</li>
+              <li>Embedded ROI models aligned to your industry realities.</li>
             </ul>
           </div>
         </div>
@@ -74,241 +79,209 @@
     </div>
   </header>
 
-  <section class="container py-4" id="metrics">
-    <div class="row g-3 text-center">
-      <div class="col-6 col-md-3" data-aos="fade-up"><div class="metric">95%<span>Cost optimisation</span></div></div>
-      <div class="col-6 col-md-3" data-aos="fade-up" data-aos-delay="50"><div class="metric">100+<span>Years combined expertise</span></div></div>
-      <div class="col-6 col-md-3" data-aos="fade-up" data-aos-delay="100"><div class="metric">30+<span>Industries transformed</span></div></div>
-      <div class="col-6 col-md-3" data-aos="fade-up" data-aos-delay="150"><div class="metric">3x<span>Deployment speed uplift</span></div></div>
-    </div>
-  </section>
+  <main>
+    <section class="container py-5" id="platformDetail">
+      <article class="platform-article" data-platform-section="valuesphere">
+        <div class="text-center mb-5" data-aos="fade-up">
+          <span class="eyebrow">ValueSphere Consulting</span>
+          <h2 class="fw-bold">Where business value consulting meets measurable transformation</h2>
+          <p class="text-fg-3">Choose the lens that suits your ambition: Navigator for individuals, Catalyst for organisational value squads.</p>
+        </div>
+        <div class="row g-4">
+          <div class="col-md-6" data-aos="zoom-in">
+            <div class="card glass h-100">
+              <div class="card-body">
+                <h5 class="mb-3">Navigator Assessments</h5>
+                <p class="text-fg-3">Self-directed value discovery experiences for personal and business licenses. Rapid scoring frames help leaders pinpoint growth, efficiency, and resilience levers.</p>
+                <ul class="text-fg-2 small mb-0">
+                  <li>Persona-led discovery flows and ROI dashboards.</li>
+                  <li>Guided executive summaries ready for the boardroom.</li>
+                  <li>Available to individual account holders immediately.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6" data-aos="zoom-in" data-aos-delay="50">
+            <div class="card glass h-100">
+              <div class="card-body">
+                <h5 class="mb-3">Catalyst Advisory Guilds</h5>
+                <p class="text-fg-3">For business licenses, Catalyst embeds seasoned consultants to operationalise value blueprints across finance, product, and go-to-market teams.</p>
+                <ul class="text-fg-2 small mb-0">
+                  <li>Quarterly value acceleration ceremonies and impact tracking.</li>
+                  <li>Integrated observability, security, and AI maturity patterns.</li>
+                  <li>Program governance designed for boards and investors.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
 
-  <section id="capabilities" class="container py-5">
-    <div class="text-center mb-5" data-aos="fade-up">
-      <span class="eyebrow">What we do</span>
-      <h2 class="fw-bold">Full-stack AI consulting with security and observability at the core</h2>
-      <p class="text-fg">We architect measurable change — from AI opportunity framing through to secure, observable, data-driven operations.</p>
-    </div>
-    <div class="row g-4">
-      <div class="col-md-6 col-xl-3" data-aos="zoom-in">
-        <div class="card h-100 glass service-card">
-          <div class="card-body">
-            <i class="bi bi-cpu display-6"></i>
-            <h5 class="mt-3">AI Strategy & Delivery</h5>
-            <p class="text-fg-3">Value mapping, model lifecycle design, and AI platform engineering tailored to your industry and constraints.</p>
+      <article class="platform-article d-none" data-platform-section="procurepath">
+        <div class="text-center mb-5" data-aos="fade-up">
+          <span class="eyebrow">ProcurePath Control Tower</span>
+          <h2 class="fw-bold">Command every vendor decision from a single procurement cockpit</h2>
+          <p class="text-fg-3">Built exclusively for business licenses, ProcurePath equips sourcing teams with intelligence, governance, and negotiation muscle.</p>
+        </div>
+        <div class="row g-4">
+          <div class="col-lg-4" data-aos="zoom-in">
+            <div class="card glass h-100">
+              <div class="card-body">
+                <h5 class="mb-3">Vendor Relationship Graphs</h5>
+                <p class="text-fg-3">Map supplier performance, compliance posture, and contractual obligations in living knowledge graphs.</p>
+                <ul class="text-fg-2 small mb-0">
+                  <li>Health scoring with escalation triggers.</li>
+                  <li>AI summaries of obligations and renewal cliffs.</li>
+                  <li>Collaborative notes for category managers.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-4" data-aos="zoom-in" data-aos-delay="50">
+            <div class="card glass h-100">
+              <div class="card-body">
+                <h5 class="mb-3">Deal Strategy Engine</h5>
+                <p class="text-fg-3">Run what-if scenarios across pricing models, concessions, and implementation timelines with AI-backed guardrails.</p>
+                <ul class="text-fg-2 small mb-0">
+                  <li>Negotiation workspaces with versioned playbooks.</li>
+                  <li>Financial modelling anchored to risk appetite.</li>
+                  <li>Auto-generated executive briefs for approvals.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-4" data-aos="zoom-in" data-aos-delay="100">
+            <div class="card glass h-100">
+              <div class="card-body">
+                <h5 class="mb-3">Contract Lifecycle Ops</h5>
+                <p class="text-fg-3">Unify intake, authoring, and compliance with embedded policy controls and vendor accountability trails.</p>
+                <ul class="text-fg-2 small mb-0">
+                  <li>Clause libraries tuned to security and data residency.</li>
+                  <li>Milestone automation with reminders and owners.</li>
+                  <li>Audit-ready history for every procurement cycle.</li>
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="col-md-6 col-xl-3" data-aos="zoom-in" data-aos-delay="50">
-        <div class="card h-100 glass service-card">
-          <div class="card-body">
-            <i class="bi bi-eye display-6"></i>
-            <h5 class="mt-3">Observability & AIOps</h5>
-            <p class="text-fg-3">SLO-based operating models, telemetry pipelines, intelligent alerting, and incident automation.</p>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-6 col-xl-3" data-aos="zoom-in" data-aos-delay="100">
-        <div class="card h-100 glass service-card">
-          <div class="card-body">
-            <i class="bi bi-shield-check display-6"></i>
-            <h5 class="mt-3">Cyber Security Advisory</h5>
-            <p class="text-fg-3">Zero Trust roadmaps, detection engineering, DevSecOps and compliance acceleration.</p>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-6 col-xl-3" data-aos="zoom-in" data-aos-delay="150">
-        <div class="card h-100 glass service-card">
-          <div class="card-body">
-            <i class="bi bi-bar-chart display-6"></i>
-            <h5 class="mt-3">Analytics & Insights</h5>
-            <p class="text-fg-3">Modern data stacks, governed self-serve analytics, and AI-assisted decision intelligence.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
+      </article>
 
-  <section class="bg-surface py-5" id="experience">
-    <div class="container">
+      <article class="platform-article d-none" data-platform-section="revenueforge">
+        <div class="text-center mb-5" data-aos="fade-up">
+          <span class="eyebrow">RevenueForge AI Studio</span>
+          <h2 class="fw-bold">Coach every commercial motion with an AI-native revenue studio</h2>
+          <p class="text-fg-3">Define bespoke sales stages, orchestrate qualification, and surface AI-generated leads your teams can pursue instantly.</p>
+        </div>
+        <div class="row g-4">
+          <div class="col-md-4" data-aos="zoom-in">
+            <div class="card glass h-100">
+              <div class="card-body">
+                <h5 class="mb-3">Lifecycle Architect</h5>
+                <p class="text-fg-3">Model every sales stage and align discovery prompts, exit criteria, and asset packs to your motion.</p>
+                <ul class="text-fg-2 small mb-0">
+                  <li>Drag-and-drop stage designer with governance.</li>
+                  <li>AI-suggested qualification frameworks.</li>
+                  <li>Embedded enablement assets for each milestone.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4" data-aos="zoom-in" data-aos-delay="50">
+            <div class="card glass h-100">
+              <div class="card-body">
+                <h5 class="mb-3">Deal Intelligence Copilot</h5>
+                <p class="text-fg-3">Generate discovery questions, pricing plays, and risk mitigations that reflect your portfolio and buyer persona.</p>
+                <ul class="text-fg-2 small mb-0">
+                  <li>AI responses anchored to your commercial policy.</li>
+                  <li>Lead briefings surfaced as liquid-glass dossiers.</li>
+                  <li>Signals piped into RevOps and success tooling.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4" data-aos="zoom-in" data-aos-delay="100">
+            <div class="card glass h-100">
+              <div class="card-body">
+                <h5 class="mb-3">Engagement Lounge</h5>
+                <p class="text-fg-3">Every AI-generated lead manifests as an interactive dossier your teams can triage, assign, and accelerate.</p>
+                <ul class="text-fg-2 small mb-0">
+                  <li>Shared workspaces with account teams and exec sponsors.</li>
+                  <li>Auto-generated follow-up cadences and collateral.</li>
+                  <li>Pipeline health metrics tuned to revenue leadership.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="bg-surface py-5" id="licenses">
+      <div class="container">
+        <div class="row g-4 align-items-center">
+          <div class="col-lg-6" data-aos="fade-right">
+            <span class="eyebrow">Licensing clarity</span>
+            <h2 class="fw-bold">Personal explorers &amp; organisational leaders get the right access</h2>
+            <p class="text-fg-3">Every Agama account starts with a license tier. Individuals unlock ValueSphere Navigator immediately. Business licenses add collaborative services across all three platforms.</p>
+            <ul class="text-fg-2 small mb-0">
+              <li>Personal licenses: ValueSphere Navigator assessments for individual operators.</li>
+              <li>Business licenses: ValueSphere Navigator + Catalyst, ProcurePath Control Tower, RevenueForge AI Studio.</li>
+              <li>Manage license tier and platform access anytime in your workspace.</li>
+            </ul>
+          </div>
+          <div class="col-lg-6" data-aos="fade-left">
+            <div class="card glass p-4">
+              <h5 class="mb-3">Get started</h5>
+              <ol class="text-fg-2 small mb-4">
+                <li>Create an account and choose personal or business licensing.</li>
+                <li>Select which platforms you want available for your organisation.</li>
+                <li>Invite teams and begin exploring each product&apos;s roadmap.</li>
+              </ol>
+              <div class="d-flex gap-3 flex-wrap">
+                <a class="btn btn-primary" href="/signup.html">Create your account</a>
+                <a class="btn btn-outline-light" href="/login.html">Sign in to workspace</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="container py-5" id="vision">
       <div class="row g-4 align-items-center">
         <div class="col-lg-6" data-aos="fade-right">
-          <h2 class="fw-bold">Trusted specialists with a century of combined delivery</h2>
-          <p class="text-fg">Our senior consultants have modernised critical systems for global banks, high-growth SaaS scale-ups, digital natives, and regulated enterprises. We partner with teams to accelerate value, not vendor lock-in.</p>
-          <ul class="list-unstyled text-fg-2">
-            <li>• AI platform migrations and inference optimisation</li>
-            <li>• SOC and observability fusion centres</li>
-            <li>• Secure-by-design platform foundations</li>
-            <li>• Analytics programmes that connect to business outcomes</li>
-          </ul>
+          <span class="eyebrow">A unified suite</span>
+          <h2 class="fw-bold">Enterprise-grade, liquid-glass experience preserved</h2>
+          <p class="text-fg-3">Agama&apos;s signature liquid glass aesthetic and dark, cinematic interface remain untouched. Platform toggles shift the hue, while the underlying design language stays consistent.</p>
+          <p class="text-fg-3">Today&apos;s release focuses on storytelling and orientation. Over the coming iterations we&apos;ll co-create the deep workflows across consulting, procurement, and revenue teams.</p>
         </div>
         <div class="col-lg-6" data-aos="fade-left">
           <div class="card glass p-4">
-            <h5>Highlighted outcomes</h5>
-            <ul class="text-fg-3 small mb-0">
-              <li><strong>Global FinServ:</strong> Reduced incident MTTR by 72% with unified telemetry and AI-assisted playbooks.</li>
-              <li><strong>Cloud SaaS:</strong> 95% platform cost optimisation via GPU right-sizing and observability-driven FinOps.</li>
-              <li><strong>Healthcare:</strong> Zero Trust implementation with real-time anomaly detection across clinical apps.</li>
+            <h5 class="mb-3">Roadmap preview</h5>
+            <ul class="text-fg-2 small mb-0">
+              <li>Interactive Navigator assessments and benchmarking dashboards.</li>
+              <li>ProcurePath contract intelligence, vendor risk, and negotiation orchestration.</li>
+              <li>RevenueForge AI lead creation, qualification prompts, and engagement tracking.</li>
             </ul>
           </div>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
+  </main>
 
-  <section id="approach" class="container py-5">
-    <div class="row g-4 align-items-center">
-      <div class="col-lg-5" data-aos="fade-right">
-        <span class="eyebrow">Engagement model</span>
-        <h2 class="fw-bold">From discovery to sustained optimisation</h2>
-        <p class="text-fg">We co-create the operating model and accelerate outcomes via a structured, insight-led approach.</p>
-      </div>
-      <div class="col-lg-7" data-aos="fade-left">
-        <div class="timeline">
-          <div class="timeline-item">
-            <div class="timeline-dot"></div>
-            <div>
-              <h6>Diagnostic sprints</h6>
-              <p class="text-fg-3">Rapid interviews, telemetry reviews, security posture scoring, and AI opportunity framing.</p>
-            </div>
-          </div>
-          <div class="timeline-item">
-            <div class="timeline-dot"></div>
-            <div>
-              <h6>Blueprint & prioritised roadmap</h6>
-              <p class="text-fg-3">Data-driven maturity baselines, benchmark comparisons, and a 30/90/180 day action plan.</p>
-            </div>
-          </div>
-          <div class="timeline-item">
-            <div class="timeline-dot"></div>
-            <div>
-              <h6>Execution pods</h6>
-              <p class="text-fg-3">Cross-functional delivery pods with embedded SMEs in AI, security, data, and reliability.</p>
-            </div>
-          </div>
-          <div class="timeline-item">
-            <div class="timeline-dot"></div>
-            <div>
-              <h6>Continuous optimisation</h6>
-              <p class="text-fg-3">AIOps and analytics loops, cost-performance tuning, and playbooks for sustainable change.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section id="insights" class="container py-5">
-    <div class="row g-4">
-      <div class="col-lg-6" data-aos="fade-right">
-        <h2 class="fw-bold">See where you stand instantly</h2>
-        <p class="text-fg">Complete the free assessment to unlock a tailored maturity snapshot. You will see part of your executive report instantly and can purchase the full insights when ready.</p>
-        <div class="card glass p-4">
-          <h5 class="mb-3">Your complimentary preview includes:</h5>
-          <ul class="text-fg-3">
-            <li>Overall maturity score and pillar breakdown</li>
-            <li>Competitive percentile positioning</li>
-            <li>Targeted recommendations and quick wins</li>
-          </ul>
-          <p class="text-fg-3 mb-0">Upgrade to the full report to get investment scenarios, technology radar, detailed benchmarking, and roadmap sequencing.</p>
-        </div>
-      </div>
-      <div class="col-lg-6" data-aos="fade-left">
-        <div class="card glass p-4">
-          <h5 class="mb-3">Modern, data-driven insights</h5>
-          <div class="d-flex flex-column gap-3">
-            <div class="insight-line">
-              <span>Industry benchmark deltas</span>
-              <strong>± 27 pts</strong>
-            </div>
-            <div class="insight-line">
-              <span>Automation opportunity</span>
-              <strong>Up to 95% cost optimisation</strong>
-            </div>
-            <div class="insight-line">
-              <span>Security incident reduction</span>
-              <strong>3.4× fewer priority incidents</strong>
-            </div>
-            <div class="insight-line">
-              <span>Analytics ROI uplift</span>
-              <strong>2.6× faster insight-to-action</strong>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section id="case-studies" class="bg-surface py-5">
-    <div class="container">
-      <div class="text-center mb-5" data-aos="fade-up">
-        <span class="eyebrow">Success stories</span>
-        <h2 class="fw-bold">AI-driven transformations delivered with confidence</h2>
-      </div>
-      <div class="row g-4">
-        <div class="col-lg-4" data-aos="zoom-in">
-          <div class="card glass h-100 p-4">
-            <h5>Global SaaS Platform</h5>
-            <p class="text-fg-3">Consolidated observability stack and launched closed-loop remediation. Achieved 55% alert noise reduction and 95% infra cost optimisation.</p>
-            <div class="badge-pill">Observability & FinOps</div>
-          </div>
-        </div>
-        <div class="col-lg-4" data-aos="zoom-in" data-aos-delay="75">
-          <div class="card glass h-100 p-4">
-            <h5>Regulated Financial Institution</h5>
-            <p class="text-fg-3">Implemented Zero Trust, AI-assisted fraud detection, and regulatory observability. MTTR improved by 72% with resilient automation.</p>
-            <div class="badge-pill">Security & AIOps</div>
-          </div>
-        </div>
-        <div class="col-lg-4" data-aos="zoom-in" data-aos-delay="150">
-          <div class="card glass h-100 p-4">
-            <h5>Next-gen Healthcare Network</h5>
-            <p class="text-fg-3">Unified data platform with governed analytics and privacy-preserving machine learning for diagnostics.</p>
-            <div class="badge-pill">Analytics & AI</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="container py-5">
-    <div class="row g-4 align-items-center">
-      <div class="col-lg-7" data-aos="fade-right">
-        <h2 class="fw-bold">Ready for a deeper partnership?</h2>
-        <p class="text-fg">Engage Agama Technologies for tailored consulting. Receive a bespoke roadmap, technology recommendations, and actionable playbooks anchored in measurable results.</p>
-        <div class="d-flex flex-wrap gap-3">
-          <a class="btn btn-primary" href="/assessment.html">Launch free assessment</a>
-          <a class="btn btn-outline-light" href="mailto:hello@agamatechnologies.com">Speak to an expert</a>
-          <a class="btn btn-outline-light" href="/downloads/agama-technologies-site.zip">Download site package (ZIP)</a>
-        </div>
-      </div>
-      <div class="col-lg-5" data-aos="fade-left">
-        <div class="card glass p-4">
-          <h5>What you'll receive</h5>
-          <ul class="text-fg-3 small mb-0">
-            <li>Executive-ready maturity report</li>
-            <li>Benchmarks vs. competitors and industry leaders</li>
-            <li>Investment scenarios aligned to budget horizons</li>
-            <li>Technology radar with vendor-neutral recommendations</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <footer class="py-4 border-top bg-glass">
-    <div class="container d-flex flex-wrap justify-content-between align-items-center gap-3">
-      <div>© <span id="year"></span> Agama Technologies. All rights reserved.</div>
-      <div class="d-flex gap-3 small">
-        <a href="mailto:hello@agamatechnologies.com">hello@agamatechnologies.com</a>
-        <a href="/login.html">Client login</a>
-        <a href="/signup.html">Create account</a>
+  <footer class="border-top border-soft py-4">
+    <div class="container d-flex flex-wrap justify-content-between gap-3 text-fg-3 small">
+      <span>&copy; <span id="year"></span> Agama Technologies. All rights reserved.</span>
+      <div class="d-flex gap-3">
+        <a href="mailto:hello@agamasuite.com" class="text-fg-3">Contact</a>
+        <a href="/login.html" class="text-fg-3">Client workspace</a>
+        <a href="/signup.html" class="text-fg-3">Create account</a>
       </div>
     </div>
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
-  <script src="/js/main.js" defer></script>
+  <script src="/js/main.js" type="module"></script>
 </body>
 </html>
