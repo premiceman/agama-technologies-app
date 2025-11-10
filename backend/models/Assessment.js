@@ -11,7 +11,11 @@ const ResponseSchema = new mongoose.Schema(
 
 const AssessmentSchema = new mongoose.Schema(
   {
-    projectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },
+    projectId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Project',
+      required: true
+    },
     type: { type: String, required: true },
     modelVersion: { type: String },
     responses: [ResponseSchema],

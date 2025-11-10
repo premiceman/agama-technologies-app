@@ -17,7 +17,11 @@ const InitiativeSchema = new mongoose.Schema(
 
 const RoadmapSchema = new mongoose.Schema(
   {
-    projectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },
+    projectId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Project',
+      required: true
+    },
     initiatives: [InitiativeSchema]
   },
   { timestamps: true }

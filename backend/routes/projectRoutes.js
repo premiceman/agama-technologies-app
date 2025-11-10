@@ -9,10 +9,17 @@ const router = Router();
 
 router.get('/', requireAuth, async (req, res, next) => {
   try {
-    const accessibleOrgIds = (req.user.org_roles || []).map((role) => role.orgId);
-    const accessibleProjectIds = (req.user.project_roles || []).map((role) => role.projectId);
+    const accessibleOrgIds = (req.user.org_roles || []).map(
+      (role) => role.orgId
+    );
+    const accessibleProjectIds = (req.user.project_roles || []).map(
+      (role) => role.projectId
+    );
     const projects = await Project.find({
-      $or: [{ orgId: { $in: accessibleOrgIds } }, { _id: { $in: accessibleProjectIds } }]
+      $or: [
+        { orgId: { $in: accessibleOrgIds } },
+        { _id: { $in: accessibleProjectIds } }
+      ]
     }).lean();
     res.json({ projects });
   } catch (err) {
@@ -23,7 +30,9 @@ router.get('/', requireAuth, async (req, res, next) => {
 router.post('/', requireAuth, async (req, res, next) => {
   try {
     const { orgId } = req.body;
-    const hasOrgAccess = req.user.org_roles?.some((role) => role.orgId?.toString() === orgId?.toString());
+    const hasOrgAccess = req.user.org_roles?.some(
+      (role) => role.orgId?.toString() === orgId?.toString()
+    );
     if (!hasOrgAccess) {
       return res.status(403).json({ message: 'No organisation access' });
     }
@@ -31,7 +40,10 @@ router.post('/', requireAuth, async (req, res, next) => {
     if (!organisation) {
       return res.status(404).json({ message: 'Organisation not found' });
     }
-    const project = await Project.create({ ...req.body, createdBy: req.user._id || req.user.id });
+    const project = await Project.create({
+      ...req.body,
+      createdBy: req.user._id || req.user.id
+    });
     await User.findByIdAndUpdate(req.user._id || req.user.id, {
       $addToSet: { project_roles: { projectId: project._id, role: 'admin' } }
     });
@@ -55,8 +67,12 @@ router.get('/:projectId', requireAuth, async (req, res, next) => {
       return res.status(404).json({ message: 'Project not found' });
     }
     const hasAccess =
-      req.user.project_roles?.some((role) => role.projectId?.toString() === project._id.toString()) ||
-      req.user.org_roles?.some((role) => role.orgId?.toString() === project.orgId?.toString());
+      req.user.project_roles?.some(
+        (role) => role.projectId?.toString() === project._id.toString()
+      ) ||
+      req.user.org_roles?.some(
+        (role) => role.orgId?.toString() === project.orgId?.toString()
+      );
     if (!hasAccess) {
       return res.status(403).json({ message: 'No project access' });
     }
@@ -72,7 +88,9 @@ router.put('/:projectId', requireAuth, async (req, res, next) => {
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
-    const hasAccess = req.user.project_roles?.some((role) => role.projectId?.toString() === project._id.toString());
+    const hasAccess = req.user.project_roles?.some(
+      (role) => role.projectId?.toString() === project._id.toString()
+    );
     if (!hasAccess) {
       return res.status(403).json({ message: 'No project access' });
     }
@@ -97,7 +115,9 @@ router.delete('/:projectId', requireAuth, async (req, res, next) => {
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
-    const hasAccess = req.user.project_roles?.some((role) => role.projectId?.toString() === project._id.toString());
+    const hasAccess = req.user.project_roles?.some(
+      (role) => role.projectId?.toString() === project._id.toString()
+    );
     if (!hasAccess) {
       return res.status(403).json({ message: 'No project access' });
     }

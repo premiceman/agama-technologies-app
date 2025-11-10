@@ -12,7 +12,9 @@ router.get('/', requireAuth, async (req, res, next) => {
     const projectIds = req.query.projectId
       ? [req.query.projectId]
       : (req.user.project_roles || []).map((role) => role.projectId);
-    const sessions = await ConsultingSession.find({ projectId: { $in: projectIds } }).lean();
+    const sessions = await ConsultingSession.find({
+      projectId: { $in: projectIds }
+    }).lean();
     res.json({ sessions });
   } catch (err) {
     next(err);
@@ -26,7 +28,9 @@ router.post('/', requireAuth, async (req, res, next) => {
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
-    const hasAccess = req.user.project_roles?.some((role) => role.projectId?.toString() === projectId?.toString());
+    const hasAccess = req.user.project_roles?.some(
+      (role) => role.projectId?.toString() === projectId?.toString()
+    );
     if (!hasAccess) {
       return res.status(403).json({ message: 'No project access' });
     }

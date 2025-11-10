@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -14,19 +14,43 @@
     </div>
     <nav class="navbar navbar-expand-lg navbar-dark px-4 py-3">
       <a class="navbar-brand" href="index.html">Agama</a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <button
+        class="navbar-toggler"
+        type="button"
+        data-bs-toggle="collapse"
+        data-bs-target="#navbarNav"
+        aria-controls="navbarNav"
+        aria-expanded="false"
+        aria-label="Toggle navigation"
+      >
         <span class="navbar-toggler-icon"></span>
       </button>
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-          <li class="nav-item"><a class="nav-link" href="projects.html">Projects</a></li>
-          <li class="nav-item"><a class="nav-link" href="assessment-new.html">Assessments</a></li>
-          <li class="nav-item"><a class="nav-link" href="rfx-new.html">RFX</a></li>
-          <li class="nav-item"><a class="nav-link" href="comparison-new.html">Comparisons</a></li>
-          <li class="nav-item"><a class="nav-link" href="roadmap.html">Roadmaps</a></li>
-          <li class="nav-item"><a class="nav-link" href="consulting.html">Consulting</a></li>
-          <li class="nav-item"><a class="nav-link" href="projects.html#admin">Admin</a></li>
-          <li class="nav-item"><a class="nav-link" href="vendor.html">Vendor</a></li>
+          <li class="nav-item">
+            <a class="nav-link" href="projects.html">Projects</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="assessment-new.html">Assessments</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="rfx-new.html">RFX</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="comparison-new.html">Comparisons</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="roadmap.html">Roadmaps</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="consulting.html">Consulting</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="projects.html#admin">Admin</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="vendor.html">Vendor</a>
+          </li>
         </ul>
       </div>
     </nav>
@@ -35,10 +59,15 @@
       <div class="row g-4">
         <section class="col-xl-8">
           <div class="card glass p-4 mb-4">
-            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-end gap-3">
+            <div
+              class="d-flex flex-column flex-md-row justify-content-between align-items-md-end gap-3"
+            >
               <div>
                 <h1 class="h4 mb-2">Consulting sessions</h1>
-                <p class="text-fg-3 mb-0">Capture discovery notes, risks, and decisions. Copilot transforms raw notes into structured actions.</p>
+                <p class="text-fg-3 mb-0">
+                  Capture discovery notes, risks, and decisions. Copilot
+                  transforms raw notes into structured actions.
+                </p>
               </div>
               <div class="d-grid gap-2">
                 <label class="form-label" for="session-project">Project</label>
@@ -52,14 +81,26 @@
             <form id="session-form" class="d-grid gap-3">
               <div>
                 <label class="form-label" for="session-date">Date</label>
-                <input class="form-control" id="session-date" type="date" required />
+                <input
+                  class="form-control"
+                  id="session-date"
+                  type="date"
+                  required
+                />
               </div>
               <div>
                 <label class="form-label" for="session-notes">Notes</label>
-                <textarea class="form-control" id="session-notes" rows="4" placeholder="Key observations, decisions, risks"></textarea>
+                <textarea
+                  class="form-control"
+                  id="session-notes"
+                  rows="4"
+                  placeholder="Key observations, decisions, risks"
+                ></textarea>
               </div>
               <div class="d-flex justify-content-end">
-                <button class="btn btn-primary" type="submit">Save session</button>
+                <button class="btn btn-primary" type="submit">
+                  Save session
+                </button>
               </div>
             </form>
           </div>
@@ -73,7 +114,9 @@
         <aside class="col-xl-4">
           <div class="card glass p-4">
             <h2 class="h5 mb-3">Copilot insights</h2>
-            <p class="text-fg-3">Automatically structured actions, risks, and decisions.</p>
+            <p class="text-fg-3">
+              Automatically structured actions, risks, and decisions.
+            </p>
             <div id="session-copilot" class="d-grid gap-3"></div>
           </div>
         </aside>

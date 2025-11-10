@@ -13,8 +13,13 @@ router.get('/', requireAuth, async (req, res, next) => {
     if (req.user.vendor_profile_id) {
       query = { vendorId: req.user.vendor_profile_id };
     } else {
-      const projectIds = (req.user.project_roles || []).map((role) => role.projectId);
-      const rfxForProjects = await Rfx.find({ projectId: { $in: projectIds } }, { _id: 1 }).lean();
+      const projectIds = (req.user.project_roles || []).map(
+        (role) => role.projectId
+      );
+      const rfxForProjects = await Rfx.find(
+        { projectId: { $in: projectIds } },
+        { _id: 1 }
+      ).lean();
       query = { rfxId: { $in: rfxForProjects.map((doc) => doc._id) } };
     }
     const responses = await VendorResponse.find(query).lean();
@@ -31,11 +36,19 @@ router.post('/', requireAuth, async (req, res, next) => {
     if (!rfx) {
       return res.status(404).json({ message: 'RFX not found' });
     }
-    if (req.user.vendor_profile_id && req.user.vendor_profile_id.toString() !== vendorId) {
+    if (
+      req.user.vendor_profile_id &&
+      req.user.vendor_profile_id.toString() !== vendorId
+    ) {
       return res.status(403).json({ message: 'Vendor scope mismatch' });
     }
-    const hasProjectAccess = req.user.project_roles?.some((role) => role.projectId?.toString() === rfx.projectId.toString());
-    if (!hasProjectAccess && req.user.vendor_profile_id?.toString() !== vendorId) {
+    const hasProjectAccess = req.user.project_roles?.some(
+      (role) => role.projectId?.toString() === rfx.projectId.toString()
+    );
+    if (
+      !hasProjectAccess &&
+      req.user.vendor_profile_id?.toString() !== vendorId
+    ) {
       return res.status(403).json({ message: 'No access' });
     }
     const response = await VendorResponse.create({ rfxId, vendorId, answers });
@@ -58,7 +71,10 @@ router.put('/:responseId', requireAuth, async (req, res, next) => {
     if (!response) {
       return res.status(404).json({ message: 'Response not found' });
     }
-    if (req.user.vendor_profile_id && response.vendorId.toString() !== req.user.vendor_profile_id.toString()) {
+    if (
+      req.user.vendor_profile_id &&
+      response.vendorId.toString() !== req.user.vendor_profile_id.toString()
+    ) {
       return res.status(403).json({ message: 'Vendor scope mismatch' });
     }
     Object.assign(response, req.body);
@@ -82,11 +98,17 @@ router.post('/:responseId/submit', requireAuth, async (req, res, next) => {
     if (!response) {
       return res.status(404).json({ message: 'Response not found' });
     }
-    if (req.user.vendor_profile_id && response.vendorId.toString() !== req.user.vendor_profile_id.toString()) {
+    if (
+      req.user.vendor_profile_id &&
+      response.vendorId.toString() !== req.user.vendor_profile_id.toString()
+    ) {
       return res.status(403).json({ message: 'Vendor scope mismatch' });
     }
     response.submittedAt = new Date();
-    response.autoscore = await autoscoreVendorResponse(response.rfxId.toString(), response._id.toString());
+    response.autoscore = await autoscoreVendorResponse(
+      response.rfxId.toString(),
+      response._id.toString()
+    );
     await response.save();
     await recordAuditEvent({
       actorId: req.user._id || req.user.id,

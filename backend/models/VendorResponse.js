@@ -12,7 +12,11 @@ const AnswerSchema = new mongoose.Schema(
 const VendorResponseSchema = new mongoose.Schema(
   {
     rfxId: { type: mongoose.Schema.Types.ObjectId, ref: 'Rfx', required: true },
-    vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'VendorProfile', required: true },
+    vendorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'VendorProfile',
+      required: true
+    },
     answers: [AnswerSchema],
     autoscore: {
       bySection: { type: mongoose.Schema.Types.Mixed, default: {} },

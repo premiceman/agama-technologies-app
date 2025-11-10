@@ -14,7 +14,8 @@ const state = {
   projects: []
 };
 
-const getSchemaDefinition = (model) => model?.schema || model?.definition || null;
+const getSchemaDefinition = (model) =>
+  model?.schema || model?.definition || null;
 
 const fetchJson = async (url, options = {}) => {
   const res = await fetch(url, {
@@ -180,14 +181,25 @@ generateButton?.addEventListener('click', async () => {
   const industry = prompt('Industry focus for the assessment?');
   if (!industry) return;
   const size = prompt('Organisation size (e.g. Mid, Large)?') || 'Mid';
-  const domainsInput = prompt('List domains separated by commas (e.g. Data, Security, Observability).');
-  const domains = domainsInput ? domainsInput.split(',').map((item) => item.trim()).filter(Boolean) : [];
+  const domainsInput = prompt(
+    'List domains separated by commas (e.g. Data, Security, Observability).'
+  );
+  const domains = domainsInput
+    ? domainsInput
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : [];
   try {
     const { schema } = await fetchJson('/api/ai/assessments/model', {
       method: 'POST',
       body: JSON.stringify({ industry, size, domains })
     });
-    const generatedModel = { type: `${industry.toLowerCase()}-custom`, version: 'ai-draft', schema };
+    const generatedModel = {
+      type: `${industry.toLowerCase()}-custom`,
+      version: 'ai-draft',
+      schema
+    };
     state.models.unshift(generatedModel);
     renderModelList();
     selectModel(generatedModel);

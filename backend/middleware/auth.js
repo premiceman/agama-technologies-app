@@ -27,7 +27,11 @@ export const requireOrgRole = (minRole) => (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({ message: 'Authentication required' });
   }
-  const roleEntry = req.user.org_roles?.find((r) => r.orgId?.toString() === (req.params.orgId || req.body.orgId || req.query.orgId));
+  const roleEntry = req.user.org_roles?.find(
+    (r) =>
+      r.orgId?.toString() ===
+      (req.params.orgId || req.body.orgId || req.query.orgId)
+  );
   if (!roleEntry) {
     return res.status(403).json({ message: 'No organisation access' });
   }
@@ -41,8 +45,11 @@ export const requireProjectRole = (minRole) => (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({ message: 'Authentication required' });
   }
-  const projectId = req.params.projectId || req.body.projectId || req.query.projectId;
-  const roleEntry = req.user.project_roles?.find((r) => r.projectId?.toString() === projectId);
+  const projectId =
+    req.params.projectId || req.body.projectId || req.query.projectId;
+  const roleEntry = req.user.project_roles?.find(
+    (r) => r.projectId?.toString() === projectId
+  );
   if (!roleEntry) {
     return res.status(403).json({ message: 'No project access' });
   }

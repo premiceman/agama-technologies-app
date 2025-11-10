@@ -2,7 +2,11 @@ import mongoose from 'mongoose';
 
 const ConsultingSessionSchema = new mongoose.Schema(
   {
-    projectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },
+    projectId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Project',
+      required: true
+    },
     date: { type: Date, required: true },
     notes: { type: String },
     decisions: [{ type: String }],
