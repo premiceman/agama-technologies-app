@@ -1,68 +1,39 @@
-import User from '../models/User.js';
+const jwt = require('jsonwebtoken');
 
-export const resolveUser = async (req, res, next) => {
+const COOKIE = process.env.JWT_COOKIE_NAME || 'at_session';
+const DAYS = parseInt(process.env.JWT_EXPIRES_DAYS || '7', 10);
+const SECRET = process.env.JWT_SECRET;
+
+if (!SECRET) {
+  throw new Error('JWT_SECRET environment variable is required for authentication middleware.');
+}
+
+function issueTokenCookie(res, payload) {
+  const token = jwt.sign(payload, SECRET, { expiresIn: `${DAYS}d` });
+  res.cookie(COOKIE, token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',
+    maxAge: DAYS * 24 * 60 * 60 * 1000,
+    path: '/'
+  });
+  return token;
+}
+
+function clearTokenCookie(res) {
+  res.cookie(COOKIE, '', { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 1, path: '/' });
+}
+
+function requireAuth(req, res, next) {
+  const token = req.cookies[COOKIE] || (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
   try {
-    if (req.session?.userId) {
-      const user = await User.findById(req.session.userId).lean();
-      if (user) {
-        req.user = user;
-      }
-    }
-    next();
-  } catch (err) {
-    next(err);
+    const decoded = jwt.verify(token, SECRET);
+    req.auth = decoded;
+    return next();
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
-};
+}
 
-export const requireAuth = (req, res, next) => {
-  if (!req.user) {
-    return res.status(401).json({ message: 'Authentication required' });
-  }
-  next();
-};
-
-const roleRank = ['viewer', 'editor', 'admin', 'owner'];
-
-export const requireOrgRole = (minRole) => (req, res, next) => {
-  if (!req.user) {
-    return res.status(401).json({ message: 'Authentication required' });
-  }
-  const roleEntry = req.user.org_roles?.find(
-    (r) =>
-      r.orgId?.toString() ===
-      (req.params.orgId || req.body.orgId || req.query.orgId)
-  );
-  if (!roleEntry) {
-    return res.status(403).json({ message: 'No organisation access' });
-  }
-  if (roleRank.indexOf(roleEntry.role) < roleRank.indexOf(minRole)) {
-    return res.status(403).json({ message: 'Insufficient organisation role' });
-  }
-  next();
-};
-
-export const requireProjectRole = (minRole) => (req, res, next) => {
-  if (!req.user) {
-    return res.status(401).json({ message: 'Authentication required' });
-  }
-  const projectId =
-    req.params.projectId || req.body.projectId || req.query.projectId;
-  const roleEntry = req.user.project_roles?.find(
-    (r) => r.projectId?.toString() === projectId
-  );
-  if (!roleEntry) {
-    return res.status(403).json({ message: 'No project access' });
-  }
-  const rank = ['viewer', 'editor', 'admin'];
-  if (rank.indexOf(roleEntry.role) < rank.indexOf(minRole)) {
-    return res.status(403).json({ message: 'Insufficient project role' });
-  }
-  next();
-};
-
-export const requireVendorAccess = () => (req, res, next) => {
-  if (!req.user?.vendor_profile_id) {
-    return res.status(403).json({ message: 'Vendor access only' });
-  }
-  next();
-};
+module.exports = { requireAuth, issueTokenCookie, clearTokenCookie };

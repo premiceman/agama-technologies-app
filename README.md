@@ -1,125 +1,178 @@
-# Agama Platform — Consulting, Enterprise, Vendor (Coming Soon)
+# Agama Technologies — Full‑Stack AI Consulting Site
 
-This repository contains the refactored Agama platform for consulting-led enterprise decision making. The app is built on **Node.js + Express + MongoDB** with a static client that reuses the original Agama visual language.
+A production‑ready starter for Agama Technologies, built with **Node.js + Express + MongoDB** and a clean static frontend.
+It includes:
 
-## Product Overview
+- Native **email/password auth** with bcrypt + HTTP‑only JWT cookies
+- Free **maturity assessment** (Observability, Security, AIOps, Analytics)
+- **Partial report** for free; **mock payment** unlocks the full report
+- Single **Render Web Service** + **MongoDB** (Atlas or self‑hosted)
+- Modern, enterprise look & feel with animations (Bootstrap + AOS)
 
-Agama is organised around three pillars:
-
-- **Agama Consulting** – premium discovery sessions that capture context, outcomes, risks, and artefacts to enrich customer intelligence.
-- **Agama Enterprise** – the customer workspace for projects, assessments, RFX, vendor comparisons, roadmaps, and consulting artefacts.
-- **Agama Vendor (Coming Soon)** – a feature-flagged placeholder for the upcoming vendor self-service portal.
-
-### Core Concepts
-
-- Organisations contain optional business units and projects.
-- Projects are containers for assessments, RFX packages, vendor comparisons, roadmaps, consulting sessions, and supporting files.
-- Schema-driven assessments, RFX sections, comparison scoring, and roadmap composition are backed by guardrailed OpenAI prompts.
-
-## Repository Structure
+## Project Structure
 
 ```
 /backend
-  index.js                # Express app, session management, static file serving
-  /models                 # Mongoose schemas (users, orgs, projects, assessments, etc.)
-  /routes                 # Modular API endpoints for orgs, projects, RFX, AI helpers
-  /services/openaiService # Deterministic prompt helpers (assessment, RFX, roadmap, etc.)
-  /middleware             # Auth resolution, RBAC checks, error handler
-  /utils                  # Audit logging + scoring helpers
-  /scripts/seed.js        # Seeds default maturity models, demo org, project, RFX, owner user
+  index.js              # Express server, routes, static serving
+  /models               # Mongoose models (User, Assessment, Report, Payment)
+  /utils/scoring.js     # Scoring + benchmarks loader
+  /data                 # Benchmarks and question banks
+  /public               # Static frontend (copied from ../frontend at build time)
   package.json
-/client
-  index.html              # Home landing page with product tiles
-  projects.html           # Portfolio of projects and creation wizard
-  project.html            # Project overview with navigation tabs
-  assessment-new.html     # Schema-driven assessment creation flow
-  rfx-new.html            # RFX creation and vendor invite experience
-  comparison-new.html     # Comparison wizard for weighted scoring
-  roadmap.html            # Initiative timeline view with AI copilot panel
-  consulting.html         # Consulting session log and copilot suggestions
-  vendor.html             # “Agama Vendor is coming soon” placeholder
-  login.html / signup.html# Authentication flows reusing Agama styling
-  /js                     # Lightweight client-side controllers for each page
-  /css/styles.v2.css      # Unmodified design system stylesheet (kept intact)
-render.yaml               # Render blueprint for single web service deployment
-README.md                 # This guide
+  .env.example
+/frontend
+  index.html, assessment.html, report.html, login.html, signup.html, dashboard.html
+  /css/styles.css
+render.yaml             # Render IaC (optional)
+README.md
 ```
 
-## Environment Variables
+---
 
-The server reads configuration from `.env` (create `/backend/.env` locally). Required keys:
+## 1) Create a MongoDB database (MongoDB Atlas)
 
-- `MONGODB_URI` – MongoDB Atlas (or local) connection string.
-- `SESSION_SECRET` – long random string for Express sessions.
-- `OPENAI_API_KEY` – optional; enables live prompt execution (fallback responses are returned if unset).
+1. Go to https://www.mongodb.com/cloud/atlas and create/sign in to your account.
+2. **Create a free cluster** (Shared, M0 is fine for testing).
+3. Create a **Database User** (username + password).
+4. Add **Network Access** → IP allowlist: `0.0.0.0/0` (or restrict to Render).
+5. Get your **Connection String** from Atlas (looks like: `mongodb+srv://.../mydb?retryWrites=true&w=majority`).
 
-## Local Development
+Update `/backend/.env` from `.env.example`:
+```
+MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>/<dbName>?retryWrites=true&w=majority
+JWT_SECRET=<generate a long random string>
+ALLOWED_ORIGINS=https://www.agamatechnologies.com,http://localhost:5173,http://localhost:3000
+```
 
-1. **Install dependencies**
-   ```bash
-   cd backend
-   npm install
-   ```
-2. **Configure environment**
-   ```bash
-   cp .env.example .env   # create this file and set MONGODB_URI, SESSION_SECRET, OPENAI_API_KEY (optional)
-   ```
-3. **Run the development server**
-   ```bash
-   npm run dev            # nodemon watches backend/index.js
-   ```
-4. **Open the client** – visit `http://localhost:5000` (or the port reported in the terminal). Static files under `/client` are served directly by Express so no additional build step is required.
+---
 
-### Seed Demo Data
+## 2) Run locally
 
-Populate the default maturity models, demo organisation, seed project, sample vendor profile, and initial RFX:
+### Prereqs
+- Node.js 18+
+- npm
+
+### Steps
+```bash
+# from repo root
+cp backend/.env.example backend/.env
+# edit backend/.env with your Atlas URI + JWT_SECRET
+
+cd backend
+npm install
+npm run build-frontend   # copies ../frontend into ./public
+npm run dev              # starts server on http://localhost:3000
+```
+
+Visit `http://localhost:3000`.
+
+---
+
+## 3) Deploy to Render (Web Service)
+
+You can use the included `render.yaml` (recommended) or configure manually in the Render dashboard.
+
+### Option A — render.yaml
+
+1. Push this repo to GitHub.
+2. In Render → **Blueprints**, select your repo containing `render.yaml`.
+3. Set environment variables:
+
+- `MONGODB_URI` — your Atlas connection string
+- `JWT_SECRET` — long random
+- `ALLOWED_ORIGINS` — e.g. `https://www.agamatechnologies.com`
+
+Render will build and start the app.
+
+### Option B — Manual (Web Service)
+
+1. Create a **Web Service** in Render, link your GitHub repo.
+2. **Root Directory**: `/backend`
+3. **Build Command**: `npm ci && npm run build-frontend`
+4. **Start Command**: `npm start`
+5. **Environment Variables**:
+   - `MONGODB_URI`
+   - `JWT_SECRET`
+   - `ALLOWED_ORIGINS`
+
+(Optional) Add custom domain `www.agamatechnologies.com` to the service.
+
+---
+
+## 4) Required ENV variables (Render)
+
+- `PORT` (Render provides this automatically)
+- `MONGODB_URI` (Atlas connection string)
+- `JWT_SECRET` (long random string)
+- `JWT_COOKIE_NAME` (default: `at_session`)
+- `JWT_EXPIRES_DAYS` (default: `7`)
+- `ALLOWED_ORIGINS` (comma‑separated list of allowed origins)
+
+---
+
+## 5) GitHub + VS Code Quickstart
+
+**Initialise repo and push:**
+```bash
+# inside project folder
+git init
+git branch -M main
+git add .
+git commit -m "Initial commit: Agama Technologies app"
+
+# create a new empty repo on GitHub first, then:
+git remote add origin https://github.com/<your-username>/<repo-name>.git
+git push -u origin main
+```
+
+**From VS Code:**
+- Open the folder (`File → Open Folder...`).
+- If not initialised, use **Source Control** panel → "Initialize Repository".
+- Commit changes via Source Control (message + checkmark).
+- "Publish Branch" or `git push` to GitHub.
+
+**Clone on a new machine:**
+```bash
+git clone https://github.com/<your-username>/<repo-name>.git
+code <repo-name>
+```
+
+---
+
+## 6) Using the App
+
+1. Visit `/signup.html` to create an account.
+2. Run a free assessment at `/assessment.html`.
+3. You’ll see a **partial** report. Click **Unlock full report** to simulate payment and reveal everything.
+
+> This project intentionally avoids any third‑party auth or storage services—only MongoDB and a single Render Web Service are required.
+
+---
+
+## 7) Security baseline
+
+The backend enables hardened HTTP defaults out of the box:
+
+- `helmet` with HSTS (production), frame protection, and `no-referrer` policy.
+- `express-rate-limit` applied to authentication, project, and assessment routes.
+- Strict CORS allow‑list controlled by `ALLOWED_ORIGINS`.
+- Request validation with [Zod](https://github.com/colinhacks/zod) for every POST/PUT endpoint to fail fast on malformed payloads.
+
+These protections are automatically active after installing dependencies—no extra configuration required beyond setting environment variables.
+
+---
+
+## 8) Data migration helper
+
+Older databases may contain assessments without a `projectId`. Use the bundled migration to backfill projects per user.
 
 ```bash
 cd backend
-npm run seed
+# Inspect actions without writing changes
+node scripts/migrate-assessments-into-projects.js --dry-run
+
+# Apply the migration
+node scripts/migrate-assessments-into-projects.js
 ```
 
-Credentials created by the seed script:
-
-- **Email**: `owner@agama.local`
-- **Password**: `Password123!`
-
-## API Surface
-
-| Route                                              | Description                                                                                                               |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/auth/register` / `POST /api/auth/login` | Email/password authentication with session cookies.                                                                       |
-| `GET/POST/PUT/DELETE /api/orgs`                    | Organisation CRUD with audit logging; nested `/api/orgs/:id/bus` manages business units.                                  |
-| `GET/POST/PUT/DELETE /api/projects`                | Project workspace management with RBAC enforcement.                                                                       |
-| `GET /api/maturity-models`                         | List schema-driven assessment templates.                                                                                  |
-| `POST /api/assessments`                            | Create assessments and auto-score against the active model.                                                               |
-| `POST /api/rfx`                                    | Create structured RFX packages; `/invite` adds vendors.                                                                   |
-| `POST /api/vendor-responses`                       | Vendor portal endpoints for drafting and submitting responses.                                                            |
-| `POST /api/comparisons`                            | Aggregate vendor scores and capture comparison commentary.                                                                |
-| `POST /api/roadmaps/create-from-assessments`       | Compose initiatives from assessment gaps via AI.                                                                          |
-| `POST /api/consulting-sessions`                    | Log consulting sessions and transform notes into actions/risks/decisions.                                                 |
-| `POST /api/ai/*`                                   | Deterministic OpenAI helpers for schema drafting, RFX generation, scoring, comparisons, roadmaps, and consulting copilot. |
-
-All mutating operations emit `AuditEvent` records for downstream analytics and compliance.
-
-## Deployment (Render)
-
-The included `render.yaml` blueprint provisions a single Node web service:
-
-- **Root Directory**: `backend`
-- **Build Command**: `npm install`
-- **Start Command**: `node index.js`
-- **Environment Variables**: `MONGODB_URI`, `OPENAI_API_KEY`, `SESSION_SECRET`
-
-Static assets under `/client` are served directly by the Express app, so no extra CDN or build service is required.
-
-## Roadmap Highlights
-
-Near-term backlog includes:
-
-- Schema registry UI for authoring new assessment models.
-- Weighting designer presets for value vs. risk vs. fit vs. TCO comparisons.
-- PDF export pipelines for assessments, comparisons, and roadmaps.
-- Evidence locker with integrity hashing and provenance.
-
-Mid-term and long-term goals cover scenario planning, compliance packs, vendor benchmarking, portfolio heatmaps, and the full Agama Vendor portal GA launch with contract intelligence and integration graph analytics.
+The script is idempotent. It creates (or reuses) an "Auto-imported Project" per user and links orphaned assessments to it, updating the embedded project snapshot in the process.

@@ -1,0 +1,1165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Maturity Report — Agama Technologies</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/css/styles.v2.css">
+</head>
+<body class="bg-body">
+  <div class="container py-5 report-wrapper">
+    <div id="content" class="d-none">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+          <span class="eyebrow">Tailored maturity intelligence</span>
+          <h1 class="h3 mb-0" id="reportTitle">Executive report</h1>
+        </div>
+        <div id="reportActions" class="d-flex flex-wrap gap-2">
+          <a href="/dashboard.html" class="btn btn-outline-light">Dashboard</a>
+          <button id="exportPlan" class="btn btn-outline-light">Export value path (xlsx)</button>
+          <button id="exportRfp" class="btn btn-outline-light d-none">Export RFP (.docx)</button>
+          <button id="unlock" class="btn btn-primary d-none">Unlock full report (mock payment)</button>
+          <a id="premiumIntake" class="btn btn-outline-light d-none">Complete premium intake</a>
+        </div>
+      </div>
+
+      <ul class="nav nav-pills mb-4 report-tabs" id="reportTabs">
+        <li class="nav-item">
+          <button class="nav-link active" data-tab-target="overview">Overview</button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-tab-target="vendors">Vendors</button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-tab-target="rfp">RFP</button>
+        </li>
+      </ul>
+
+      <div class="tab-panel" data-tab="overview">
+        <section class="card glass p-4 mb-4">
+          <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+            <div class="badge-pill" id="reportStatus">Preview</div>
+            <div class="text-fg-3" id="reportDate"></div>
+          </div>
+          <div class="row g-4 align-items-start">
+          <div class="col-lg-4">
+            <div class="display-4 fw-bold" id="headlineScore">--</div>
+            <p class="text-fg-2" id="reportSummary">Loading...</p>
+            <div class="notice mt-3" id="competitorSummary"></div>
+            <div class="mt-3">
+              <h6 class="text-fg-2">Key metrics</h6>
+              <div id="overviewMetrics" class="d-flex flex-column gap-2"></div>
+            </div>
+          </div>
+          <div class="col-lg-8">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="summary-panel">
+                  <h6 class="text-fg-2 mb-2">Strategic drivers</h6>
+                  <ul id="strategicDriverList" class="list-unstyled small mb-0"></ul>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="summary-panel">
+                  <h6 class="text-fg-2 mb-2">Capability focus</h6>
+                  <div id="capabilityFocusChips" class="d-flex flex-wrap gap-2"></div>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="summary-panel">
+                  <h6 class="text-fg-2 mb-2">Strategic recommendations</h6>
+                  <ol id="recommendations" class="mb-0 small"></ol>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        </section>
+
+        <section class="card glass p-4 mb-4">
+          <h5 class="section-heading mb-3">Overview</h5>
+          <div class="row g-4">
+          <div class="col-lg-6">
+            <div class="summary-panel h-100">
+              <h6 class="text-fg-2 mb-2">Persona highlights</h6>
+              <div id="personaHighlights" class="d-flex flex-column gap-2"></div>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <div class="summary-panel h-100">
+              <h6 class="text-fg-2 mb-2">Maturity signals</h6>
+              <div id="maturitySignals" class="d-flex flex-column gap-2"></div>
+            </div>
+          </div>
+        </div>
+        </section>
+
+        <section class="card glass p-4 mb-4">
+          <h5 class="section-heading mb-3">Technology</h5>
+        <div class="row g-4">
+          <div class="col-lg-6">
+            <div class="summary-panel h-100">
+              <h6 class="text-fg-2 mb-2">Architecture signals</h6>
+              <div id="architectureSignals" class="d-flex flex-column gap-2"></div>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <div class="summary-panel h-100">
+              <h6 class="text-fg-2 mb-2">Tooling snapshot</h6>
+              <div id="toolingSnapshot" class="d-flex flex-column gap-2"></div>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <div class="summary-panel h-100">
+              <h6 class="text-fg-2 mb-2">Vendor signals</h6>
+              <div id="vendorSignals" class="d-flex flex-column gap-2"></div>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <div class="summary-panel h-100">
+              <h6 class="text-fg-2 mb-2">Opportunities</h6>
+              <div id="technologyOpportunities" class="d-flex flex-column gap-2"></div>
+            </div>
+          </div>
+        </div>
+        </section>
+
+        <section class="card glass p-4 mb-4">
+          <h5 class="section-heading mb-3">Data & analytics</h5>
+        <div class="row g-4">
+          <div class="col-lg-6">
+            <div class="summary-panel h-100">
+              <h6 class="text-fg-2 mb-2">Pipelines & shippers</h6>
+              <div id="dataPipelines" class="d-flex flex-column gap-2"></div>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <div class="summary-panel h-100">
+              <h6 class="text-fg-2 mb-2">Insight expectations</h6>
+              <div id="insightExpectations" class="d-flex flex-column gap-2"></div>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <div class="summary-panel h-100">
+              <h6 class="text-fg-2 mb-2">Analytics focus areas</h6>
+              <div id="analyticsFocus" class="d-flex flex-column gap-2"></div>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <div class="summary-panel h-100">
+              <h6 class="text-fg-2 mb-2">Value drivers</h6>
+              <div id="dataValueDrivers" class="d-flex flex-column gap-2"></div>
+            </div>
+          </div>
+        </div>
+        </section>
+
+        <section class="card glass p-4 mb-4">
+          <h5 class="section-heading mb-3">People</h5>
+        <div class="row g-4">
+          <div class="col-lg-6">
+            <div class="summary-panel h-100">
+              <h6 class="text-fg-2 mb-2">Organisation structure</h6>
+              <div id="organisationStructure" class="d-flex flex-column gap-2"></div>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <div class="summary-panel h-100">
+              <h6 class="text-fg-2 mb-2">Talent & change focus</h6>
+              <ul id="talentFocusList" class="list-unstyled small mb-0"></ul>
+            </div>
+          </div>
+          <div class="col-lg-12">
+            <div class="summary-panel">
+              <h6 class="text-fg-2 mb-2">Persona briefings</h6>
+              <div id="personaBriefings" class="row g-3"></div>
+            </div>
+          </div>
+        </div>
+        </section>
+
+        <section class="card glass p-4 mb-4">
+          <h5 class="section-heading mb-3">Process</h5>
+        <div class="row g-4">
+          <div class="col-lg-4">
+            <div class="summary-panel h-100">
+              <h6 class="text-fg-2 mb-2">Operating rhythms</h6>
+              <p class="small mb-0" id="operatingRhythms"></p>
+            </div>
+          </div>
+          <div class="col-lg-4">
+            <div class="summary-panel h-100">
+              <h6 class="text-fg-2 mb-2">Procurement & reporting</h6>
+              <ul class="list-unstyled small mb-0" id="processSummary"></ul>
+            </div>
+          </div>
+          <div class="col-lg-4">
+            <div class="summary-panel h-100">
+              <h6 class="text-fg-2 mb-2">Risk register</h6>
+              <div id="riskRegister" class="d-flex flex-column gap-2"></div>
+            </div>
+          </div>
+        </div>
+        </section>
+
+        <section class="card glass p-4 mb-4">
+          <h5 class="section-heading mb-3">Value path</h5>
+        <div class="row g-4">
+          <div class="col-lg-7">
+            <div class="summary-panel h-100">
+              <h6 class="text-fg-2 mb-2">Transformation phases</h6>
+              <div class="table-responsive">
+                <table class="table table-dark table-sm align-middle mb-0" id="valuePathTable">
+                  <thead>
+                    <tr>
+                      <th>Phase</th>
+                      <th>Duration</th>
+                      <th>Focus</th>
+                      <th>Maturity target</th>
+                      <th>Outcomes</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-5">
+            <div class="summary-panel h-100">
+              <h6 class="text-fg-2 mb-2">Coverage impact</h6>
+              <div id="coverageImpactList" class="d-flex flex-column gap-2 mb-3"></div>
+              <h6 class="text-fg-2 mb-2">Objectives</h6>
+              <ul id="coverageObjectivesList" class="list-unstyled small mb-3"></ul>
+              <h6 class="text-fg-2 mb-2">Value lenses</h6>
+              <ul id="valueLenses" class="list-unstyled small mb-0"></ul>
+            </div>
+          </div>
+        </div>
+        </section>
+      </div>
+
+      <div class="tab-panel d-none" data-tab="vendors">
+        <section class="card glass p-4 mb-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="section-heading mb-0">Vendor shortlist</h5>
+            <span class="badge-pill" id="vendorContext"></span>
+          </div>
+          <div id="vendorShortlist" class="row g-3"></div>
+          <div id="vendorEmpty" class="text-fg-3 small"></div>
+        </section>
+        <section class="card glass p-4 mb-4">
+          <h5 class="section-heading mb-3">Strengths & caveats</h5>
+          <div id="vendorInsights" class="row g-3"></div>
+        </section>
+      </div>
+
+      <div class="tab-panel d-none" data-tab="rfp">
+        <section class="card glass p-4 mb-4">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <h5 class="section-heading mb-1">RFP draft</h5>
+              <div class="text-fg-3" id="rfpMeta"></div>
+            </div>
+          </div>
+          <div class="row g-4">
+            <div class="col-lg-6">
+              <div class="summary-panel h-100">
+                <h6 class="text-fg-2 mb-2">Evaluation criteria</h6>
+                <div id="rfpCriteria" class="d-flex flex-column gap-2"></div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="summary-panel h-100">
+                <h6 class="text-fg-2 mb-2">Stakeholders</h6>
+                <div id="rfpStakeholders" class="d-flex flex-column gap-2"></div>
+              </div>
+            </div>
+            <div class="col-lg-12">
+              <div class="summary-panel">
+                <h6 class="text-fg-2 mb-2">Key questions</h6>
+                <div id="rfpQuestions" class="d-flex flex-column gap-2"></div>
+              </div>
+            </div>
+            <div class="col-lg-12">
+              <div class="summary-panel">
+                <h6 class="text-fg-2 mb-2">Timeline</h6>
+                <div id="rfpTimeline" class="d-flex flex-column gap-2"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="loading" class="d-flex align-items-center justify-content-center py-5">
+      <div class="text-center text-fg-2">
+        <div class="spinner-border text-primary mb-3" role="status"></div>
+        <div>Generating your tailored intelligence...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const reportId = params.get('id');
+    if (!reportId) {
+      location.href = '/dashboard.html';
+    }
+
+    const contentEl = document.getElementById('content');
+    const loadingEl = document.getElementById('loading');
+    const exportBtn = document.getElementById('exportPlan');
+    const exportRfpBtn = document.getElementById('exportRfp');
+    const unlockBtn = document.getElementById('unlock');
+    const premiumIntake = document.getElementById('premiumIntake');
+    const tabButtons = document.querySelectorAll('#reportTabs [data-tab-target]');
+    const tabPanels = document.querySelectorAll('.tab-panel');
+
+    let currentRfpDraftId = null;
+
+    const setText = (id, value, fallback = '—') => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.textContent = value ? String(value) : fallback;
+      }
+    };
+
+    const renderList = (id, items, { emptyText } = {}) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.innerHTML = '';
+      const list = Array.isArray(items) ? items : [];
+      if (!list.length && emptyText) {
+        const li = document.createElement('li');
+        li.className = 'text-fg-3';
+        li.textContent = emptyText;
+        el.appendChild(li);
+        return;
+      }
+      list.forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = item;
+        el.appendChild(li);
+      });
+    };
+
+    const renderChips = (id, items) => {
+      const container = document.getElementById(id);
+      if (!container) return;
+      container.innerHTML = '';
+      const list = Array.isArray(items) ? items : [];
+      list.forEach(text => {
+        const span = document.createElement('span');
+        span.className = 'badge-pill';
+        span.textContent = text;
+        container.appendChild(span);
+      });
+      if (!list.length) {
+        const span = document.createElement('span');
+        span.className = 'text-fg-3 small';
+        span.textContent = 'No focus areas captured.';
+        container.appendChild(span);
+      }
+    };
+
+    const renderPersonaHighlights = (highlights = []) => {
+      const container = document.getElementById('personaHighlights');
+      if (!container) return;
+      container.innerHTML = '';
+      if (!highlights.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-fg-3 small';
+        empty.textContent = 'Add personas in the premium intake to tailor executive guidance.';
+        container.appendChild(empty);
+        return;
+      }
+      highlights.forEach(item => {
+        const panel = document.createElement('div');
+        panel.className = 'persona-card';
+        panel.innerHTML = `
+          <h6 class="mb-1">${item.title || 'Persona'}</h6>
+          ${item.focus ? `<p class="small mb-2">${item.focus}</p>` : ''}
+          ${Array.isArray(item.metrics) && item.metrics.length ? `<ul class="mb-0 small">${item.metrics.map(metric => `<li>${metric}</li>`).join('')}</ul>` : ''}
+        `;
+        container.appendChild(panel);
+      });
+    };
+
+    const renderMaturitySignals = (signals = []) => {
+      const container = document.getElementById('maturitySignals');
+      if (!container) return;
+      container.innerHTML = '';
+      if (!signals.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-fg-3 small';
+        empty.textContent = 'No maturity insights available yet.';
+        container.appendChild(empty);
+        return;
+      }
+      signals.forEach(signal => {
+        const card = document.createElement('div');
+        card.className = 'summary-tile';
+        card.innerHTML = `
+          <div class="d-flex justify-content-between align-items-center">
+            <strong>${signal.pillar || 'Capability'}</strong>
+            <span class="badge-pill">${signal.score ?? '--'}%</span>
+          </div>
+          <div class="small text-fg-3">${signal.commentary || ''}</div>
+          ${signal.quickWins?.length ? `<div class="mt-2 small">Quick wins: ${signal.quickWins.join(', ')}</div>` : ''}
+        `;
+        container.appendChild(card);
+      });
+    };
+
+    const renderKeyValueList = (containerId, entries = []) => {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      container.innerHTML = '';
+      entries.forEach(entry => {
+        if (!entry) return;
+        const wrap = document.createElement('div');
+        wrap.className = 'summary-line';
+        wrap.innerHTML = `<strong>${entry.title}</strong><span class="text-fg-3 small">${entry.value}</span>`;
+        container.appendChild(wrap);
+      });
+      if (!entries.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-fg-3 small';
+        empty.textContent = 'No data provided yet.';
+        container.appendChild(empty);
+      }
+    };
+
+    const renderOpportunities = (containerId, opportunities = []) => {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      container.innerHTML = '';
+      if (!opportunities.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-fg-3 small';
+        empty.textContent = 'Add technology landscape inputs to surface tailored opportunities.';
+        container.appendChild(empty);
+        return;
+      }
+      opportunities.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'summary-tile';
+        card.innerHTML = `
+          <div class="fw-semibold">${item.pillar || item.category || 'Opportunity'}</div>
+          <div class="small text-fg-3 mb-1">${item.horizon ? `${item.horizon} horizon · ` : ''}${item.category || ''}</div>
+          <div class="small">${item.rationale || ''}</div>
+          ${Array.isArray(item.vendors) && item.vendors.length ? `<div class="small text-fg-3 mt-1">Vendors: ${item.vendors.join(', ')}</div>` : ''}
+        `;
+        container.appendChild(card);
+      });
+    };
+
+    const renderPersonaBriefings = (briefings = []) => {
+      const container = document.getElementById('personaBriefings');
+      if (!container) return;
+      container.innerHTML = '';
+      if (!briefings.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-fg-3 small';
+        empty.textContent = 'Select personas in the premium intake to generate executive briefings.';
+        container.appendChild(empty);
+        return;
+      }
+      briefings.forEach(brief => {
+        const col = document.createElement('div');
+        col.className = 'col-md-6';
+        col.innerHTML = `
+          <div class="persona-card h-100">
+            <h6>${brief.title || 'Persona'}</h6>
+            <div class="small text-fg-3 mb-2">Focus pillars: ${(brief.focusPillars || []).join(', ')}</div>
+            <ul class="mb-2 small">${(brief.actions || []).map(action => `<li>${action}</li>`).join('')}</ul>
+            <div class="small text-fg-3">Metrics: ${(brief.metrics || []).join(', ')}</div>
+          </div>
+        `;
+        container.appendChild(col);
+      });
+    };
+
+    const renderRiskRegister = (risks = []) => {
+      const container = document.getElementById('riskRegister');
+      if (!container) return;
+      container.innerHTML = '';
+      if (!risks.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-fg-3 small';
+        empty.textContent = 'No risks captured.';
+        container.appendChild(empty);
+        return;
+      }
+      risks.forEach(risk => {
+        const card = document.createElement('div');
+        card.className = 'summary-tile';
+        card.innerHTML = `
+          <div class="fw-semibold">${risk.pillar || 'Risk'}</div>
+          <div class="small text-fg-3">${risk.risk || ''}</div>
+          <div class="small mt-2">Mitigation: ${risk.mitigation || 'TBC'}</div>
+          <div class="small text-fg-3 mt-1">Priority: ${risk.priority || '—'}</div>
+        `;
+        container.appendChild(card);
+      });
+    };
+
+    const renderValuePath = (phases = []) => {
+      const tbody = document.querySelector('#valuePathTable tbody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      if (!phases.length) {
+        const row = document.createElement('tr');
+        const cell = document.createElement('td');
+        cell.colSpan = 5;
+        cell.className = 'text-center text-fg-3';
+        cell.textContent = 'Value path will populate once maturity scoring is complete.';
+        row.appendChild(cell);
+        tbody.appendChild(row);
+        return;
+      }
+      phases.forEach(phase => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${phase.phase || ''}</td>
+          <td>${phase.duration || ''}</td>
+          <td>${phase.focusPillar || ''}</td>
+          <td>${phase.targetScore ?? '--'} (from ${phase.currentScore ?? '--'})</td>
+          <td>${(phase.outcomes || []).join('; ') || 'TBD'}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    };
+
+    const renderCoverage = (coverage = {}) => {
+      const impactContainer = document.getElementById('coverageImpactList');
+      const objectivesList = document.getElementById('coverageObjectivesList');
+      const valueLensesList = document.getElementById('valueLenses');
+
+      if (impactContainer) {
+        impactContainer.innerHTML = '';
+        const focus = Array.isArray(coverage.focusPillars) ? coverage.focusPillars : [];
+        if (!focus.length) {
+          const empty = document.createElement('div');
+          empty.className = 'text-fg-3 small';
+          empty.textContent = 'No urgent pillars captured yet.';
+          impactContainer.appendChild(empty);
+        } else {
+          focus.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'summary-tile';
+            card.innerHTML = `
+              <div class="d-flex justify-content-between align-items-center">
+                <strong>${item.pillar}</strong>
+                <span class="badge-pill">Urgency ${item.urgency ?? '—'}</span>
+              </div>
+              <div class="small text-fg-3">${item.commentary || ''}</div>
+            `;
+            impactContainer.appendChild(card);
+          });
+        }
+      }
+
+      renderList('coverageObjectivesList', coverage.objectives || [], { emptyText: 'No discovery objectives captured.' });
+
+      if (valueLensesList) {
+        valueLensesList.innerHTML = '';
+        const lenses = coverage.valueLenses || {};
+        const entries = Object.entries(lenses);
+        if (!entries.length) {
+          const li = document.createElement('li');
+          li.className = 'text-fg-3 small';
+          li.textContent = 'Define value drivers in the premium intake to quantify impact.';
+          valueLensesList.appendChild(li);
+        } else {
+          entries.forEach(([key, value]) => {
+            const li = document.createElement('li');
+            li.innerHTML = `<strong class="me-1 text-capitalize">${key}:</strong><span class="text-fg-3">${value}</span>`;
+            valueLensesList.appendChild(li);
+          });
+        }
+      }
+    };
+
+    const renderTooling = (containerId, items = []) => {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      container.innerHTML = '';
+      if (!items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-fg-3 small';
+        empty.textContent = 'Add current tools in the premium intake to populate this view.';
+        container.appendChild(empty);
+        return;
+      }
+      items.forEach(item => {
+        const tile = document.createElement('div');
+        tile.className = 'summary-tile';
+        tile.innerHTML = `
+          <strong>${item.area || 'Component'}</strong>
+          <div class="small text-fg-3">${Array.isArray(item.tools) ? item.tools.join(', ') : item.tools}</div>
+        `;
+        container.appendChild(tile);
+      });
+    };
+
+    const renderDataDrivers = (drivers = []) => {
+      const container = document.getElementById('dataValueDrivers');
+      if (!container) return;
+      container.innerHTML = '';
+      if (!drivers.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-fg-3 small';
+        empty.textContent = 'Complete maturity scoring to quantify analytics value drivers.';
+        container.appendChild(empty);
+        return;
+      }
+      drivers.forEach(driver => {
+        const tile = document.createElement('div');
+        tile.className = 'summary-tile';
+        tile.innerHTML = `
+          <strong>${driver.pillar}</strong>
+          <div class="small text-fg-3">${driver.narrative || ''}</div>
+        `;
+        container.appendChild(tile);
+      });
+    };
+
+    const renderTechnologySignals = (signals = []) => {
+      const container = document.getElementById('architectureSignals');
+      if (!container) return;
+      container.innerHTML = '';
+      if (!signals.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-fg-3 small';
+        empty.textContent = 'No architecture signals captured yet.';
+        container.appendChild(empty);
+        return;
+      }
+      signals.forEach(signal => {
+        const tile = document.createElement('div');
+        tile.className = 'summary-tile';
+        tile.innerHTML = `
+          <strong>${signal.layer || 'Observation'}</strong>
+          <div class="small text-fg-3">${signal.observation || ''}</div>
+          ${signal.implication ? `<div class="small mt-1">Implication: ${signal.implication}</div>` : ''}
+        `;
+        container.appendChild(tile);
+      });
+    };
+
+    const renderVendorSignals = (signals = []) => {
+      const container = document.getElementById('vendorSignals');
+      if (!container) return;
+      container.innerHTML = '';
+      if (!signals.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-fg-3 small';
+        empty.textContent = 'Document vendor strategy to surface alignment and watchlists.';
+        container.appendChild(empty);
+        return;
+      }
+      signals.forEach(signal => {
+        const tile = document.createElement('div');
+        tile.className = 'summary-tile';
+        tile.innerHTML = `
+          <strong>${signal.theme || 'Vendor signal'}</strong>
+          <div class="small">${signal.note || ''}</div>
+          ${Array.isArray(signal.vendors) && signal.vendors.length ? `<div class="small text-fg-3 mt-1">Vendors: ${signal.vendors.join(', ')}</div>` : ''}
+        `;
+        container.appendChild(tile);
+      });
+    };
+
+    const renderVendorShortlist = (vendors = []) => {
+      const grid = document.getElementById('vendorShortlist');
+      const empty = document.getElementById('vendorEmpty');
+      if (!grid || !empty) return;
+      grid.innerHTML = '';
+      empty.textContent = '';
+      if (!vendors.length) {
+        empty.textContent = 'Shortlist will populate once capability focus and project details are available.';
+        return;
+      }
+      vendors.forEach(vendor => {
+        const col = document.createElement('div');
+        col.className = 'col-lg-4';
+        col.innerHTML = `
+          <div class="summary-panel h-100">
+            <h6 class="mb-1">${vendor.name || vendor.slug}</h6>
+            <div class="text-fg-3 small mb-2">${(vendor.categories || []).join(', ')}</div>
+            ${vendor.pricingNotes ? `<div class="small mb-2">Pricing: ${vendor.pricingNotes}</div>` : ''}
+            ${Array.isArray(vendor.reasons) && vendor.reasons.length ? `<ul class="small mb-0">${vendor.reasons.map(reason => `<li>${reason}</li>`).join('')}</ul>` : ''}
+          </div>
+        `;
+        grid.appendChild(col);
+      });
+    };
+
+    const renderVendorInsights = (vendors = []) => {
+      const grid = document.getElementById('vendorInsights');
+      if (!grid) return;
+      grid.innerHTML = '';
+      if (!vendors.length) {
+        const col = document.createElement('div');
+        col.className = 'col-12 text-fg-3 small';
+        col.textContent = 'Generate a shortlist to surface strengths and caveats.';
+        grid.appendChild(col);
+        return;
+      }
+      vendors.slice(0, 3).forEach(vendor => {
+        const col = document.createElement('div');
+        col.className = 'col-lg-4';
+        const strengths = (vendor.strengths || []).slice(0, 4);
+        const caveats = (vendor.caveats || []).slice(0, 3);
+        col.innerHTML = `
+          <div class="summary-panel h-100">
+            <h6 class="mb-2">${vendor.name || vendor.slug}</h6>
+            ${strengths.length ? `<div class="small mb-2"><strong>Strengths:</strong> ${strengths.join(', ')}</div>` : ''}
+            ${caveats.length ? `<div class="small text-fg-3"><strong>Caveats:</strong> ${caveats.join(', ')}</div>` : ''}
+          </div>
+        `;
+        grid.appendChild(col);
+      });
+    };
+
+    const renderAnalyticsFocus = (items = []) => {
+      const container = document.getElementById('analyticsFocus');
+      if (!container) return;
+      container.innerHTML = '';
+      if (!items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-fg-3 small';
+        empty.textContent = 'Benchmark data not available for this assessment.';
+        container.appendChild(empty);
+        return;
+      }
+      items.forEach(item => {
+        const tile = document.createElement('div');
+        tile.className = 'summary-tile';
+        tile.innerHTML = `
+          <strong>${item.pillar || 'Dimension'}</strong>
+          <div class="small text-fg-3">Peer median: ${item.median ?? '--'} · Target: ${item.target ?? '--'}</div>
+        `;
+        container.appendChild(tile);
+      });
+    };
+
+    const renderOrganisationStructure = (items = []) => {
+      const container = document.getElementById('organisationStructure');
+      if (!container) return;
+      container.innerHTML = '';
+      if (!items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-fg-3 small';
+        empty.textContent = 'Document reporting lines to personalise the operating model guidance.';
+        container.appendChild(empty);
+        return;
+      }
+      items.forEach(item => {
+        const tile = document.createElement('div');
+        tile.className = 'summary-tile';
+        tile.textContent = item;
+        container.appendChild(tile);
+      });
+    };
+
+    const renderTalentFocus = (focus, timeline = []) => {
+      const list = document.getElementById('talentFocusList');
+      if (!list) return;
+      list.innerHTML = '';
+      const entries = [];
+      if (focus?.talentFocus) entries.push(`Talent: ${focus.talentFocus}`);
+      if (focus?.changeManagement) entries.push(`Change: ${focus.changeManagement}`);
+      if (timeline?.length) {
+        timeline.slice(0, 3).forEach(item => {
+          if (!item) return;
+          const actionList = Array.isArray(item.actions) ? item.actions.join('; ') : item.actions;
+          entries.push(`${item.phase}: ${actionList}`);
+        });
+      }
+      if (!entries.length) {
+        const li = document.createElement('li');
+        li.className = 'text-fg-3';
+        li.textContent = 'Capture talent priorities to unlock persona activation guidance.';
+        list.appendChild(li);
+        return;
+      }
+      entries.forEach(entry => {
+        const li = document.createElement('li');
+        li.textContent = entry;
+        list.appendChild(li);
+      });
+    };
+
+    const renderProcessSummary = (process = {}) => {
+      const list = document.getElementById('processSummary');
+      if (!list) return;
+      list.innerHTML = '';
+      const entries = [];
+      if (process.procurement) entries.push(`Procurement: ${process.procurement}`);
+      if (process.reportingChains) entries.push(`Reporting: ${process.reportingChains}`);
+      if (process.meanTimeToInnocence) entries.push(`MTTI: ${process.meanTimeToInnocence}`);
+      if (!entries.length) {
+        const li = document.createElement('li');
+        li.className = 'text-fg-3';
+        li.textContent = 'Define procurement and reporting cadences to align governance guidance.';
+        list.appendChild(li);
+        return;
+      }
+      entries.forEach(entry => {
+        const li = document.createElement('li');
+        li.textContent = entry;
+        list.appendChild(li);
+      });
+    };
+
+    const renderValueDrivers = (containerId, items = []) => {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      container.innerHTML = '';
+      if (!items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-fg-3 small';
+        empty.textContent = 'Capture additional data to quantify value impact.';
+        container.appendChild(empty);
+        return;
+      }
+      items.forEach(item => {
+        const tile = document.createElement('div');
+        tile.className = 'summary-tile';
+        tile.innerHTML = `<strong>${item.title}</strong><div class="small text-fg-3">${item.value}</div>`;
+        container.appendChild(tile);
+      });
+    };
+
+    const renderDataLists = (id, items = []) => {
+      const container = document.getElementById(id);
+      if (!container) return;
+      container.innerHTML = '';
+      if (!items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-fg-3 small';
+        empty.textContent = 'No data provided.';
+        container.appendChild(empty);
+        return;
+      }
+      items.forEach(item => {
+        const tile = document.createElement('div');
+        tile.className = 'summary-tile';
+        tile.textContent = item;
+        container.appendChild(tile);
+      });
+    };
+
+    const renderAnalyticsDrivers = (drivers = []) => {
+      const list = drivers.map(driver => driver && driver.pillar ? `${driver.pillar}: peer median ${driver.median ?? '--'} · target ${driver.target ?? '--'}` : null).filter(Boolean);
+      renderDataLists('analyticsFocus', list);
+    };
+
+    const renderRfpDraft = draft => {
+      const meta = document.getElementById('rfpMeta');
+      const criteriaContainer = document.getElementById('rfpCriteria');
+      const stakeholdersContainer = document.getElementById('rfpStakeholders');
+      const questionsContainer = document.getElementById('rfpQuestions');
+      const timelineContainer = document.getElementById('rfpTimeline');
+
+      if (meta) {
+        if (draft) {
+          meta.textContent = `Capability: ${draft.capability || '—'}${draft.industry ? ` · Industry: ${draft.industry}` : ''}`;
+        } else {
+          meta.textContent = 'RFP draft will appear once a capability assessment is available.';
+        }
+      }
+
+      const hydrateList = (container, items, { emptyText, formatter }) => {
+        if (!container) return;
+        container.innerHTML = '';
+        const list = Array.isArray(items) ? items : [];
+        if (!list.length) {
+          const empty = document.createElement('div');
+          empty.className = 'text-fg-3 small';
+          empty.textContent = emptyText;
+          container.appendChild(empty);
+          return;
+        }
+        list.forEach(item => {
+          const tile = document.createElement('div');
+          tile.className = 'summary-tile';
+          tile.innerHTML = formatter(item);
+          container.appendChild(tile);
+        });
+      };
+
+      hydrateList(criteriaContainer, draft?.criteria, {
+        emptyText: 'No evaluation criteria generated yet.',
+        formatter: item => {
+          const weight = typeof item?.weight === 'number' ? `<span class="text-fg-3 ms-2">${item.weight}%</span>` : '';
+          const desc = item?.description ? `<div class="small mt-1">${item.description}</div>` : '';
+          return `<strong>${item?.title || 'Criterion'}</strong>${weight}${desc}`;
+        }
+      });
+
+      hydrateList(stakeholdersContainer, draft?.stakeholders, {
+        emptyText: 'Add stakeholders to tailor governance guidance.',
+        formatter: person => {
+          const role = person?.role ? `<div class="small text-fg-3">${person.role}</div>` : '';
+          return `<strong>${person?.name || 'Stakeholder'}</strong>${role}`;
+        }
+      });
+
+      hydrateList(questionsContainer, draft?.questions, {
+        emptyText: 'No supplier questions generated yet.',
+        formatter: question => {
+          const section = question?.section ? `<div class="small text-fg-3 mb-1">${question.section}</div>` : '';
+          const guidance = question?.guidance ? `<div class="small text-fg-3 mt-1">Guidance: ${question.guidance}</div>` : '';
+          return `${section}<div>${question?.prompt || ''}</div>${guidance}`;
+        }
+      });
+
+      hydrateList(timelineContainer, draft?.timeline?.phases, {
+        emptyText: 'Add timeline expectations to structure the sourcing process.',
+        formatter: phase => {
+          const duration = phase?.durationWeeks ? `<span class="text-fg-3 ms-2">${phase.durationWeeks} weeks</span>` : '';
+          const activities = Array.isArray(phase?.activities) && phase.activities.length
+            ? `<div class="small text-fg-3 mt-1">${phase.activities.join('; ')}</div>`
+            : '';
+          return `<strong>${phase?.name || 'Phase'}</strong>${duration}${activities}`;
+        }
+      });
+
+      if (draft?.timeline?.targetLaunch && timelineContainer) {
+        const footer = document.createElement('div');
+        footer.className = 'text-fg-3 small mt-2';
+        footer.textContent = `Target launch: ${draft.timeline.targetLaunch}`;
+        timelineContainer.appendChild(footer);
+      }
+    };
+
+    const renderCoverageMetrics = (report) => {
+      const metrics = [];
+      metrics.push({ title: 'Overall score', value: `${report.headlineScore ?? '--'}` });
+      if (report.competitorSummary?.percentile) {
+        metrics.push({ title: 'Percentile vs peers', value: `${report.competitorSummary.percentile}th` });
+      }
+      if (report.stage) {
+        metrics.push({ title: 'Report stage', value: report.stage });
+      }
+      const urgent = Object.entries(report.urgencyMap || {})
+        .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))
+        .slice(0, 3)
+        .map(([pillar, urgency]) => `${pillar} (${urgency})`);
+      if (urgent.length) {
+        metrics.push({ title: 'Urgent focus', value: urgent.join(', ') });
+      }
+      renderValueDrivers('overviewMetrics', metrics);
+    };
+
+    const renderReport = (report) => {
+      const overview = report.structuredSections?.overview || {};
+      const technology = report.structuredSections?.technology || {};
+      const dataSection = report.structuredSections?.data || {};
+      const people = report.structuredSections?.people || {};
+      const process = report.structuredSections?.process || {};
+
+      if (overview.organisation) {
+        setText('reportTitle', `${overview.organisation} — Executive report`);
+      }
+      setText('reportStatus', report.paid ? 'Premium' : 'Preview');
+      if (report.createdAt) {
+        const date = new Date(report.createdAt);
+        setText('reportDate', date.toLocaleString());
+      }
+      setText('headlineScore', report.headlineScore ?? '--');
+      setText('reportSummary', report.summary || overview.summary || '');
+      setText('competitorSummary', report.competitorSummary?.narrative || '', '');
+
+      renderCoverageMetrics(report);
+      renderList('strategicDriverList', overview.strategicDrivers || [], { emptyText: 'No drivers selected.' });
+      renderChips('capabilityFocusChips', overview.capabilityFocus || []);
+      renderList('recommendations', report.recommendations || [], { emptyText: 'Complete premium intake to unlock recommendations.' });
+      renderPersonaHighlights(overview.personaHighlights || []);
+      renderMaturitySignals(overview.maturitySignals || []);
+
+      renderTechnologySignals(technology.architectureSignals || []);
+      renderTooling('toolingSnapshot', technology.toolingSnapshot || []);
+      renderVendorSignals(technology.vendorSignals || []);
+      renderOpportunities('technologyOpportunities', technology.opportunities || []);
+
+      renderDataLists('dataPipelines', dataSection.pipelines || []);
+      renderDataLists('insightExpectations', dataSection.insightExpectations || []);
+      renderAnalyticsDrivers(dataSection.analyticsFocus || []);
+      renderDataDrivers(dataSection.valueDrivers?.map(driver => ({ title: driver.pillar, value: driver.narrative })) || []);
+
+      renderOrganisationStructure(people.organisationStructure || []);
+      renderTalentFocus(people, people.timelineExpectations || []);
+      renderPersonaBriefings(report.personaBriefings || []);
+
+      setText('operatingRhythms', process.governanceCadence || '');
+      renderProcessSummary({
+        procurement: process.procurement,
+        reportingChains: process.reportingChains,
+        meanTimeToInnocence: process.meanTimeToInnocence
+      });
+      renderRiskRegister(process.riskRegister || []);
+
+      renderValuePath(report.valuePath || []);
+      renderCoverage(report.coverageSummary || {});
+    };
+
+    const loadVendorData = async report => {
+      if (!report.projectId) return;
+      try {
+        const res = await fetch('/api/vendors/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            projectId: report.projectId,
+            capability: report.assessmentType,
+            query: report.summary?.slice(0, 120)
+          })
+        });
+        if (!res.ok) throw new Error('Vendor search failed');
+        const json = await res.json();
+        const matches = Array.isArray(json.matches) ? json.matches : [];
+        setText('vendorContext', matches.length ? `${matches.length} matches` : 'No matches');
+        renderVendorShortlist(matches);
+        renderVendorInsights(matches);
+      } catch (err) {
+        console.error(err);
+        const empty = document.getElementById('vendorEmpty');
+        if (empty) {
+          empty.textContent = 'Unable to load vendor shortlist right now.';
+        }
+        setText('vendorContext', 'Unavailable');
+      }
+    };
+
+    const loadRfpDraft = async report => {
+      if (!report.projectId) {
+        renderRfpDraft(null);
+        return;
+      }
+      try {
+        const res = await fetch('/api/rfp/templates/materialize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            projectId: report.projectId,
+            capability: report.assessmentType,
+            industry: report.vertical,
+            assessmentId: report.assessmentId
+          })
+        });
+        if (!res.ok) throw new Error('Unable to generate RFP draft');
+        const json = await res.json();
+        const draft = json.draft;
+        renderRfpDraft(draft);
+        currentRfpDraftId = draft?._id || null;
+        if (draft?._id && exportRfpBtn) {
+          exportRfpBtn.classList.remove('d-none');
+          exportRfpBtn.onclick = () => {
+            window.location.href = `/api/rfp/${encodeURIComponent(draft._id)}/export`;
+          };
+        }
+      } catch (err) {
+        console.error(err);
+        renderRfpDraft(null);
+        if (exportRfpBtn) {
+          exportRfpBtn.classList.add('d-none');
+        }
+        currentRfpDraftId = null;
+      }
+    };
+
+    const handleUnlock = async (reportId) => {
+      try {
+        const res = await fetch('/api/payments/mock/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ reportId })
+        });
+        const json = await res.json();
+        if (!res.ok || !json.ok) {
+          alert(json.error || 'Unable to unlock report at this time.');
+          return;
+        }
+        location.reload();
+      } catch (err) {
+        console.error(err);
+        alert('Unable to unlock report at this time.');
+      }
+    };
+
+    const init = async () => {
+      activateTab('overview');
+      try {
+        const res = await fetch(`/api/reports/${encodeURIComponent(reportId)}`, { credentials: 'include' });
+        if (res.status === 401) {
+          location.href = '/login.html';
+          return;
+        }
+        if (!res.ok) {
+          throw new Error('Failed to load report');
+        }
+        const json = await res.json();
+        if (!json.ok) {
+          throw new Error(json.error || 'Unable to load report');
+        }
+        const report = json.report;
+
+        if (exportBtn) {
+          exportBtn.addEventListener('click', () => {
+            window.location.href = `/api/reports/${encodeURIComponent(report._id)}/export`;
+          });
+        }
+        if (unlockBtn) {
+          unlockBtn.addEventListener('click', () => handleUnlock(report._id));
+        }
+        if (premiumIntake && report.assessmentId) {
+          premiumIntake.classList.remove('d-none');
+          premiumIntake.href = `/premium-assessment.html?id=${encodeURIComponent(report.assessmentId)}`;
+        }
+        if (!report.paid) {
+          unlockBtn?.classList.remove('d-none');
+        }
+
+        renderReport(report);
+        if (exportRfpBtn) {
+          exportRfpBtn.classList.add('d-none');
+        }
+        loadVendorData(report);
+        loadRfpDraft(report);
+        loadingEl.classList.add('d-none');
+        contentEl.classList.remove('d-none');
+      } catch (err) {
+        console.error(err);
+        loadingEl.innerHTML = '<div class="text-danger">Failed to load report. Refresh to try again.</div>';
+      }
+    };
+
+    init();
+  </script>
+</body>
+</html>
+    const activateTab = target => {
+      tabButtons.forEach(btn => {
+        const isActive = btn.dataset.tabTarget === target;
+        btn.classList.toggle('active', isActive);
+      });
+      tabPanels.forEach(panel => {
+        const isActive = panel.dataset.tab === target;
+        panel.classList.toggle('d-none', !isActive);
+      });
+    };
+
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', event => {
+        event.preventDefault();
+        activateTab(btn.dataset.tabTarget);
+      });
+    });
