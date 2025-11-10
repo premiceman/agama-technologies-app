@@ -1,0 +1,28 @@
+{
+  "medians": {
+    "overall": 60,
+    "pillars": {
+      "Observability": 62,
+      "Security": 58,
+      "AIOps": 55,
+      "Business Analytics": 61
+    }
+  },
+  "percentiles": {
+    "Observability": { "p75": 78, "p90": 86 },
+    "Security": { "p75": 74, "p90": 83 },
+    "AIOps": { "p75": 71, "p90": 82 },
+    "Business Analytics": { "p75": 76, "p90": 85 }
+  },
+  "spend": {
+    "Observability": { "median": 0.07, "leaders": 0.11 },
+    "Security": { "median": 0.09, "leaders": 0.14 },
+    "AIOps": { "median": 0.05, "leaders": 0.09 },
+    "Business Analytics": { "median": 0.08, "leaders": 0.12 }
+  },
+  "leaders": [
+    { "name": "Digital Native A", "focus": "Proactive SLO management, golden signals automation" },
+    { "name": "Global Enterprise B", "focus": "Unified SOC + NOC, integrated risk telemetry" },
+    { "name": "Scale-up C", "focus": "Unified analytics lakehouse with governed self-serve" }
+  ]
+}

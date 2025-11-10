@@ -1,0 +1,28 @@
+{
+  "medians": {
+    "overall": 65,
+    "pillars": {
+      "Observability": 68,
+      "Security": 63,
+      "AIOps": 60,
+      "Business Analytics": 66
+    }
+  },
+  "percentiles": {
+    "Observability": { "p75": 82, "p90": 90 },
+    "Security": { "p75": 78, "p90": 87 },
+    "AIOps": { "p75": 75, "p90": 86 },
+    "Business Analytics": { "p75": 80, "p90": 88 }
+  },
+  "spend": {
+    "Observability": { "median": 0.08, "leaders": 0.12 },
+    "Security": { "median": 0.1, "leaders": 0.16 },
+    "AIOps": { "median": 0.06, "leaders": 0.1 },
+    "Business Analytics": { "median": 0.09, "leaders": 0.13 }
+  },
+  "leaders": [
+    { "name": "Cloud SaaS Pioneer", "focus": "Automated remediation pipelines and FinOps" },
+    { "name": "AI-first SaaS", "focus": "Real-time customer telemetry with in-product ML" },
+    { "name": "Enterprise SaaS", "focus": "Continuous compliance with predictive risk scoring" }
+  ]
+}
