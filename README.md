@@ -19,7 +19,7 @@ Agama is organised around three pillars:
 ## Repository Structure
 
 ```
-/server
+/backend
   index.js                # Express app, session management, static file serving
   /models                 # Mongoose schemas (users, orgs, projects, assessments, etc.)
   /routes                 # Modular API endpoints for orgs, projects, RFX, AI helpers
@@ -47,7 +47,7 @@ README.md                 # This guide
 
 ## Environment Variables
 
-The server reads configuration from `.env` (create `/server/.env` locally). Required keys:
+The server reads configuration from `.env` (create `/backend/.env` locally). Required keys:
 
 - `MONGODB_URI` – MongoDB Atlas (or local) connection string.
 - `SESSION_SECRET` – long random string for Express sessions.
@@ -57,7 +57,7 @@ The server reads configuration from `.env` (create `/server/.env` locally). Requ
 
 1. **Install dependencies**
    ```bash
-   cd server
+   cd backend
    npm install
    ```
 2. **Configure environment**
@@ -66,7 +66,7 @@ The server reads configuration from `.env` (create `/server/.env` locally). Requ
    ```
 3. **Run the development server**
    ```bash
-   npm run dev            # nodemon watches server/index.js
+   npm run dev            # nodemon watches backend/index.js
    ```
 4. **Open the client** – visit `http://localhost:5000` (or the port reported in the terminal). Static files under `/client` are served directly by Express so no additional build step is required.
 
@@ -75,7 +75,7 @@ The server reads configuration from `.env` (create `/server/.env` locally). Requ
 Populate the default maturity models, demo organisation, seed project, sample vendor profile, and initial RFX:
 
 ```bash
-cd server
+cd backend
 npm run seed
 ```
 
@@ -106,7 +106,7 @@ All mutating operations emit `AuditEvent` records for downstream analytics and c
 
 The included `render.yaml` blueprint provisions a single Node web service:
 
-- **Root Directory**: `server`
+- **Root Directory**: `backend`
 - **Build Command**: `npm install`
 - **Start Command**: `node index.js`
 - **Environment Variables**: `MONGODB_URI`, `OPENAI_API_KEY`, `SESSION_SECRET`
