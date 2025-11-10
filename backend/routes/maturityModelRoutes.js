@@ -6,8 +6,8 @@ const router = Router();
 
 router.get('/', requireAuth, async (req, res, next) => {
   try {
-    const models = await MaturityModel.find({}).lean();
-    res.json({ models });
+    const models = await MaturityModel.find({});
+    res.json({ models: models.map((model) => model.toJSON()) });
   } catch (err) {
     next(err);
   }
@@ -15,11 +15,11 @@ router.get('/', requireAuth, async (req, res, next) => {
 
 router.get('/:id', requireAuth, async (req, res, next) => {
   try {
-    const model = await MaturityModel.findById(req.params.id).lean();
+    const model = await MaturityModel.findById(req.params.id);
     if (!model) {
       return res.status(404).json({ message: 'Model not found' });
     }
-    res.json({ model });
+    res.json({ model: model.toJSON() });
   } catch (err) {
     next(err);
   }

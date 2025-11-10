@@ -23,7 +23,7 @@ const createMaturityModels = async () => {
       {
         type: domain.toLowerCase(),
         version: 'v1',
-        schema: {
+        definition: {
           sections: [
             {
               id: `${domain.toLowerCase()}-strategy`,
