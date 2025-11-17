@@ -107,6 +107,7 @@ Render will build and start the app.
 - `JWT_COOKIE_NAME` (default: `at_session`)
 - `JWT_EXPIRES_DAYS` (default: `7`)
 - `ALLOWED_ORIGINS` (comma‑separated list of allowed origins)
+- `OPENAI_API_KEY` (optional, enables ProcurePath AI playbooks)
 
 ---
 
@@ -144,6 +145,7 @@ code <repo-name>
 1. Visit `/signup.html` to create an account.
 2. Run a free assessment at `/assessment.html`.
 3. You’ll see a **partial** report. Click **Unlock full report** to simulate payment and reveal everything.
+4. Business license users with ProcurePath enabled can open `/procurepath-tool.html` to manage vendors, objectives, touchpoints, and AI negotiation playbooks.
 
 > This project intentionally avoids any third‑party auth or storage services—only MongoDB and a single Render Web Service are required.
 
