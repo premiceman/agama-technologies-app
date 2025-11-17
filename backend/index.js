@@ -12,6 +12,7 @@ const { z } = require('zod');
 const { requireAuth, issueTokenCookie, clearTokenCookie } = require('./middleware/auth');
 const { validateBody } = require('./middleware/validation');
 const User = require('./models/User');
+const ProcurementVendor = require('./models/ProcurementVendor');
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
@@ -73,6 +74,8 @@ mongoose
     console.error('❌ MongoDB connection error', err);
     process.exit(1);
   });
+
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 const PLATFORM_DEFINITIONS = [
   {
@@ -137,6 +140,14 @@ function normalisePlatformAccess(licenseTier, requested) {
   return { platformAccess: filtered };
 }
 
+function assertProcurePathAccess(user) {
+  const hasProcurePath = Array.isArray(user.platformAccess) && user.platformAccess.includes('procurepath');
+  if (user.licenseTier !== 'business' || !hasProcurePath) {
+    return { error: 'ProcurePath Control Tower requires a business license with ProcurePath enabled.' };
+  }
+  return { ok: true };
+}
+
 const signupSchema = z.object({
   name: z.string().trim().min(1).max(120),
   email: z.string().email(),
@@ -160,6 +171,39 @@ const profileUpdateSchema = z.object({
   industry: z.string().trim().max(160).optional(),
   licenseTier: z.enum(LICENSE_OPTIONS).optional(),
   platformAccess: z.array(z.string()).optional()
+});
+
+const procurementVendorSchema = z.object({
+  name: z.string().trim().min(2).max(200),
+  category: z.string().trim().max(160).optional(),
+  tier: z.enum(['strategic', 'preferred', 'tactical', 'specialist']).optional(),
+  businessOwner: z.string().trim().max(160).optional(),
+  relationshipManager: z.string().trim().max(160).optional(),
+  annualSpend: z.coerce.number().min(0).max(1_000_000_000).optional(),
+  renewalDate: z.coerce.date().optional(),
+  healthScore: z.coerce.number().min(0).max(100).optional(),
+  riskLevel: z.enum(['low', 'medium', 'high']).optional(),
+  status: z.enum(['active', 'watchlist', 'sunset']).optional(),
+  notes: z.string().trim().max(2000).optional()
+});
+
+const procurementObjectiveSchema = z.object({
+  title: z.string().trim().min(4).max(240),
+  owner: z.string().trim().max(160).optional(),
+  targetMetric: z.string().trim().max(200).optional(),
+  targetValue: z.coerce.number().optional(),
+  unit: z.string().trim().max(40).optional(),
+  dueDate: z.coerce.date().optional(),
+  status: z.enum(['on-track', 'at-risk', 'blocked', 'completed']).optional(),
+  notes: z.string().trim().max(1200).optional()
+});
+
+const procurementTouchpointSchema = z.object({
+  type: z.string().trim().max(120).optional(),
+  occurredOn: z.coerce.date().optional(),
+  summary: z.string().trim().min(4).max(800),
+  followUp: z.string().trim().max(400).optional(),
+  sentiment: z.string().trim().max(120).optional()
 });
 
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: Date.now() }));
@@ -268,6 +312,215 @@ app.delete('/api/auth/me', requireAuth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Unable to delete profile' });
+  }
+});
+
+async function loadProcurePathUser(req, res) {
+  const user = await User.findById(req.auth.uid);
+  if (!user) {
+    res.status(404).json({ error: 'Not found' });
+    return null;
+  }
+
+  const access = assertProcurePathAccess(user);
+  if (access.error) {
+    res.status(403).json({ error: access.error });
+    return null;
+  }
+
+  return user;
+}
+
+app.get('/api/procurepath/overview', requireAuth, async (req, res) => {
+  try {
+    const user = await loadProcurePathUser(req, res);
+    if (!user) return;
+    const vendors = await ProcurementVendor.find({ userId: user._id }).lean();
+
+    const totalObjectives = vendors.reduce((acc, vendor) => acc + (vendor.objectives?.length || 0), 0);
+    const atRiskVendors = vendors.filter(vendor => vendor.riskLevel === 'high' || vendor.status === 'watchlist').length;
+    const upcomingRenewals = vendors.filter(vendor => {
+      if (!vendor.renewalDate) return false;
+      const diff = new Date(vendor.renewalDate).getTime() - Date.now();
+      return diff > 0 && diff < 90 * 24 * 60 * 60 * 1000;
+    }).length;
+
+    res.json({
+      ok: true,
+      overview: {
+        totalVendors: vendors.length,
+        totalObjectives,
+        atRiskVendors,
+        upcomingRenewals
+      },
+      vendors
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to load ProcurePath overview' });
+  }
+});
+
+app.get('/api/procurepath/vendors', requireAuth, async (req, res) => {
+  try {
+    const user = await loadProcurePathUser(req, res);
+    if (!user) return;
+    const vendors = await ProcurementVendor.find({ userId: user._id }).sort({ updatedAt: -1 }).lean();
+    res.json({ ok: true, vendors });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to fetch vendors' });
+  }
+});
+
+app.post('/api/procurepath/vendors', requireAuth, validateBody(procurementVendorSchema), async (req, res) => {
+  try {
+    const user = await loadProcurePathUser(req, res);
+    if (!user) return;
+    const vendor = await ProcurementVendor.create({ ...req.validatedBody, userId: user._id });
+    res.status(201).json({ ok: true, vendor });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to create vendor' });
+  }
+});
+
+app.put('/api/procurepath/vendors/:id', requireAuth, validateBody(procurementVendorSchema.partial()), async (req, res) => {
+  try {
+    const user = await loadProcurePathUser(req, res);
+    if (!user) return;
+    const vendor = await ProcurementVendor.findOneAndUpdate(
+      { _id: req.params.id, userId: user._id },
+      { $set: req.validatedBody },
+      { new: true }
+    );
+
+    if (!vendor) {
+      return res.status(404).json({ error: 'Vendor not found' });
+    }
+
+    res.json({ ok: true, vendor });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to update vendor' });
+  }
+});
+
+app.post(
+  '/api/procurepath/vendors/:id/objectives',
+  requireAuth,
+  validateBody(procurementObjectiveSchema),
+  async (req, res) => {
+    try {
+      const user = await loadProcurePathUser(req, res);
+      if (!user) return;
+
+      const vendor = await ProcurementVendor.findOne({ _id: req.params.id, userId: user._id });
+      if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
+
+      vendor.objectives.push(req.validatedBody);
+      await vendor.save();
+      res.status(201).json({ ok: true, vendor });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Unable to add objective' });
+    }
+  }
+);
+
+app.post(
+  '/api/procurepath/vendors/:id/touchpoints',
+  requireAuth,
+  validateBody(procurementTouchpointSchema),
+  async (req, res) => {
+    try {
+      const user = await loadProcurePathUser(req, res);
+      if (!user) return;
+
+      const vendor = await ProcurementVendor.findOne({ _id: req.params.id, userId: user._id });
+      if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
+
+      vendor.touchpoints.push(req.validatedBody);
+      await vendor.save();
+      res.status(201).json({ ok: true, vendor });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Unable to add touchpoint' });
+    }
+  }
+);
+
+app.post('/api/procurepath/ai/playbook', requireAuth, async (req, res) => {
+  try {
+    const user = await loadProcurePathUser(req, res);
+    if (!user) return;
+
+    if (!OPENAI_API_KEY) {
+      return res
+        .status(400)
+        .json({ error: 'OpenAI API key missing. Add OPENAI_API_KEY to generate AI playbooks.' });
+    }
+
+    const { vendorId, goal } = req.body || {};
+    if (!vendorId || !goal) {
+      return res.status(400).json({ error: 'Provide vendorId and goal to generate a playbook.' });
+    }
+
+    const vendor = await ProcurementVendor.findOne({ _id: vendorId, userId: user._id });
+    if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
+
+    const latestObjectives = (vendor.objectives || []).slice(-3);
+    const objectiveSummary = latestObjectives
+      .map(obj => `${obj.title} (${obj.status || 'on-track'}) - ${obj.targetMetric || 'Outcome focus'}`)
+      .join('; ');
+
+    const touchpointSummary = (vendor.touchpoints || [])
+      .slice(-2)
+      .map(tp => `${tp.type || 'Touchpoint'}: ${tp.summary}`)
+      .join(' | ');
+
+    const prompt = [
+      'You are a procurement strategist building a vendor relationship playbook.',
+      `Vendor: ${vendor.name} (${vendor.category || 'uncategorised'}). Tier: ${vendor.tier}. Risk: ${vendor.riskLevel}. Health: ${
+        vendor.healthScore || 'n/a'
+      }. Annual spend: ${vendor.annualSpend || 0}.`,
+      `Objectives: ${objectiveSummary || 'No objectives logged yet.'}`,
+      `Recent touchpoints: ${touchpointSummary || 'No recent activity recorded.'}`,
+      `Goal: ${goal}.`,
+      'Return a concise plan with 3-5 actions, KPIs to monitor, and negotiation guardrails.'
+    ].join('\n');
+
+    const completion = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an experienced procurement leader who writes crisp action plans.'
+          },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.4,
+        max_tokens: 600
+      })
+    });
+
+    if (!completion.ok) {
+      const error = await completion.text();
+      return res.status(500).json({ error: 'OpenAI request failed', details: error });
+    }
+
+    const data = await completion.json();
+    const message = data.choices?.[0]?.message?.content?.trim();
+    res.json({ ok: true, playbook: message || 'No plan generated. Try again with more context.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to generate playbook' });
   }
 });
 
