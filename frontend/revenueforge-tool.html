@@ -1,0 +1,968 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RevenueForge AI Studio — Workspace</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="/css/styles.v2.css">
+</head>
+<body class="bg-body text-fg">
+  <div class="liquid-bg" aria-hidden="true">
+    <div class="blob blob-blue"></div>
+    <div class="blob blob-teal"></div>
+    <div class="blob blob-magenta"></div>
+  </div>
+
+  <nav class="navbar navbar-expand-lg sticky-top bg-glass border-bottom">
+    <div class="container">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="/">
+        <span class="brand-dot"></span>
+        Agama <strong>Technologies</strong>
+      </a>
+      <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-light btn-sm" href="/workspace.html">Back to workspace</a>
+        <button class="btn btn-primary btn-sm" id="logout">Sign out</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container py-4" style="max-width: 1320px;">
+    <div class="row g-4">
+      <aside class="col-lg-3">
+        <div class="card glass p-3 sticky-top revenue-menu" style="top: 96px;">
+          <div class="d-flex align-items-center gap-2 mb-3">
+            <div class="indicator-dot"></div>
+            <div>
+              <span class="eyebrow d-block">RevenueForge</span>
+              <strong class="small">AI Studio</strong>
+            </div>
+          </div>
+          <nav class="nav flex-column revenue-nav" id="sideMenu">
+            <a class="nav-link px-0 active" href="#overview">Overview</a>
+            <a class="nav-link px-0" href="/procurepath-tool.html">ProcurePath</a>
+            <a class="nav-link px-0" href="#revenueforge">RevenueForge</a>
+            <a class="nav-link px-0" href="/valuesphere-soon.html">ValueSphere</a>
+            <a class="nav-link px-0" href="#profile">Profile</a>
+          </nav>
+          <div class="pt-4 mt-3 border-top border-soft">
+            <button class="btn btn-outline-danger w-100" id="signOut">Sign out</button>
+          </div>
+        </div>
+      </aside>
+
+      <section class="col-lg-9 d-flex flex-column gap-4" id="revenueforge">
+        <header class="card glass p-4" id="overview">
+          <span class="eyebrow">RevenueForge AI Studio</span>
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div>
+              <h1 class="h4 mb-2">Collaborative revenue cockpit</h1>
+              <p class="text-fg-3 mb-0">Enable sales, presales, and post-sales teams to collaborate on every account, opportunity, and meeting.</p>
+            </div>
+            <div class="badge-soft">Business license</div>
+          </div>
+        </header>
+
+        <section class="card glass p-4" aria-labelledby="accountsHeading" id="accountsPanel">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <h2 class="h5 mb-1" id="accountsHeading">Accounts</h2>
+              <p class="text-fg-3 small mb-0">Create accounts to unlock opportunities, meeting intelligence, and AI-generated playbooks.</p>
+            </div>
+            <button class="btn btn-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#newAccountForm">Create account</button>
+          </div>
+
+          <div class="collapse" id="newAccountForm">
+            <form class="card glass p-3 mb-3" id="accountForm">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label" for="accountName">Business or entity name</label>
+                  <input class="form-control" id="accountName" name="name" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="accountHeadcount">Headcount</label>
+                  <input class="form-control" id="accountHeadcount" name="headcount" type="number" min="1" placeholder="e.g., 1200">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="accountOwnership">Ownership</label>
+                  <select class="form-select" id="accountOwnership" name="ownership">
+                    <option value="">Select...</option>
+                    <option value="private">Private</option>
+                    <option value="public">Public</option>
+                    <option value="government">Government</option>
+                    <option value="non-profit">Non-profit</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="accountIndustry">Industry</label>
+                  <input class="form-control" id="accountIndustry" name="industry" placeholder="e.g., Financial Services">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="accountRegion">Region</label>
+                  <input class="form-control" id="accountRegion" name="region" placeholder="e.g., North America">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="accountRevenue">Revenue range</label>
+                  <input class="form-control" id="accountRevenue" name="revenueRange" placeholder="e.g., $250M - $500M">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="accountWebsite">Website</label>
+                  <input class="form-control" id="accountWebsite" name="website" placeholder="https://">
+                </div>
+                <div class="col-md-6 d-flex align-items-center gap-2">
+                  <input class="form-check-input mt-0" type="checkbox" id="accountCustomer" name="isCustomer" value="true">
+                  <label class="form-check-label" for="accountCustomer">Existing customer</label>
+                </div>
+                <div class="col-12">
+                  <label class="form-label" for="accountDescription">Account context</label>
+                  <textarea class="form-control" id="accountDescription" name="description" rows="2" placeholder="What matters for this relationship?"></textarea>
+                </div>
+              </div>
+              <div class="d-flex justify-content-end gap-2 mt-3">
+                <button type="reset" class="btn btn-outline-light">Reset</button>
+                <button type="submit" class="btn btn-primary" id="accountSubmit">Save account</button>
+              </div>
+              <div class="form-text" id="accountFeedback"></div>
+            </form>
+          </div>
+
+          <div class="row g-3" id="accountList"></div>
+        </section>
+
+        <section class="card glass p-4 d-none" id="accountDetail">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <span class="badge-soft" id="accountBadge"></span>
+              <h2 class="h5 mb-1" id="accountTitle"></h2>
+              <p class="text-fg-3 small mb-0" id="accountMeta"></p>
+            </div>
+            <div class="text-end">
+              <p class="mb-1 small">Account value</p>
+              <strong class="h4" id="accountValue">$0</strong>
+            </div>
+          </div>
+          <div class="row g-3 mb-3" id="accountStats"></div>
+          <div class="card glass p-3">
+            <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+              <h3 class="h6 mb-0">Opportunities</h3>
+              <button class="btn btn-outline-light btn-sm" data-bs-toggle="collapse" data-bs-target="#opportunityFormWrap">New opportunity</button>
+            </div>
+            <div class="collapse" id="opportunityFormWrap">
+              <form class="row g-3" id="opportunityForm">
+                <div class="col-md-6">
+                  <label class="form-label" for="opportunityName">Opportunity name</label>
+                  <input class="form-control" id="opportunityName" name="name" required>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label" for="opportunityValue">Value (USD)</label>
+                  <input class="form-control" id="opportunityValue" name="value" type="number" min="0" step="1000">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label" for="opportunityProbability">Probability %</label>
+                  <input class="form-control" id="opportunityProbability" name="probability" type="number" min="0" max="100">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" for="opportunityStage">Stage</label>
+                  <input class="form-control" id="opportunityStage" name="stage" placeholder="e.g., Discovery">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" for="opportunityOwner">Owner</label>
+                  <input class="form-control" id="opportunityOwner" name="owner" placeholder="Account executive">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" for="opportunityClose">Close date</label>
+                  <input class="form-control" id="opportunityClose" name="closeDate" type="date">
+                </div>
+                <div class="col-12">
+                  <label class="form-label" for="opportunitySummary">Summary</label>
+                  <textarea class="form-control" id="opportunitySummary" name="summary" rows="2" placeholder="What does success look like?"></textarea>
+                </div>
+                <div class="col-12 d-flex justify-content-end">
+                  <button class="btn btn-primary" type="submit" id="opportunitySubmit">Add opportunity</button>
+                </div>
+                <div class="col-12"><div class="form-text" id="opportunityFeedback"></div></div>
+              </form>
+            </div>
+            <div class="table-responsive">
+              <table class="table align-middle mb-0">
+                <thead class="small text-fg-3">
+                  <tr>
+                    <th>Name</th>
+                    <th>Stage</th>
+                    <th class="text-end">Value</th>
+                    <th class="text-end">Meetings</th>
+                  </tr>
+                </thead>
+                <tbody id="opportunityTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="card glass p-4 d-none" id="opportunityDetail">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <span class="badge-soft">Opportunity workspace</span>
+              <h2 class="h5 mb-1" id="opportunityTitle"></h2>
+              <p class="text-fg-3 small mb-0" id="opportunityMeta"></p>
+            </div>
+            <div class="text-end">
+              <p class="mb-1 small">Value</p>
+              <strong class="h4" id="opportunityValueTotal">$0</strong>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <div class="card glass h-100 p-3">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <h3 class="h6 mb-0">Qualification</h3>
+                  <span class="badge-soft">MEDDPICC / SPICED</span>
+                </div>
+                <form id="qualificationForm" class="d-flex flex-column gap-2">
+                  <input class="form-control" name="framework" placeholder="Framework (MEDDPICC, SPICED, Command of the Message)">
+                  <input class="form-control" name="champion" placeholder="Champion">
+                  <input class="form-control" name="blockers" placeholder="Blockers">
+                  <input class="form-control" name="score" type="number" min="0" max="100" placeholder="Fit score">
+                  <textarea class="form-control" name="notes" rows="2" placeholder="Discovery notes & decision criteria"></textarea>
+                  <button class="btn btn-outline-light btn-sm align-self-end" type="submit">Save qualification</button>
+                </form>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="card glass h-100 p-3">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <h3 class="h6 mb-0">Risks</h3>
+                  <button class="btn btn-outline-light btn-sm" id="addRisk">Add risk</button>
+                </div>
+                <div class="d-flex flex-column gap-2" id="riskList"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-lg-6">
+              <div class="card glass h-100 p-3">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <h3 class="h6 mb-0">Timelines</h3>
+                  <button class="btn btn-outline-light btn-sm" id="addTimeline">Add milestone</button>
+                </div>
+                <div class="d-flex flex-column gap-2" id="timelineList"></div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="card glass h-100 p-3">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <h3 class="h6 mb-0">Personas</h3>
+                  <button class="btn btn-outline-light btn-sm" id="addPersona">Add persona</button>
+                </div>
+                <div class="d-flex flex-column gap-2" id="personaList"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-lg-6">
+              <div class="card glass h-100 p-3">
+                <h3 class="h6 mb-2">Architecture & technical requirements</h3>
+                <form id="architectureForm" class="d-flex flex-column gap-2">
+                  <textarea class="form-control" name="currentState" rows="2" placeholder="Current architecture"></textarea>
+                  <textarea class="form-control" name="proposedState" rows="2" placeholder="Proposed architecture"></textarea>
+                  <textarea class="form-control" name="integrations" rows="2" placeholder="Integrations / data flows"></textarea>
+                  <button class="btn btn-outline-light btn-sm align-self-end" type="submit">Save architecture</button>
+                </form>
+                <hr class="border-soft my-3">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <h4 class="h6 mb-0">Technical requirements</h4>
+                  <button class="btn btn-outline-light btn-sm" id="addRequirement">Add requirement</button>
+                </div>
+                <div class="d-flex flex-column gap-2" id="requirementsList"></div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="card glass h-100 p-3">
+                <h3 class="h6 mb-2">POC success criteria</h3>
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <p class="small text-fg-3 mb-0">Make proof criteria measurable and owned.</p>
+                  <button class="btn btn-outline-light btn-sm" id="addPoc">Add criterion</button>
+                </div>
+                <div class="d-flex flex-column gap-2" id="pocList"></div>
+                <hr class="border-soft my-3">
+                <h4 class="h6 mb-2">Links & collateral</h4>
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <p class="small text-fg-3 mb-0">Centralise briefs, slides, and validation assets.</p>
+                  <div class="d-flex gap-2">
+                    <button class="btn btn-outline-light btn-sm" id="addLink">Add link</button>
+                    <button class="btn btn-outline-light btn-sm" id="addCollateral">Add collateral</button>
+                  </div>
+                </div>
+                <div class="d-flex flex-column gap-2" id="linksList"></div>
+                <div class="d-flex flex-column gap-2" id="collateralList"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card glass p-3" id="meetingsBlock">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+              <div>
+                <h3 class="h6 mb-1">Meeting calendar & AI notes</h3>
+                <p class="text-fg-3 small mb-0">Attach meeting notes to specific dates. Green dots show where notes exist.</p>
+              </div>
+              <div class="d-flex gap-2 align-items-center">
+                <button class="btn btn-outline-light btn-sm" id="prevMonth">Prev</button>
+                <strong id="calendarLabel"></strong>
+                <button class="btn btn-outline-light btn-sm" id="nextMonth">Next</button>
+              </div>
+            </div>
+            <div class="row g-3">
+              <div class="col-lg-6">
+                <div class="calendar-grid" id="calendarGrid"></div>
+              </div>
+              <div class="col-lg-6">
+                <form class="card glass p-3 h-100" id="meetingForm">
+                  <div class="row g-2">
+                    <div class="col-12">
+                      <label class="form-label" for="meetingTitle">Meeting title</label>
+                      <input class="form-control" id="meetingTitle" name="title" placeholder="Quarterly business review">
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="meetingDatetime">Date & time</label>
+                      <input class="form-control" id="meetingDatetime" name="datetime" type="datetime-local" required>
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="meetingNotes">Notes</label>
+                      <textarea class="form-control" id="meetingNotes" name="notes" rows="2" placeholder="Highlights, risks, blockers"></textarea>
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="meetingFollowUps">Follow ups</label>
+                      <textarea class="form-control" id="meetingFollowUps" name="followUps" rows="2" placeholder="Who owns next steps?"></textarea>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="internalAttendees">Our team</label>
+                      <input class="form-control" id="internalAttendees" name="internalAttendees" placeholder="Comma separated names">
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="customerAttendees">Customer team</label>
+                      <input class="form-control" id="customerAttendees" name="customerAttendees" placeholder="Comma separated names">
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="meetingTranscript">Transcript (optional)</label>
+                      <textarea class="form-control" id="meetingTranscript" name="transcript" rows="3" placeholder="Paste transcript to generate AI notes"></textarea>
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="meetingPrimary">Primary seller name</label>
+                      <input class="form-control" id="meetingPrimary" name="primaryRep" placeholder="Your name for AI context">
+                    </div>
+                  </div>
+                  <div class="d-flex justify-content-end gap-2 mt-3">
+                    <button class="btn btn-outline-light" type="reset">Reset</button>
+                    <button class="btn btn-primary" type="submit" id="meetingSubmit">Attach notes</button>
+                  </div>
+                  <div class="form-text" id="meetingFeedback"></div>
+                </form>
+              </div>
+            </div>
+            <div class="mt-3" id="meetingList"></div>
+          </div>
+        </section>
+
+        <section class="card glass p-4" id="profile">
+          <h2 class="h6 mb-2">Profile</h2>
+          <p class="text-fg-3 small mb-0">Profile controls are managed in your workspace. New features coming soon.</p>
+        </section>
+      </section>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const rfState = {
+      user: null,
+      accounts: [],
+      selectedAccount: null,
+      selectedOpportunity: null,
+      calendarCursor: new Date()
+    };
+
+    const currencyFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+
+    async function initWorkspace() {
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        if (res.status === 401) return (window.location.href = '/login.html');
+        const json = await res.json();
+        rfState.user = json.user;
+        if (!json.user.platformAccess?.includes('revenueforge') || json.user.licenseTier !== 'business') {
+          document.body.innerHTML = '<div class="container py-5"><div class="alert alert-warning">RevenueForge requires a business license with platform access enabled.</div></div>';
+          return;
+        }
+        await loadAccounts();
+      } catch (err) {
+        console.error(err);
+        document.body.innerHTML = '<div class="container py-5"><div class="alert alert-danger">Unable to load RevenueForge workspace.</div></div>';
+      }
+    }
+
+    async function loadAccounts() {
+      const list = document.getElementById('accountList');
+      if (list) list.innerHTML = '<div class="text-center text-fg-3">Loading accounts...</div>';
+      try {
+        const res = await fetch('/api/revenueforge/accounts', { credentials: 'include' });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Unable to load accounts');
+        rfState.accounts = json.accounts || [];
+        renderAccounts();
+      } catch (err) {
+        console.error(err);
+        if (list) list.innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+      }
+    }
+
+    function renderAccounts() {
+      const list = document.getElementById('accountList');
+      if (!list) return;
+      list.innerHTML = '';
+      if (!rfState.accounts.length) {
+        list.innerHTML = '<div class="col-12 text-center text-fg-3">No accounts yet. Create one to begin.</div>';
+        return;
+      }
+      rfState.accounts.forEach(account => {
+        const col = document.createElement('div');
+        col.className = 'col-md-6';
+        const stats = account.stats || {};
+        col.innerHTML = `
+          <div class="card glass h-100 p-3 revenue-card" role="button" data-id="${account._id}">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+              <div>
+                <h3 class="h6 mb-0">${account.name}</h3>
+                <p class="text-fg-3 small mb-0">${account.industry || 'Industry TBD'}</p>
+              </div>
+              <span class="badge-soft">${account.ownership || 'Prospect'}</span>
+            </div>
+            <div class="small text-fg-2">Value ${currencyFormatter.format(stats.totalValue || 0)}</div>
+            <div class="d-flex gap-3 small text-fg-3 mt-2">
+              <span><i class="bi bi-briefcase"></i> ${stats.opportunityCount || 0} opps</span>
+              <span><i class="bi bi-calendar-event"></i> ${stats.meetingCount || 0} meetings</span>
+              <span><i class="bi bi-journal-text"></i> ${stats.noteCount || 0} notes</span>
+            </div>
+          </div>
+        `;
+        col.querySelector('.revenue-card').addEventListener('click', () => selectAccount(account._id));
+        list.appendChild(col);
+      });
+    }
+
+    async function selectAccount(id) {
+      try {
+        const res = await fetch(`/api/revenueforge/accounts/${id}`, { credentials: 'include' });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Unable to load account');
+        rfState.selectedAccount = json.account;
+        const updated = rfState.accounts.map(acc => (acc._id === json.account._id ? json.account : acc));
+        rfState.accounts = updated;
+        renderAccounts();
+        renderAccountDetail(json.account, json.stats);
+      } catch (err) {
+        console.error(err);
+        alert(err.message);
+      }
+    }
+
+    function renderAccountDetail(account, stats) {
+      const wrap = document.getElementById('accountDetail');
+      if (!wrap) return;
+      wrap.classList.remove('d-none');
+      document.getElementById('accountTitle').textContent = account.name;
+      document.getElementById('accountBadge').textContent = account.ownership || 'Prospect';
+      document.getElementById('accountMeta').textContent = [account.industry, account.region, account.website].filter(Boolean).join(' · ') || 'Metadata pending';
+      document.getElementById('accountValue').textContent = currencyFormatter.format(stats?.totalValue || 0);
+      const statsWrap = document.getElementById('accountStats');
+      statsWrap.innerHTML = '';
+      const statItems = [
+        { label: 'Opportunities', value: stats?.opportunityCount || 0 },
+        { label: 'Meetings', value: stats?.meetingCount || 0 },
+        { label: 'Notes', value: stats?.noteCount || 0 }
+      ];
+      statItems.forEach(item => {
+        const col = document.createElement('div');
+        col.className = 'col-md-4';
+        col.innerHTML = `
+          <div class="glass p-3 rounded-3 border border-soft h-100">
+            <div class="small text-fg-3 mb-1">${item.label}</div>
+            <strong class="h5 mb-0">${item.value}</strong>
+          </div>`;
+        statsWrap.appendChild(col);
+      });
+      renderOpportunities(account);
+    }
+
+    function renderOpportunities(account) {
+      const table = document.getElementById('opportunityTable');
+      if (!table) return;
+      table.innerHTML = '';
+      (account.opportunities || []).forEach(opportunity => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="text-nowrap">${opportunity.name}</td>
+          <td>${opportunity.stage || 'Unstaged'}</td>
+          <td class="text-end">${currencyFormatter.format(opportunity.value || 0)}</td>
+          <td class="text-end">${opportunity.meetingNotes?.length || 0}</td>`;
+        tr.addEventListener('click', () => selectOpportunity(opportunity._id));
+        table.appendChild(tr);
+      });
+    }
+
+    async function selectOpportunity(id) {
+      if (!rfState.selectedAccount) return;
+      const opportunity = (rfState.selectedAccount.opportunities || []).find(opp => opp._id === id);
+      if (!opportunity) return;
+      rfState.selectedOpportunity = opportunity;
+      renderOpportunityDetail();
+    }
+
+    function renderOpportunityDetail() {
+      const opp = rfState.selectedOpportunity;
+      if (!opp) return;
+      const wrap = document.getElementById('opportunityDetail');
+      wrap.classList.remove('d-none');
+      document.getElementById('opportunityTitle').textContent = opp.name;
+      document.getElementById('opportunityMeta').textContent = [opp.stage || 'Stage pending', opp.owner || 'Owner TBD'].join(' · ');
+      document.getElementById('opportunityValueTotal').textContent = currencyFormatter.format(opp.value || 0);
+
+      const qualificationForm = document.getElementById('qualificationForm');
+      qualificationForm.framework.value = opp.qualification?.framework || '';
+      qualificationForm.champion.value = opp.qualification?.champion || '';
+      qualificationForm.blockers.value = opp.qualification?.blockers || '';
+      qualificationForm.score.value = opp.qualification?.score || '';
+      qualificationForm.notes.value = opp.qualification?.notes || '';
+
+      renderList('riskList', opp.risks, risk => `
+        <div class="p-2 rounded-3 border border-soft">
+          <div class="d-flex justify-content-between align-items-start gap-2">
+            <div>
+              <strong>${risk.title}</strong>
+              <p class="small text-fg-3 mb-0">${risk.impact || 'Impact pending'}</p>
+            </div>
+            <span class="badge-soft">${risk.severity || 'Monitor'}</span>
+          </div>
+          ${risk.mitigation ? `<p class="small mb-0">Mitigation: ${risk.mitigation}</p>` : ''}
+        </div>`);
+
+      renderList('timelineList', opp.timelines, item => `
+        <div class="p-2 rounded-3 border border-soft d-flex justify-content-between align-items-start gap-2">
+          <div>
+            <strong>${item.milestone}</strong>
+            <p class="small text-fg-3 mb-0">${item.targetDate ? new Date(item.targetDate).toLocaleDateString() : 'Date tbc'}</p>
+          </div>
+          <span class="badge-soft">${item.risk || 'On-track'}</span>
+        </div>`);
+
+      renderList('personaList', opp.personas, persona => `
+        <div class="p-2 rounded-3 border border-soft">
+          <div class="d-flex justify-content-between align-items-start gap-2">
+            <div>
+              <strong>${persona.name}</strong>
+              <p class="small text-fg-3 mb-0">${persona.role || 'Role pending'}${persona.influence ? ` · ${persona.influence}` : ''}</p>
+            </div>
+            <span class="badge-soft">${persona.stance || 'Neutral'}</span>
+          </div>
+          ${persona.goals ? `<p class="small mb-0">Goals: ${persona.goals}</p>` : ''}
+        </div>`);
+
+      const architectureForm = document.getElementById('architectureForm');
+      architectureForm.currentState.value = opp.architecture?.currentState || '';
+      architectureForm.proposedState.value = opp.architecture?.proposedState || '';
+      architectureForm.integrations.value = opp.architecture?.integrations || '';
+      renderList('requirementsList', opp.technicalRequirements, req => `
+        <div class="p-2 rounded-3 border border-soft d-flex justify-content-between align-items-start gap-2">
+          <div>
+            <strong>${req.requirement}</strong>
+            <p class="small text-fg-3 mb-0">${req.priority || 'Priority tbc'} · ${req.owner || 'Owner tbc'}</p>
+          </div>
+          <span class="badge-soft">${req.status || 'Open'}</span>
+        </div>`);
+
+      renderList('pocList', opp.pocSuccess, item => `
+        <div class="p-2 rounded-3 border border-soft d-flex justify-content-between align-items-start gap-2">
+          <div>
+            <strong>${item.criterion}</strong>
+            <p class="small text-fg-3 mb-0">${item.metric || 'Outcome metric pending'}</p>
+          </div>
+          <span class="badge-soft">${item.status || 'Planned'}</span>
+        </div>`);
+
+      renderList('linksList', opp.customLinks, link => `
+        <div class="p-2 rounded-3 border border-soft">
+          <a class="text-decoration-none" href="${link.url}" target="_blank">${link.label}</a>
+          ${link.description ? `<p class="small text-fg-3 mb-0">${link.description}</p>` : ''}
+        </div>`);
+
+      renderList('collateralList', opp.collateral, item => `
+        <div class="p-2 rounded-3 border border-soft d-flex justify-content-between align-items-start gap-2">
+          <div>
+            <strong>${item.title}</strong>
+            <p class="small text-fg-3 mb-0">${item.type || 'Asset'}</p>
+          </div>
+          <a href="${item.url}" target="_blank" class="small">Open</a>
+        </div>`);
+
+      renderMeetings();
+    }
+
+    function renderList(containerId, items, templateFn) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      el.innerHTML = '';
+      if (!items || !items.length) {
+        el.innerHTML = '<p class="small text-fg-3 mb-0">No entries yet.</p>';
+        return;
+      }
+      items.forEach(item => {
+        const div = document.createElement('div');
+        div.innerHTML = templateFn(item);
+        el.appendChild(div.firstElementChild);
+      });
+    }
+
+    function addSimpleEntry(promptFields, targetKey) {
+      const values = promptFields.reduce((acc, field) => {
+        const value = window.prompt(field.label, field.default || '');
+        if (value) acc[field.key] = value;
+        return acc;
+      }, {});
+      if (!Object.keys(values).length) return;
+      if (!values[promptFields[0].key]) {
+        alert(`${promptFields[0].label} is required.`);
+        return;
+      }
+      const opp = rfState.selectedOpportunity;
+      if (!opp) return;
+      const next = [...(opp[targetKey] || []), values];
+      saveOpportunityUpdate({ [targetKey]: next });
+    }
+
+    async function saveOpportunityUpdate(payload) {
+      if (!rfState.selectedAccount || !rfState.selectedOpportunity) return;
+      try {
+        const res = await fetch(`/api/revenueforge/accounts/${rfState.selectedAccount._id}/opportunities/${rfState.selectedOpportunity._id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Unable to update opportunity');
+        rfState.selectedAccount = json.account;
+        rfState.selectedOpportunity = (json.account.opportunities || []).find(opp => opp._id === rfState.selectedOpportunity._id);
+        rfState.accounts = rfState.accounts.map(acc => (acc._id === json.account._id ? json.account : acc));
+        renderAccounts();
+        renderAccountDetail(json.account, json.stats);
+        renderOpportunityDetail();
+      } catch (err) {
+        console.error(err);
+        alert(err.message);
+      }
+    }
+
+    function renderCalendar() {
+      const grid = document.getElementById('calendarGrid');
+      if (!grid || !rfState.selectedOpportunity) return;
+      grid.innerHTML = '';
+      const cursor = new Date(rfState.calendarCursor);
+      const year = cursor.getFullYear();
+      const month = cursor.getMonth();
+      document.getElementById('calendarLabel').textContent = cursor.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+      const firstDay = new Date(year, month, 1);
+      const startDay = firstDay.getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const meetingsByDay = new Set(
+        (rfState.selectedOpportunity.meetingNotes || [])
+          .map(note => new Date(note.occurredAt))
+          .filter(date => date.getMonth() === month && date.getFullYear() === year)
+          .map(date => date.getDate())
+      );
+
+      for (let i = 0; i < startDay; i++) {
+        const empty = document.createElement('div');
+        empty.className = 'calendar-cell muted';
+        grid.appendChild(empty);
+      }
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const cell = document.createElement('div');
+        cell.className = 'calendar-cell';
+        cell.textContent = day;
+        if (meetingsByDay.has(day)) {
+          const dot = document.createElement('span');
+          dot.className = 'calendar-dot';
+          cell.appendChild(dot);
+        }
+        grid.appendChild(cell);
+      }
+    }
+
+    function renderMeetings() {
+      const list = document.getElementById('meetingList');
+      if (!list || !rfState.selectedOpportunity) return;
+      renderCalendar();
+      list.innerHTML = '';
+      const meetings = [...(rfState.selectedOpportunity.meetingNotes || [])].sort(
+        (a, b) => new Date(b.occurredAt) - new Date(a.occurredAt)
+      );
+      if (!meetings.length) {
+        list.innerHTML = '<p class="text-fg-3 small mb-0">No meetings logged yet.</p>';
+        return;
+      }
+      meetings.forEach(meeting => {
+        const div = document.createElement('div');
+        div.className = 'card glass p-3 mb-2';
+        div.innerHTML = `
+          <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+            <div>
+              <strong>${meeting.title || 'Meeting'}</strong>
+              <p class="small text-fg-3 mb-0">${new Date(meeting.occurredAt).toLocaleString()}</p>
+            </div>
+            <span class="badge-soft">${meeting.sentiment || 'Recorded'}</span>
+          </div>
+          ${meeting.notes ? `<p class="mb-1">${meeting.notes}</p>` : ''}
+          ${meeting.followUps ? `<p class="small mb-1"><strong>Follow ups:</strong> ${meeting.followUps}</p>` : ''}
+          ${meeting.aiSummary ? `<div class="small p-2 rounded-3 bg-glass-subtle">${meeting.aiSummary}</div>` : ''}
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    document.getElementById('prevMonth').addEventListener('click', () => {
+      rfState.calendarCursor.setMonth(rfState.calendarCursor.getMonth() - 1);
+      renderCalendar();
+    });
+    document.getElementById('nextMonth').addEventListener('click', () => {
+      rfState.calendarCursor.setMonth(rfState.calendarCursor.getMonth() + 1);
+      renderCalendar();
+    });
+
+    document.getElementById('accountForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const form = e.target;
+      const feedback = document.getElementById('accountFeedback');
+      feedback.textContent = '';
+      document.getElementById('accountSubmit').disabled = true;
+      const formData = new FormData(form);
+      const payload = Object.fromEntries(formData.entries());
+      payload.isCustomer = formData.get('isCustomer') === 'true';
+      try {
+        const res = await fetch('/api/revenueforge/accounts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Unable to create account');
+        rfState.accounts.unshift(json.account);
+        renderAccounts();
+        feedback.textContent = 'Account created.';
+        form.reset();
+      } catch (err) {
+        console.error(err);
+        feedback.textContent = err.message;
+      } finally {
+        document.getElementById('accountSubmit').disabled = false;
+      }
+    });
+
+    document.getElementById('opportunityForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      if (!rfState.selectedAccount) return;
+      const form = e.target;
+      const feedback = document.getElementById('opportunityFeedback');
+      feedback.textContent = '';
+      document.getElementById('opportunitySubmit').disabled = true;
+      const formData = new FormData(form);
+      const payload = Object.fromEntries(formData.entries());
+      try {
+        const res = await fetch(`/api/revenueforge/accounts/${rfState.selectedAccount._id}/opportunities`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Unable to create opportunity');
+        rfState.selectedAccount = json.account;
+        rfState.accounts = rfState.accounts.map(acc => (acc._id === json.account._id ? json.account : acc));
+        renderAccounts();
+        renderAccountDetail(json.account, json.stats);
+        form.reset();
+        feedback.textContent = 'Opportunity added.';
+      } catch (err) {
+        console.error(err);
+        feedback.textContent = err.message;
+      } finally {
+        document.getElementById('opportunitySubmit').disabled = false;
+      }
+    });
+
+    document.getElementById('qualificationForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const payload = Object.fromEntries(formData.entries());
+      if (payload.score === '') delete payload.score;
+      saveOpportunityUpdate({ qualification: payload });
+    });
+
+    document.getElementById('architectureForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const payload = Object.fromEntries(formData.entries());
+      saveOpportunityUpdate({ architecture: payload });
+    });
+
+    document.getElementById('addRisk').addEventListener('click', () => {
+      addSimpleEntry(
+        [
+          { key: 'title', label: 'Risk title' },
+          { key: 'severity', label: 'Severity (high/med/low)', default: 'medium' },
+          { key: 'impact', label: 'Impact' },
+          { key: 'mitigation', label: 'Mitigation' }
+        ],
+        'risks'
+      );
+    });
+
+    document.getElementById('addTimeline').addEventListener('click', () => {
+      addSimpleEntry(
+        [
+          { key: 'milestone', label: 'Milestone' },
+          { key: 'targetDate', label: 'Target date (YYYY-MM-DD)' },
+          { key: 'risk', label: 'Risk/owner' }
+        ],
+        'timelines'
+      );
+    });
+
+    document.getElementById('addPersona').addEventListener('click', () => {
+      addSimpleEntry(
+        [
+          { key: 'name', label: 'Persona name' },
+          { key: 'role', label: 'Role' },
+          { key: 'influence', label: 'Influence / power' },
+          { key: 'goals', label: 'Goals' },
+          { key: 'stance', label: 'Stance' }
+        ],
+        'personas'
+      );
+    });
+
+    document.getElementById('addRequirement').addEventListener('click', () => {
+      addSimpleEntry(
+        [
+          { key: 'requirement', label: 'Requirement' },
+          { key: 'priority', label: 'Priority' },
+          { key: 'owner', label: 'Owner' },
+          { key: 'status', label: 'Status' }
+        ],
+        'technicalRequirements'
+      );
+    });
+
+    document.getElementById('addPoc').addEventListener('click', () => {
+      addSimpleEntry(
+        [
+          { key: 'criterion', label: 'POC criterion' },
+          { key: 'metric', label: 'Metric / exit criteria' },
+          { key: 'status', label: 'Status' },
+          { key: 'owner', label: 'Owner' }
+        ],
+        'pocSuccess'
+      );
+    });
+
+    document.getElementById('addLink').addEventListener('click', () => {
+      addSimpleEntry(
+        [
+          { key: 'label', label: 'Link label' },
+          { key: 'url', label: 'URL (https://...)' },
+          { key: 'description', label: 'Description' }
+        ],
+        'customLinks'
+      );
+    });
+
+    document.getElementById('addCollateral').addEventListener('click', () => {
+      addSimpleEntry(
+        [
+          { key: 'title', label: 'Collateral title' },
+          { key: 'type', label: 'Type (deck, architecture, value map)' },
+          { key: 'url', label: 'URL' }
+        ],
+        'collateral'
+      );
+    });
+
+    document.getElementById('meetingForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      if (!rfState.selectedOpportunity) return;
+      const form = e.target;
+      const feedback = document.getElementById('meetingFeedback');
+      feedback.textContent = '';
+      document.getElementById('meetingSubmit').disabled = true;
+      const formData = new FormData(form);
+      const payload = {
+        title: formData.get('title'),
+        occurredAt: formData.get('datetime'),
+        notes: formData.get('notes'),
+        followUps: formData.get('followUps'),
+        internalAttendees: (formData.get('internalAttendees') || '')
+          .split(',')
+          .map(v => v.trim())
+          .filter(Boolean),
+        customerAttendees: (formData.get('customerAttendees') || '')
+          .split(',')
+          .map(v => v.trim())
+          .filter(Boolean),
+        transcript: formData.get('transcript'),
+        primaryRep: formData.get('primaryRep')
+      };
+      try {
+        const res = await fetch(`/api/revenueforge/opportunities/${rfState.selectedOpportunity._id}/meetings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Unable to attach meeting');
+        rfState.selectedAccount = json.account;
+        rfState.accounts = rfState.accounts.map(acc => (acc._id === json.account._id ? json.account : acc));
+        rfState.selectedOpportunity = (json.account.opportunities || []).find(opp => opp._id === rfState.selectedOpportunity._id);
+        renderAccounts();
+        renderAccountDetail(json.account, json.stats);
+        renderOpportunityDetail();
+        form.reset();
+        feedback.textContent = 'Meeting captured. AI notes appear when transcript is provided.';
+      } catch (err) {
+        console.error(err);
+        feedback.textContent = err.message;
+      } finally {
+        document.getElementById('meetingSubmit').disabled = false;
+      }
+    });
+
+    document.getElementById('logout').addEventListener('click', async () => {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+      window.location.href = '/';
+    });
+    document.getElementById('signOut').addEventListener('click', async () => {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+      window.location.href = '/';
+    });
+
+    initWorkspace();
+  </script>
+</body>
+</html>
