@@ -13,6 +13,7 @@ const { requireAuth, issueTokenCookie, clearTokenCookie } = require('./middlewar
 const { validateBody } = require('./middleware/validation');
 const User = require('./models/User');
 const ProcurementVendor = require('./models/ProcurementVendor');
+const RevenueAccount = require('./models/RevenueAccount');
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
@@ -148,6 +149,14 @@ function assertProcurePathAccess(user) {
   return { ok: true };
 }
 
+function assertRevenueForgeAccess(user) {
+  const hasRevenueForge = Array.isArray(user.platformAccess) && user.platformAccess.includes('revenueforge');
+  if (user.licenseTier !== 'business' || !hasRevenueForge) {
+    return { error: 'RevenueForge AI Studio requires a business license with RevenueForge enabled.' };
+  }
+  return { ok: true };
+}
+
 const signupSchema = z.object({
   name: z.string().trim().min(1).max(120),
   email: z.string().email(),
@@ -204,6 +213,117 @@ const procurementTouchpointSchema = z.object({
   summary: z.string().trim().min(4).max(800),
   followUp: z.string().trim().max(400).optional(),
   sentiment: z.string().trim().max(120).optional()
+});
+
+const revenueAccountSchema = z.object({
+  name: z.string().trim().min(2).max(200),
+  headcount: z.coerce.number().int().positive().max(1_000_000).optional(),
+  ownership: z.string().trim().max(80).optional(),
+  industry: z.string().trim().max(160).optional(),
+  region: z.string().trim().max(160).optional(),
+  website: z.string().trim().url().optional(),
+  description: z.string().trim().max(2000).optional(),
+  revenueRange: z.string().trim().max(160).optional(),
+  isCustomer: z.coerce.boolean().optional()
+});
+
+const revenueOpportunitySchema = z.object({
+  name: z.string().trim().min(2).max(240),
+  value: z.coerce.number().min(0).max(1_000_000_000).optional(),
+  stage: z.string().trim().max(160).optional(),
+  owner: z.string().trim().max(160).optional(),
+  probability: z.coerce.number().min(0).max(100).optional(),
+  closeDate: z.coerce.date().optional(),
+  summary: z.string().trim().max(4000).optional()
+});
+
+const revenueQualificationSchema = z.object({
+  framework: z.string().trim().max(160).optional(),
+  score: z.coerce.number().min(0).max(100).optional(),
+  champion: z.string().trim().max(160).optional(),
+  blockers: z.string().trim().max(800).optional(),
+  notes: z.string().trim().max(2000).optional()
+});
+
+const riskSchema = z.object({
+  title: z.string().trim().min(2).max(200),
+  severity: z.string().trim().max(80).optional(),
+  impact: z.string().trim().max(400).optional(),
+  mitigation: z.string().trim().max(400).optional(),
+  owner: z.string().trim().max(160).optional()
+});
+
+const timelineSchema = z.object({
+  milestone: z.string().trim().min(2).max(240),
+  targetDate: z.coerce.date().optional(),
+  risk: z.string().trim().max(240).optional()
+});
+
+const personaSchema = z.object({
+  name: z.string().trim().min(2).max(200),
+  role: z.string().trim().max(200).optional(),
+  influence: z.string().trim().max(160).optional(),
+  goals: z.string().trim().max(400).optional(),
+  stance: z.string().trim().max(200).optional(),
+  contact: z.string().trim().max(200).optional()
+});
+
+const requirementSchema = z.object({
+  requirement: z.string().trim().min(2).max(320),
+  priority: z.string().trim().max(120).optional(),
+  owner: z.string().trim().max(160).optional(),
+  status: z.string().trim().max(160).optional()
+});
+
+const pocSchema = z.object({
+  criterion: z.string().trim().min(2).max(320),
+  metric: z.string().trim().max(200).optional(),
+  status: z.string().trim().max(160).optional(),
+  owner: z.string().trim().max(160).optional()
+});
+
+const linkSchema = z.object({
+  label: z.string().trim().min(2).max(200),
+  url: z.string().trim().url(),
+  description: z.string().trim().max(320).optional()
+});
+
+const collateralSchema = z.object({
+  title: z.string().trim().min(2).max(240),
+  type: z.string().trim().max(160).optional(),
+  url: z.string().trim().url()
+});
+
+const revenueCollaborationSchema = z.object({
+  risks: z.array(riskSchema).optional(),
+  qualification: revenueQualificationSchema.optional(),
+  timelines: z.array(timelineSchema).optional(),
+  personas: z.array(personaSchema).optional(),
+  architecture: z
+    .object({
+      currentState: z.string().trim().max(2000).optional(),
+      proposedState: z.string().trim().max(2000).optional(),
+      integrations: z.string().trim().max(2000).optional()
+    })
+    .optional(),
+  technicalRequirements: z.array(requirementSchema).optional(),
+  pocSuccess: z.array(pocSchema).optional(),
+  customLinks: z.array(linkSchema).optional(),
+  collateral: z.array(collateralSchema).optional(),
+  summary: z.string().trim().max(2000).optional()
+});
+
+const opportunityUpdateSchema = revenueCollaborationSchema.merge(revenueOpportunitySchema.partial());
+
+const meetingNoteSchema = z.object({
+  title: z.string().trim().max(240).optional(),
+  occurredAt: z.coerce.date(),
+  notes: z.string().trim().max(6000).optional(),
+  followUps: z.string().trim().max(3000).optional(),
+  internalAttendees: z.array(z.string().trim().max(160)).optional(),
+  customerAttendees: z.array(z.string().trim().max(160)).optional(),
+  transcript: z.string().trim().max(12_000).optional(),
+  primaryRep: z.string().trim().max(160).optional()
 });
 
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: Date.now() }));
@@ -329,6 +449,46 @@ async function loadProcurePathUser(req, res) {
   }
 
   return user;
+}
+
+async function loadRevenueForgeUser(req, res) {
+  const user = await User.findById(req.auth.uid);
+  if (!user) {
+    res.status(404).json({ error: 'Not found' });
+    return null;
+  }
+
+  const access = assertRevenueForgeAccess(user);
+  if (access.error) {
+    res.status(403).json({ error: access.error });
+    return null;
+  }
+
+  return user;
+}
+
+function calculateRevenueStats(account) {
+  const opportunities = account.opportunities || [];
+  const totalValue = opportunities.reduce((acc, opp) => acc + (opp.value || 0), 0);
+  const totalMeetings = opportunities.reduce((acc, opp) => acc + (opp.meetingNotes?.length || 0), 0);
+  const totalNotes = opportunities.reduce((acc, opp) => {
+    const collaborationNotes = [
+      opp.summary,
+      opp.qualification?.notes,
+      opp.qualification?.blockers,
+      opp.qualification?.framework,
+      opp.architecture?.currentState,
+      opp.architecture?.proposedState
+    ].filter(Boolean);
+    return acc + collaborationNotes.length;
+  }, 0);
+
+  return {
+    opportunityCount: opportunities.length,
+    totalValue,
+    meetingCount: totalMeetings,
+    noteCount: totalNotes
+  };
 }
 
 app.get('/api/procurepath/overview', requireAuth, async (req, res) => {
@@ -523,6 +683,178 @@ app.post('/api/procurepath/ai/playbook', requireAuth, async (req, res) => {
     res.status(500).json({ error: 'Unable to generate playbook' });
   }
 });
+
+app.get('/api/revenueforge/accounts', requireAuth, async (req, res) => {
+  try {
+    const user = await loadRevenueForgeUser(req, res);
+    if (!user) return;
+    const accounts = await RevenueAccount.find({ userId: user._id }).sort({ updatedAt: -1 }).lean();
+    const enriched = accounts.map(account => ({ ...account, stats: calculateRevenueStats(account) }));
+    res.json({ ok: true, accounts: enriched });
+  } catch (err) {
+    console.error('RevenueForge account listing failed', err);
+    res.status(500).json({ error: 'Unable to load RevenueForge accounts' });
+  }
+});
+
+app.post('/api/revenueforge/accounts', requireAuth, validateBody(revenueAccountSchema), async (req, res) => {
+  try {
+    const user = await loadRevenueForgeUser(req, res);
+    if (!user) return;
+    const account = await RevenueAccount.create({ ...req.validatedBody, userId: user._id });
+    res.status(201).json({ ok: true, account, stats: calculateRevenueStats(account) });
+  } catch (err) {
+    console.error('RevenueForge account create failed', err);
+    res.status(500).json({ error: 'Unable to create account' });
+  }
+});
+
+app.get('/api/revenueforge/accounts/:id', requireAuth, async (req, res) => {
+  try {
+    const user = await loadRevenueForgeUser(req, res);
+    if (!user) return;
+    const account = await RevenueAccount.findOne({ _id: req.params.id, userId: user._id });
+    if (!account) return res.status(404).json({ error: 'Account not found' });
+    res.json({ ok: true, account, stats: calculateRevenueStats(account) });
+  } catch (err) {
+    console.error('RevenueForge account fetch failed', err);
+    res.status(500).json({ error: 'Unable to load account' });
+  }
+});
+
+app.post(
+  '/api/revenueforge/accounts/:id/opportunities',
+  requireAuth,
+  validateBody(revenueOpportunitySchema),
+  async (req, res) => {
+    try {
+      const user = await loadRevenueForgeUser(req, res);
+      if (!user) return;
+      const account = await RevenueAccount.findOne({ _id: req.params.id, userId: user._id });
+      if (!account) return res.status(404).json({ error: 'Account not found' });
+      account.opportunities.push(req.validatedBody);
+      await account.save();
+      const opportunity = account.opportunities[account.opportunities.length - 1];
+      res.status(201).json({ ok: true, opportunity, account, stats: calculateRevenueStats(account) });
+    } catch (err) {
+      console.error('RevenueForge opportunity create failed', err);
+      res.status(500).json({ error: 'Unable to create opportunity' });
+    }
+  }
+);
+
+app.put(
+  '/api/revenueforge/accounts/:accountId/opportunities/:opportunityId',
+  requireAuth,
+  validateBody(opportunityUpdateSchema),
+  async (req, res) => {
+    try {
+      const user = await loadRevenueForgeUser(req, res);
+      if (!user) return;
+      const account = await RevenueAccount.findOne({ _id: req.params.accountId, userId: user._id });
+      if (!account) return res.status(404).json({ error: 'Account not found' });
+      const opportunity = account.opportunities.id(req.params.opportunityId);
+      if (!opportunity) return res.status(404).json({ error: 'Opportunity not found' });
+
+      Object.entries(req.validatedBody).forEach(([key, value]) => {
+        opportunity[key] = value;
+      });
+
+      await account.save();
+      res.json({ ok: true, opportunity, account, stats: calculateRevenueStats(account) });
+    } catch (err) {
+      console.error('RevenueForge opportunity update failed', err);
+      res.status(500).json({ error: 'Unable to update opportunity' });
+    }
+  }
+);
+
+app.post(
+  '/api/revenueforge/opportunities/:opportunityId/meetings',
+  requireAuth,
+  validateBody(meetingNoteSchema),
+  async (req, res) => {
+    try {
+      const user = await loadRevenueForgeUser(req, res);
+      if (!user) return;
+      const account = await RevenueAccount.findOne({ userId: user._id, 'opportunities._id': req.params.opportunityId });
+      if (!account) return res.status(404).json({ error: 'Opportunity not found' });
+      const opportunity = account.opportunities.id(req.params.opportunityId);
+      if (!opportunity) return res.status(404).json({ error: 'Opportunity not found' });
+
+      const meetingPayload = {
+        title: req.validatedBody.title || 'Customer touchpoint',
+        occurredAt: req.validatedBody.occurredAt,
+        notes: req.validatedBody.notes,
+        followUps: req.validatedBody.followUps,
+        internalAttendees: req.validatedBody.internalAttendees || [],
+        customerAttendees: req.validatedBody.customerAttendees || [],
+        transcriptSource: req.validatedBody.transcript ? 'provided' : undefined
+      };
+
+      if (req.validatedBody.transcript && OPENAI_API_KEY) {
+        try {
+          const attendees = [
+            req.validatedBody.primaryRep ? `Primary seller: ${req.validatedBody.primaryRep}.` : null,
+            meetingPayload.internalAttendees.length
+              ? `Internal: ${meetingPayload.internalAttendees.join(', ')}.`
+              : null,
+            meetingPayload.customerAttendees.length
+              ? `Customer: ${meetingPayload.customerAttendees.join(', ')}.`
+              : null
+          ]
+            .filter(Boolean)
+            .join(' ');
+
+          const prompt = [
+            'You are a revenue strategist producing crisp meeting insights.',
+            attendees || 'Meeting attendees were not provided.',
+            'Transcript:',
+            req.validatedBody.transcript,
+            'Return bullet insights for notes, actions, next steps, and sentiment. Keep it concise.'
+          ].join('\n');
+
+          const completion = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${OPENAI_API_KEY}`
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [
+                { role: 'system', content: 'You are an enterprise account executive assistant.' },
+                { role: 'user', content: prompt }
+              ],
+              temperature: 0.3,
+              max_tokens: 700
+            })
+          });
+
+          if (completion.ok) {
+            const data = await completion.json();
+            const aiContent = data.choices?.[0]?.message?.content;
+            meetingPayload.aiSummary = aiContent || 'AI summary unavailable';
+            meetingPayload.aiActions = 'AI generated insights';
+          } else {
+            const details = await completion.text();
+            console.error('OpenAI meeting summary failed', details);
+          }
+        } catch (aiErr) {
+          console.error('OpenAI meeting summary errored', aiErr);
+        }
+      }
+
+      opportunity.meetingNotes.push(meetingPayload);
+      await account.save();
+      const meeting = opportunity.meetingNotes[opportunity.meetingNotes.length - 1];
+      res.status(201).json({ ok: true, meeting, opportunity, account, stats: calculateRevenueStats(account) });
+    } catch (err) {
+      console.error('RevenueForge meeting capture failed', err);
+      res.status(500).json({ error: 'Unable to capture meeting notes' });
+    }
+  }
+);
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
 app.use(express.static(PUBLIC_DIR));
