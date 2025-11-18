@@ -8,6 +8,7 @@ const morgan = require('morgan');
 const mongoose = require('mongoose');
 const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
+const { WorkOS } = require('@workos-inc/node');
 
 const { requireAuth, issueTokenCookie, clearTokenCookie } = require('./middleware/auth');
 const { validateBody } = require('./middleware/validation');
@@ -17,6 +18,11 @@ const RevenueAccount = require('./models/RevenueAccount');
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
+const workosClient = process.env.WORKOS_API_KEY ? new WorkOS(process.env.WORKOS_API_KEY) : null;
+const WORKOS_CLIENT_ID = process.env.WORKOS_CLIENT_ID;
+const WORKOS_REDIRECT_URI =
+  process.env.WORKOS_REDIRECT_URI || `${process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000'}/api/auth/workos/callback`;
+const WORKOS_SUCCESS_REDIRECT = process.env.WORKOS_SUCCESS_REDIRECT || process.env.RENDER_EXTERNAL_URL || '/';
 
 app.use(helmet({
   contentSecurityPolicy: false,
@@ -117,6 +123,17 @@ const PLATFORM_DEFINITIONS = [
 const PLATFORM_IDS = new Set(PLATFORM_DEFINITIONS.map(platform => platform.id));
 const PERSONAL_ALLOWED_PLATFORMS = new Set(['valuesphere']);
 const LICENSE_OPTIONS = ['personal', 'business'];
+
+function resolveWorkOSSuccessRedirect(req) {
+  const target = WORKOS_SUCCESS_REDIRECT || '/';
+  if (/^https?:\/\//i.test(target)) return target;
+
+  const origin = process.env.RENDER_EXTERNAL_URL || `${req.protocol}://${req.get('host')}`;
+  if (target.startsWith('/')) {
+    return `${origin}${target}`;
+  }
+  return `${origin}/${target}`;
+}
 
 function normalisePlatformAccess(licenseTier, requested) {
   if (!LICENSE_OPTIONS.includes(licenseTier)) {
@@ -364,11 +381,54 @@ app.post('/api/auth/signup', validateBody(signupSchema), async (req, res) => {
   }
 });
 
+app.get('/api/auth/workos/callback', async (req, res) => {
+  if (!workosClient || !WORKOS_CLIENT_ID) {
+    return res.status(503).json({ error: 'WorkOS is not configured' });
+  }
+
+  const { code } = req.query;
+  if (!code) return res.status(400).json({ error: 'Missing authorization code' });
+
+  try {
+    const authentication = await workosClient.userManagement.authenticateWithCode({
+      code,
+      clientId: WORKOS_CLIENT_ID,
+      redirectUri: WORKOS_REDIRECT_URI
+    });
+
+    const profile = authentication?.user || authentication?.profile;
+    if (!profile) {
+      throw new Error('Missing WorkOS user profile');
+    }
+
+    const user = await User.findOrCreateFromWorkOSProfile(profile);
+    const token = issueTokenCookie(res, { uid: user._id.toString() });
+    const redirectUrl = resolveWorkOSSuccessRedirect(req);
+
+    if (req.accepts(['json']) && !req.accepts(['html'])) {
+      return res.json({ ok: true, user: user.public(), token, redirect: redirectUrl });
+    }
+
+    return res.redirect(redirectUrl);
+  } catch (err) {
+    console.error('WorkOS callback error', err);
+    const redirectUrl = resolveWorkOSSuccessRedirect(req);
+    if (req.accepts(['json']) && !req.accepts(['html'])) {
+      return res.status(500).json({ error: 'Unable to complete WorkOS sign-in' });
+    }
+
+    return res.redirect(`${redirectUrl}?error=workos_login_failed`);
+  }
+});
+
 app.post('/api/auth/login', validateBody(loginSchema), async (req, res) => {
   try {
     const { email, password } = req.validatedBody;
     const user = await User.findOne({ email: email.toLowerCase().trim() });
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!user.passwordHash) {
+      return res.status(400).json({ error: 'Password login is disabled for this account. Use WorkOS to sign in.' });
+    }
     const valid = await user.verifyPassword(password);
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
     const token = issueTokenCookie(res, { uid: user._id.toString() });

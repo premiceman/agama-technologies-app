@@ -6,7 +6,8 @@ const UserSchema = new Schema(
   {
     name: { type: String, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    passwordHash: { type: String, required: true },
+    passwordHash: { type: String },
+    workosUserId: { type: String, unique: true, sparse: true },
     company: { type: String, trim: true },
     role: { type: String, trim: true },
     industry: { type: String, trim: true },
@@ -21,6 +22,7 @@ UserSchema.methods.public = function() {
     id: this._id,
     name: this.name,
     email: this.email,
+    workosUserId: this.workosUserId,
     company: this.company,
     role: this.role,
     industry: this.industry,
@@ -31,6 +33,7 @@ UserSchema.methods.public = function() {
 };
 
 UserSchema.methods.verifyPassword = async function(password) {
+  if (!this.passwordHash) return false;
   return bcrypt.compare(password, this.passwordHash);
 };
 
@@ -56,6 +59,66 @@ UserSchema.statics.createSecure = async function({
     licenseTier,
     platformAccess
   });
+};
+
+UserSchema.statics.findOrCreateFromWorkOSProfile = async function(profile) {
+  const email = (profile.email || '').toLowerCase();
+  const nameParts = [profile.firstName, profile.lastName].filter(Boolean);
+  const fullName = nameParts.length > 0 ? nameParts.join(' ') : profile.email;
+
+  let user = null;
+  if (profile.id) {
+    user = await this.findOne({ workosUserId: profile.id });
+  }
+
+  if (!user && email) {
+    user = await this.findOne({ email });
+  }
+
+  if (!user) {
+    user = await this.create({
+      workosUserId: profile.id,
+      email,
+      name: fullName,
+      passwordHash: null,
+      licenseTier: 'personal',
+      platformAccess: ['valuesphere']
+    });
+    return user;
+  }
+
+  let changed = false;
+
+  if (!user.workosUserId && profile.id) {
+    user.workosUserId = profile.id;
+    changed = true;
+  }
+
+  if (email && user.email !== email) {
+    user.email = email;
+    changed = true;
+  }
+
+  if (!user.name && fullName) {
+    user.name = fullName;
+    changed = true;
+  }
+
+  if (!Array.isArray(user.platformAccess) || user.platformAccess.length === 0) {
+    user.platformAccess = ['valuesphere'];
+    changed = true;
+  }
+
+  if (!user.licenseTier) {
+    user.licenseTier = 'personal';
+    changed = true;
+  }
+
+  if (changed) {
+    await user.save();
+  }
+
+  return user;
 };
 
 module.exports = mongoose.model('User', UserSchema);
