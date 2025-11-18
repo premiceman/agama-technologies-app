@@ -11,5 +11,17 @@ services:
         sync: false
       - key: JWT_SECRET
         sync: false
+      - key: WORKOS_API_KEY
+        sync: false
+      - key: WORKOS_CLIENT_ID
+        sync: false
+      - key: APP_BASE_URL
+        value: https://www.agamatechnologies.com
+      - key: WORKOS_REDIRECT_URI
+        value: https://www.agamatechnologies.com/api/auth/workos/callback
+      - key: WORKOS_SUCCESS_REDIRECT
+        value: https://www.agamatechnologies.com/workspace.html
+      - key: WORKOS_LOGOUT_REDIRECT
+        value: https://www.agamatechnologies.com
       - key: ALLOWED_ORIGINS
         value: https://www.agamatechnologies.com

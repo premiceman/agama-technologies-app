@@ -339,7 +339,7 @@
       try {
         const authRes = await fetch('/api/auth/me', { credentials: 'include' });
         if (authRes.status === 401) {
-          window.location.href = '/login.html';
+          window.location.href = '/api/auth/workos/login';
           return;
         }
         const authJson = await authRes.json();

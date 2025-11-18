@@ -24,53 +24,38 @@
       </a>
       <p class="text-fg-3 small mt-2">Access ValueSphere, ProcurePath, and RevenueForge from your liquid-glass workspace.</p>
     </div>
-    <form id="loginForm" class="card glass p-4">
-      <h1 class="h4 mb-3">Welcome back</h1>
-      <p class="text-fg-3 small mb-4">Enter your credentials to continue to the unified Agama workspace.</p>
-      <div class="mb-3">
-        <label class="form-label" for="loginEmail">Email</label>
-        <input class="form-control" type="email" name="email" id="loginEmail" required autocomplete="email">
+    <div class="card glass p-4 text-center" id="loginRedirectCard">
+      <h1 class="h4 mb-3">Secure WorkOS sign-in</h1>
+      <p class="text-fg-3 small mb-4">Production authentication now routes through WorkOS AuthKit so your session stays in sync with our platform.</p>
+      <div class="d-grid gap-2">
+        <a class="btn btn-primary" id="workosLoginButton" href="/api/auth/workos/login">Continue to WorkOS</a>
+        <a class="btn btn-outline-secondary" href="/api/auth/workos/signup">Need an account? Start with WorkOS</a>
       </div>
-      <div class="mb-4">
-        <label class="form-label" for="loginPassword">Password</label>
-        <input class="form-control" type="password" name="password" id="loginPassword" required autocomplete="current-password">
-      </div>
-      <button class="btn btn-primary w-100" type="submit" id="loginSubmit">Sign in</button>
-      <div class="form-text text-center mt-3" id="loginFeedback"></div>
-    </form>
-    <p class="mt-3 text-fg-3 text-center">No account yet? <a href="/signup.html">Create one</a></p>
+      <div class="form-text text-center mt-3" id="loginFeedback">Redirecting you to WorkOS…</div>
+    </div>
+    <p class="mt-3 text-fg-3 text-center">Having trouble? <a href="https://prompt-giraffe-12.authkit.app/reset-password">Reset your password</a></p>
   </div>
 
   <script>
-    const form = document.getElementById('loginForm');
+    const loginUrl = '/api/auth/workos/login';
+    const loginButton = document.getElementById('workosLoginButton');
     const feedback = document.getElementById('loginFeedback');
-    if (form) {
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        feedback.textContent = '';
-        const submitBtn = document.getElementById('loginSubmit');
-        if (submitBtn) submitBtn.disabled = true;
-        const body = Object.fromEntries(new FormData(form).entries());
-        try {
-          const res = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(body)
-          });
-          const json = await res.json();
-          if (res.ok && json.ok) {
-            window.location.href = '/workspace.html';
-          } else {
-            feedback.textContent = json.error || 'Unable to sign in. Please check your details.';
-          }
-        } catch (err) {
-          feedback.textContent = 'Network error. Please try again.';
-        } finally {
-          if (submitBtn) submitBtn.disabled = false;
-        }
+
+    function forwardToWorkOS() {
+      if (feedback) feedback.textContent = 'Redirecting you to WorkOS…';
+      window.location.href = loginUrl;
+    }
+
+    if (loginButton) {
+      loginButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        forwardToWorkOS();
       });
     }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(forwardToWorkOS, 250);
+    });
   </script>
 </body>
 </html>

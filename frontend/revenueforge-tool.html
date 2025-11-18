@@ -497,7 +497,7 @@
     async function initWorkspace() {
       try {
         const res = await fetch('/api/auth/me', { credentials: 'include' });
-        if (res.status === 401) return (window.location.href = '/login.html');
+        if (res.status === 401) return (window.location.href = '/api/auth/workos/login');
         const json = await res.json();
         rfState.user = json.user;
         if (!json.user.platformAccess?.includes('revenueforge') || json.user.licenseTier !== 'business') {

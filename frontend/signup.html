@@ -24,168 +24,38 @@
       </a>
       <p class="text-fg-3 small mt-2">Configure licenses for ValueSphere Consulting, ProcurePath Control Tower, and RevenueForge AI Studio.</p>
     </div>
-    <form id="signupForm" class="card glass p-4">
-      <h1 class="h4 mb-3">Create your Agama account</h1>
-      <p class="text-fg-3 small mb-4">Choose the license tier that fits your ambition and select the platforms available to your organisation.</p>
-      <div class="row g-3">
-        <div class="col-md-6">
-          <label class="form-label" for="signupName">Name</label>
-          <input class="form-control" name="name" id="signupName" required autocomplete="name">
-        </div>
-        <div class="col-md-6">
-          <label class="form-label" for="signupCompany">Organisation (optional for personal)</label>
-          <input class="form-control" name="company" id="signupCompany" autocomplete="organization">
-        </div>
-        <div class="col-md-6">
-          <label class="form-label" for="signupEmail">Email</label>
-          <input class="form-control" type="email" name="email" id="signupEmail" required autocomplete="email">
-        </div>
-        <div class="col-md-6">
-          <label class="form-label" for="signupPassword">Password</label>
-          <input class="form-control" type="password" name="password" id="signupPassword" required autocomplete="new-password" minlength="8">
-        </div>
-        <div class="col-md-6">
-          <label class="form-label" for="signupRole">Role</label>
-          <input class="form-control" name="role" id="signupRole" autocomplete="organization-title">
-        </div>
-        <div class="col-md-6">
-          <label class="form-label" for="signupIndustry">Industry</label>
-          <select class="form-select" name="industry" id="signupIndustry">
-            <option value="Consulting">Consulting</option>
-            <option value="SaaS">SaaS</option>
-            <option value="Financial Services">Financial Services</option>
-            <option value="Health">Health</option>
-            <option value="Manufacturing">Manufacturing</option>
-            <option value="Other" selected>Other</option>
-          </select>
-        </div>
+    <div class="card glass p-4 text-center" id="signupRedirectCard">
+      <h1 class="h4 mb-3">Create your account with WorkOS</h1>
+      <p class="text-fg-3 small mb-4">Agama uses WorkOS AuthKit for production sign-ups so that every identity stays consistent across WorkOS and MongoDB.</p>
+      <div class="d-grid gap-2">
+        <a class="btn btn-primary" id="workosSignupButton" href="/api/auth/workos/signup">Continue to WorkOS sign-up</a>
+        <a class="btn btn-outline-secondary" href="/api/auth/workos/login">Already verified? Return to WorkOS sign-in</a>
       </div>
-
-      <hr class="my-4">
-
-      <div class="row g-4">
-        <div class="col-md-6">
-          <h2 class="h5 mb-3">License tier</h2>
-          <div class="card glass p-3 mb-3">
-            <div class="form-check">
-              <input class="form-check-input" type="radio" name="licenseTier" id="licensePersonal" value="personal" checked>
-              <label class="form-check-label" for="licensePersonal">
-                Personal Navigator access
-                <span class="d-block text-fg-3 small">Ideal for individual leaders exploring ValueSphere Navigator assessments.</span>
-              </label>
-            </div>
-          </div>
-          <div class="card glass p-3">
-            <div class="form-check">
-              <input class="form-check-input" type="radio" name="licenseTier" id="licenseBusiness" value="business">
-              <label class="form-check-label" for="licenseBusiness">
-                Business license
-                <span class="d-block text-fg-3 small">Unlock ValueSphere Catalyst advisory plus ProcurePath and RevenueForge platforms.</span>
-              </label>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-6">
-          <h2 class="h5 mb-3">Platform access</h2>
-          <p class="text-fg-3 small">Personal licenses always include ValueSphere Navigator. Business licenses can enable all platforms.</p>
-          <div class="card glass p-3 mb-3">
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" name="platformAccess" id="platformValuesphere" value="valuesphere" checked>
-              <label class="form-check-label" for="platformValuesphere">
-                ValueSphere Consulting
-                <span class="d-block text-fg-3 small">Navigator assessments and Catalyst advisory for value-driven change.</span>
-              </label>
-            </div>
-          </div>
-          <div class="card glass p-3 mb-3">
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" name="platformAccess" id="platformProcurepath" value="procurepath" data-business-only="true">
-              <label class="form-check-label" for="platformProcurepath">
-                ProcurePath Control Tower
-                <span class="d-block text-fg-3 small">Vendor relationship management, contract intelligence, and negotiation ops.</span>
-              </label>
-            </div>
-          </div>
-          <div class="card glass p-3">
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" name="platformAccess" id="platformRevenueforge" value="revenueforge" data-business-only="true">
-              <label class="form-check-label" for="platformRevenueforge">
-                RevenueForge AI Studio
-                <span class="d-block text-fg-3 small">AI-led sales cycle orchestration, qualification copilots, and lead dossiers.</span>
-              </label>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <button class="btn btn-primary w-100 mt-4" type="submit" id="signupSubmit">Create account</button>
-      <div class="form-text text-center mt-3" id="signupFeedback"></div>
-    </form>
-    <p class="mt-3 text-fg-3 text-center">Already have an account? <a href="/login.html">Sign in</a></p>
+      <div class="form-text text-center mt-3" id="signupFeedback">Redirecting you to WorkOS…</div>
+    </div>
+    <p class="mt-3 text-fg-3 text-center">Need to accept an invite or reset your password? Visit the WorkOS <a href="https://prompt-giraffe-12.authkit.app/invite">invitation</a> or <a href="https://prompt-giraffe-12.authkit.app/reset-password">password reset</a> pages.</p>
   </div>
 
   <script>
-    const form = document.getElementById('signupForm');
-    const licenseRadios = document.querySelectorAll('input[name="licenseTier"]');
-    const platformCheckboxes = document.querySelectorAll('input[name="platformAccess"]');
+    const signupUrl = '/api/auth/workos/signup';
+    const signupButton = document.getElementById('workosSignupButton');
     const feedback = document.getElementById('signupFeedback');
 
-    function syncPlatformAvailability() {
-      const tier = document.querySelector('input[name="licenseTier"]:checked')?.value || 'personal';
-      platformCheckboxes.forEach(checkbox => {
-        const businessOnly = checkbox.dataset.businessOnly === 'true';
-        if (tier === 'personal') {
-          checkbox.checked = checkbox.value === 'valuesphere';
-          checkbox.disabled = businessOnly || checkbox.value !== 'valuesphere';
-        } else {
-          checkbox.disabled = false;
-          if (!checkbox.checked && checkbox.value === 'valuesphere') {
-            checkbox.checked = true;
-          }
-        }
+    function forwardToWorkOS() {
+      if (feedback) feedback.textContent = 'Redirecting you to WorkOS…';
+      window.location.href = signupUrl;
+    }
+
+    if (signupButton) {
+      signupButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        forwardToWorkOS();
       });
     }
 
-    licenseRadios.forEach(radio => radio.addEventListener('change', syncPlatformAvailability));
-    syncPlatformAvailability();
-
-    if (form) {
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        feedback.textContent = '';
-        const submitBtn = document.getElementById('signupSubmit');
-        if (submitBtn) submitBtn.disabled = true;
-        const formData = new FormData(form);
-        const payload = {
-          name: formData.get('name'),
-          company: formData.get('company') || undefined,
-          email: formData.get('email'),
-          password: formData.get('password'),
-          role: formData.get('role') || undefined,
-          industry: formData.get('industry') || undefined,
-          licenseTier: formData.get('licenseTier'),
-          platformAccess: formData.getAll('platformAccess')
-        };
-        try {
-          const res = await fetch('/api/auth/signup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(payload)
-          });
-          const json = await res.json();
-          if (res.ok && json.ok) {
-            window.location.href = '/workspace.html';
-          } else {
-            feedback.textContent = json.error || 'Unable to create account. Please review your details.';
-          }
-        } catch (err) {
-          feedback.textContent = 'Network error. Please try again.';
-        } finally {
-          if (submitBtn) submitBtn.disabled = false;
-        }
-      });
-    }
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(forwardToWorkOS, 250);
+    });
   </script>
 </body>
 </html>
