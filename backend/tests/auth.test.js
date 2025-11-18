@@ -1,9 +1,12 @@
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-key';
 process.env.NODE_ENV = 'test';
+process.env.WORKOS_API_KEY = 'test-api-key';
+process.env.WORKOS_CLIENT_ID = 'test-client-id';
 
 const mongoose = require('mongoose');
 const request = require('supertest');
 const { MongoMemoryServer } = require('mongodb-memory-server');
+const { installWorkOSStub } = require('./helpers/workosStub');
 
 let app;
 let mongo;
@@ -18,6 +21,7 @@ async function waitForConnection() {
 
 describe('Authentication & licensing', () => {
   beforeAll(async () => {
+    installWorkOSStub();
     mongo = await MongoMemoryServer.create();
     process.env.MONGODB_URI = mongo.getUri();
     app = require('../index');
@@ -28,6 +32,7 @@ describe('Authentication & licensing', () => {
     if (mongo) {
       await mongo.stop();
     }
+    await mongoose.disconnect();
   });
 
   afterEach(async () => {

@@ -16,6 +16,9 @@ const { validateBody } = require('./middleware/validation');
 const User = require('./models/User');
 const ProcurementVendor = require('./models/ProcurementVendor');
 const RevenueAccount = require('./models/RevenueAccount');
+const Organization = require('./models/Organization');
+const OrganizationMembership = require('./models/OrganizationMembership');
+const { requireOrgRole } = require('./middleware/orgAuth');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -191,7 +194,15 @@ function normalisePlatformAccess(licenseTier, requested) {
   return { platformAccess: filtered };
 }
 
-function assertProcurePathAccess(user) {
+function assertProcurePathAccess(user, organization) {
+  if (organization) {
+    const hasProcurePath = Array.isArray(organization.platformAccess) && organization.platformAccess.includes('procurepath');
+    if (organization.tier !== 'business' || !hasProcurePath) {
+      return { error: 'ProcurePath Control Tower requires a business license with ProcurePath enabled.' };
+    }
+    return { ok: true };
+  }
+
   const hasProcurePath = Array.isArray(user.platformAccess) && user.platformAccess.includes('procurepath');
   if (user.licenseTier !== 'business' || !hasProcurePath) {
     return { error: 'ProcurePath Control Tower requires a business license with ProcurePath enabled.' };
@@ -199,7 +210,16 @@ function assertProcurePathAccess(user) {
   return { ok: true };
 }
 
-function assertRevenueForgeAccess(user) {
+function assertRevenueForgeAccess(user, organization) {
+  if (organization) {
+    const hasRevenueForge =
+      Array.isArray(organization.platformAccess) && organization.platformAccess.includes('revenueforge');
+    if (organization.tier !== 'business' || !hasRevenueForge) {
+      return { error: 'RevenueForge AI Studio requires a business license with RevenueForge enabled.' };
+    }
+    return { ok: true };
+  }
+
   const hasRevenueForge = Array.isArray(user.platformAccess) && user.platformAccess.includes('revenueforge');
   if (user.licenseTier !== 'business' || !hasRevenueForge) {
     return { error: 'RevenueForge AI Studio requires a business license with RevenueForge enabled.' };
@@ -230,6 +250,30 @@ const profileUpdateSchema = z.object({
   industry: z.string().trim().max(160).optional(),
   licenseTier: z.enum(LICENSE_OPTIONS).optional(),
   platformAccess: z.array(z.string()).optional()
+});
+
+const organizationCreateSchema = z.object({
+  name: z.string().trim().min(2),
+  slug: z.string().trim().min(2),
+  domains: z.array(z.string().trim()).default([]),
+  seatLimit: z.number().int().positive().max(10000).default(10),
+  platformAccess: z.array(z.string()).optional()
+});
+
+const organizationUpdateSchema = z.object({
+  name: z.string().trim().min(2).optional(),
+  seatLimit: z.number().int().positive().max(10000).optional(),
+  platformAccess: z.array(z.string()).optional()
+});
+
+const membershipUpdateSchema = z.object({
+  role: z.enum(['owner', 'admin', 'member', 'viewer']).optional(),
+  status: z.enum(['active', 'invited', 'suspended']).optional()
+});
+
+const membershipCreateSchema = z.object({
+  email: z.string().email(),
+  role: z.enum(['owner', 'admin', 'member', 'viewer']).default('member')
 });
 
 const procurementVendorSchema = z.object({
@@ -446,7 +490,10 @@ app.post('/api/auth/signup', validateBody(signupSchema), async (req, res) => {
       platformAccess: normalised.platformAccess
     });
 
-    const token = issueTokenCookie(res, { uid: user._id.toString() });
+    const token = issueTokenCookie(res, {
+      uid: user._id.toString(),
+      orgId: user.defaultOrganization ? user.defaultOrganization.toString() : null
+    });
     res.json({ ok: true, user: user.public(), token });
   } catch (err) {
     console.error(err);
@@ -481,13 +528,83 @@ app.get('/api/auth/workos/callback', async (req, res) => {
       redirectUri: resolveWorkOSRedirectUri(req)
     });
 
+    const workosOrgId = authentication.organization_id || authentication.organizationId || null;
     const profile = authentication?.user || authentication?.profile;
     if (!profile) {
       throw new Error('Missing WorkOS user profile');
     }
 
     const user = await User.findOrCreateFromWorkOSProfile(profile);
-    const token = issueTokenCookie(res, { uid: user._id.toString() });
+
+    let organization = null;
+    let membership = null;
+
+    if (workosOrgId) {
+      organization = await Organization.findOne({ workosOrganizationId: workosOrgId });
+
+      if (!organization) {
+        const defaultName =
+          authentication.user?.organization?.name || (profile.email ? profile.email.split('@')[1] : 'Workspace');
+        const baseSlug = String(defaultName || 'workspace')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)+/g, '')
+          .slice(0, 60) ||
+          `org-${Date.now()}`;
+        let slug = baseSlug;
+        let slugSuffix = 1;
+        while (await Organization.findOne({ slug })) {
+          slug = `${baseSlug}-${slugSuffix++}`;
+        }
+
+        organization = await Organization.create({
+          name: defaultName || 'Workspace',
+          slug,
+          workosOrganizationId: workosOrgId,
+          tier: 'business',
+          platformAccess: ['valuesphere', 'procurepath', 'revenueforge'],
+          seatLimit: 10,
+          createdBy: user._id
+        });
+      }
+
+      membership = await OrganizationMembership.findOne({ organization: organization._id, user: user._id });
+      if (!membership) {
+        const existingCount = await OrganizationMembership.countDocuments({ organization: organization._id });
+        const role = existingCount === 0 ? 'owner' : 'member';
+        membership = new OrganizationMembership({ organization: organization._id, user: user._id, role });
+      }
+
+      const seatsUsed = await OrganizationMembership.countActiveSeats(organization._id);
+      if (membership.status !== 'active') {
+        if (seatsUsed >= organization.seatLimit) {
+          membership.status = 'suspended';
+          await membership.save();
+          if (wantsJson) {
+            return res
+              .status(403)
+              .json({ error: 'Seat limit exceeded for this organization. Contact your workspace admin.' });
+          }
+          return res.redirect(`${redirectUrl}?error=seat_limit_exceeded`);
+        }
+        membership.status = 'active';
+      }
+
+      await membership.save();
+
+      if (!user.defaultOrganization) {
+        user.defaultOrganization = organization._id;
+      }
+    }
+
+    if (organization && typeof user.isModified === 'function' && user.isModified('defaultOrganization')) {
+      await user.save();
+    }
+
+    const token = issueTokenCookie(res, {
+      uid: user._id.toString(),
+      orgId: user.defaultOrganization ? user.defaultOrganization.toString() : null
+    });
     if (wantsJson) {
       return res.json({ ok: true, user: user.public(), token, redirect: redirectUrl });
     }
@@ -513,7 +630,10 @@ app.post('/api/auth/login', validateBody(loginSchema), async (req, res) => {
     }
     const valid = await user.verifyPassword(password);
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
-    const token = issueTokenCookie(res, { uid: user._id.toString() });
+    const token = issueTokenCookie(res, {
+      uid: user._id.toString(),
+      orgId: user.defaultOrganization ? user.defaultOrganization.toString() : null
+    });
     res.json({ ok: true, user: user.public(), token });
   } catch (err) {
     console.error(err);
@@ -534,7 +654,23 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
   try {
     const user = await User.findById(req.auth.uid);
     if (!user) return res.status(404).json({ error: 'Not found' });
-    res.json({ ok: true, user: user.public(), platforms: PLATFORM_DEFINITIONS });
+    let organizationContext = null;
+    if (user.defaultOrganization) {
+      const organization = await Organization.findById(user.defaultOrganization);
+      const membership = await OrganizationMembership.findForUserAndOrg(user._id, user.defaultOrganization);
+      if (organization) {
+        organizationContext = {
+          id: organization._id.toString(),
+          name: organization.name,
+          slug: organization.slug,
+          tier: organization.tier,
+          seatLimit: organization.seatLimit,
+          seatsUsed: await OrganizationMembership.countActiveSeats(organization._id),
+          role: membership ? membership.role : null
+        };
+      }
+    }
+    res.json({ ok: true, user: user.public(), platforms: PLATFORM_DEFINITIONS, organizationContext });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -581,6 +717,353 @@ app.delete('/api/auth/me', requireAuth, async (req, res) => {
   }
 });
 
+app.get('/api/orgs', requireAuth, async (req, res) => {
+  try {
+    const memberships = await OrganizationMembership.find({ user: req.auth.uid, status: 'active' }).populate(
+      'organization'
+    );
+
+    const organizations = await Promise.all(
+      memberships
+        .filter(m => m.organization)
+        .map(async membership => {
+          const org = membership.organization;
+          const seatsUsed = await OrganizationMembership.countActiveSeats(org._id);
+          return {
+            id: org._id.toString(),
+            name: org.name,
+            slug: org.slug,
+            tier: org.tier,
+            seatLimit: org.seatLimit,
+            seatsUsed,
+            role: membership.role
+          };
+        })
+    );
+
+    res.json({ ok: true, organizations });
+  } catch (err) {
+    console.error('List orgs error', err);
+    res.status(500).json({ error: 'Unable to list organizations' });
+  }
+});
+
+app.post('/api/orgs', requireAuth, validateBody(organizationCreateSchema), async (req, res) => {
+  try {
+    const payload = req.validatedBody;
+    const baseSlug = payload.slug
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)+/g, '')
+      .slice(0, 60);
+
+    let slug = baseSlug || `org-${Date.now()}`;
+    let suffix = 1;
+    while (await Organization.findOne({ slug })) {
+      slug = `${baseSlug}-${suffix++}`;
+    }
+
+    const organization = await Organization.create({
+      name: payload.name,
+      slug,
+      domains: payload.domains || [],
+      seatLimit: payload.seatLimit || 10,
+      tier: 'business',
+      platformAccess: payload.platformAccess || ['valuesphere'],
+      createdBy: req.auth.uid
+    });
+
+    await OrganizationMembership.create({
+      organization: organization._id,
+      user: req.auth.uid,
+      role: 'owner',
+      status: 'active'
+    });
+
+    const user = await User.findById(req.auth.uid);
+    if (user && !user.defaultOrganization) {
+      user.defaultOrganization = organization._id;
+      await user.save();
+    }
+
+    const seatsUsed = await OrganizationMembership.countActiveSeats(organization._id);
+
+    res.status(201).json({
+      ok: true,
+      organization: {
+        id: organization._id.toString(),
+        name: organization.name,
+        slug: organization.slug,
+        tier: organization.tier,
+        seatLimit: organization.seatLimit,
+        seatsUsed,
+        role: 'owner'
+      }
+    });
+  } catch (err) {
+    console.error('Create org error', err);
+    res.status(500).json({ error: 'Unable to create organization' });
+  }
+});
+
+app.get('/api/orgs/:orgId', requireAuth, requireOrgRole('viewer'), async (req, res) => {
+  try {
+    const seatsUsed = await OrganizationMembership.countActiveSeats(req.organization._id);
+    res.json({
+      ok: true,
+      organization: {
+        id: req.organization._id.toString(),
+        name: req.organization.name,
+        slug: req.organization.slug,
+        tier: req.organization.tier,
+        seatLimit: req.organization.seatLimit,
+        seatsUsed,
+        role: req.orgMembership.role
+      }
+    });
+  } catch (err) {
+    console.error('Get org error', err);
+    res.status(500).json({ error: 'Unable to fetch organization' });
+  }
+});
+
+app.put('/api/orgs/:orgId', requireAuth, requireOrgRole('owner'), validateBody(organizationUpdateSchema), async (req, res) => {
+  try {
+    const payload = req.validatedBody;
+    ['name', 'seatLimit', 'platformAccess'].forEach(field => {
+      if (payload[field] !== undefined) {
+        req.organization[field] = payload[field];
+      }
+    });
+    await req.organization.save();
+
+    const seatsUsed = await OrganizationMembership.countActiveSeats(req.organization._id);
+    res.json({
+      ok: true,
+      organization: {
+        id: req.organization._id.toString(),
+        name: req.organization.name,
+        slug: req.organization.slug,
+        tier: req.organization.tier,
+        seatLimit: req.organization.seatLimit,
+        seatsUsed,
+        role: req.orgMembership.role
+      }
+    });
+  } catch (err) {
+    console.error('Update org error', err);
+    res.status(500).json({ error: 'Unable to update organization' });
+  }
+});
+
+app.get('/api/orgs/:orgId/members', requireAuth, requireOrgRole('admin'), async (req, res) => {
+  try {
+    const members = await OrganizationMembership.find({ organization: req.organization._id }).populate({
+      path: 'user',
+      select: 'name email'
+    });
+
+    const formatted = members.map(member => ({
+      id: member._id.toString(),
+      userId: member.user ? member.user._id.toString() : null,
+      name: member.user ? member.user.name : null,
+      email: member.user ? member.user.email : member.invitedEmail,
+      role: member.role,
+      status: member.status
+    }));
+
+    res.json({ ok: true, members: formatted });
+  } catch (err) {
+    console.error('List members error', err);
+    res.status(500).json({ error: 'Unable to list members' });
+  }
+});
+
+app.post(
+  '/api/orgs/:orgId/members',
+  requireAuth,
+  requireOrgRole('admin'),
+  validateBody(membershipCreateSchema),
+  async (req, res) => {
+    try {
+      const { email, role } = req.validatedBody;
+      const user = await User.findOne({ email: email.toLowerCase() });
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      let membership = await OrganizationMembership.findOne({ organization: req.organization._id, user: user._id });
+      if (!membership) {
+        membership = new OrganizationMembership({ organization: req.organization._id, user: user._id });
+      }
+
+      if (role) membership.role = role;
+
+      const isActivating = membership.isNew || membership.status !== 'active';
+      if (isActivating) {
+        const seatsUsed = await OrganizationMembership.countActiveSeats(req.organization._id);
+        if (seatsUsed >= req.organization.seatLimit) {
+          membership.status = 'suspended';
+          await membership.save();
+          return res
+            .status(403)
+            .json({ error: 'Seat limit exceeded for this organization. Contact your workspace admin.' });
+        }
+        membership.status = 'active';
+      }
+
+      await membership.save();
+
+      res.status(201).json({
+        ok: true,
+        member: {
+          id: membership._id.toString(),
+          userId: user._id.toString(),
+          name: user.name,
+          email: user.email,
+          role: membership.role,
+          status: membership.status
+        }
+      });
+    } catch (err) {
+      console.error('Create member error', err);
+      res.status(500).json({ error: 'Unable to add member' });
+    }
+  }
+);
+
+app.put(
+  '/api/orgs/:orgId/members/:memberId',
+  requireAuth,
+  requireOrgRole('admin'),
+  validateBody(membershipUpdateSchema),
+  async (req, res) => {
+    try {
+      const membership = await OrganizationMembership.findOne({
+        _id: req.params.memberId,
+        organization: req.organization._id
+      });
+
+      if (!membership) return res.status(404).json({ error: 'Member not found' });
+
+      const payload = req.validatedBody;
+
+      if (membership.role === 'owner' && payload.role && payload.role !== 'owner') {
+        const otherOwners = await OrganizationMembership.countDocuments({
+          organization: req.organization._id,
+          role: 'owner',
+          status: 'active',
+          _id: { $ne: membership._id }
+        });
+        if (otherOwners === 0) {
+          return res.status(400).json({ error: 'At least one owner is required.' });
+        }
+      }
+
+      if (payload.status === 'active' && membership.status !== 'active') {
+        const seatsUsed = await OrganizationMembership.countActiveSeats(req.organization._id);
+        if (seatsUsed >= req.organization.seatLimit) {
+          return res
+            .status(403)
+            .json({ error: 'Seat limit exceeded for this organization. Contact your workspace admin.' });
+        }
+      }
+
+      if (payload.role) membership.role = payload.role;
+      if (payload.status) {
+        if (membership.role === 'owner' && payload.status !== 'active') {
+          const otherOwners = await OrganizationMembership.countDocuments({
+            organization: req.organization._id,
+            role: 'owner',
+            status: 'active',
+            _id: { $ne: membership._id }
+          });
+          if (otherOwners === 0) {
+            return res.status(400).json({ error: 'At least one owner is required.' });
+          }
+        }
+        membership.status = payload.status;
+      }
+
+      await membership.save();
+
+      res.json({
+        ok: true,
+        member: {
+          id: membership._id.toString(),
+          userId: membership.user.toString(),
+          role: membership.role,
+          status: membership.status
+        }
+      });
+    } catch (err) {
+      console.error('Update member error', err);
+      res.status(500).json({ error: 'Unable to update member' });
+    }
+  }
+);
+
+app.delete('/api/orgs/:orgId/members/:memberId', requireAuth, requireOrgRole('admin'), async (req, res) => {
+  try {
+    const membership = await OrganizationMembership.findOne({
+      _id: req.params.memberId,
+      organization: req.organization._id
+    });
+    if (!membership) return res.status(404).json({ error: 'Member not found' });
+
+    if (membership.role === 'owner') {
+      const otherOwners = await OrganizationMembership.countDocuments({
+        organization: req.organization._id,
+        role: 'owner',
+        status: 'active',
+        _id: { $ne: membership._id }
+      });
+      if (otherOwners === 0) {
+        return res.status(400).json({ error: 'At least one owner is required.' });
+      }
+    }
+
+    await membership.deleteOne();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Delete member error', err);
+    res.status(500).json({ error: 'Unable to delete member' });
+  }
+});
+
+app.post(
+  '/api/orgs/:orgId/workos/admin-portal-link',
+  requireAuth,
+  requireOrgRole('admin'),
+  async (req, res) => {
+    if (!workosClient) {
+      return res.status(500).json({ error: 'WorkOS is not configured.' });
+    }
+
+    try {
+      const org = req.organization;
+      if (!org.workosOrganizationId) {
+        return res.status(400).json({ error: 'Organization is not linked to a WorkOS organization.' });
+      }
+
+      const returnUrl =
+        process.env.WORKOS_PORTAL_RETURN_URL ||
+        `${APP_BASE_URL || 'https://www.agamatechnologies.com'}/workspace.html`;
+
+      const { link } = await workosClient.portal.generateLink({
+        organization: org.workosOrganizationId,
+        intent: 'sso',
+        returnUrl
+      });
+
+      return res.json({ ok: true, link });
+    } catch (err) {
+      console.error('Admin Portal link error', err);
+      return res.status(500).json({ error: 'Unable to generate Admin Portal link.' });
+    }
+  }
+);
+
 async function loadProcurePathUser(req, res) {
   const user = await User.findById(req.auth.uid);
   if (!user) {
@@ -588,7 +1071,7 @@ async function loadProcurePathUser(req, res) {
     return null;
   }
 
-  const access = assertProcurePathAccess(user);
+  const access = assertProcurePathAccess(user, req.organization);
   if (access.error) {
     res.status(403).json({ error: access.error });
     return null;
@@ -604,7 +1087,7 @@ async function loadRevenueForgeUser(req, res) {
     return null;
   }
 
-  const access = assertRevenueForgeAccess(user);
+  const access = assertRevenueForgeAccess(user, req.organization);
   if (access.error) {
     res.status(403).json({ error: access.error });
     return null;
