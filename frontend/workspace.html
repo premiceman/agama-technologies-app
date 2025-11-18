@@ -70,6 +70,7 @@
           <div>
             <span class="eyebrow">Agama workspace</span>
             <h1 class="h3 mb-0" id="workspaceGreeting">Loading workspace...</h1>
+            <div class="text-fg-3 small" id="orgContext"></div>
           </div>
           <div class="d-flex gap-2">
             <a class="btn btn-outline-light" href="/">Back to site</a>
@@ -215,7 +216,8 @@
   <script>
     const workspaceState = {
       user: null,
-      platforms: []
+      platforms: [],
+      organizationContext: null
     };
 
     async function fetchWorkspace() {
@@ -228,6 +230,7 @@
         const json = await res.json();
         workspaceState.user = json.user;
         workspaceState.platforms = json.platforms || [];
+        workspaceState.organizationContext = json.organizationContext || null;
         renderWorkspace();
       } catch (err) {
         document.getElementById('workspaceGreeting').textContent = 'Unable to load workspace';
@@ -235,10 +238,26 @@
     }
 
     function renderWorkspace() {
-      const { user, platforms } = workspaceState;
+      const { user, platforms, organizationContext } = workspaceState;
       if (!user) return;
       document.getElementById('workspaceGreeting').textContent = `Welcome, ${user.name || user.email}`;
-      document.getElementById('licenseStatus').textContent = user.licenseTier === 'business' ? 'Business license' : 'Personal license';
+      document.getElementById('licenseStatus').textContent =
+        (organizationContext && organizationContext.tier === 'business') || user.licenseTier === 'business'
+          ? 'Business license'
+          : 'Personal license';
+
+      const orgContextEl = document.getElementById('orgContext');
+      if (orgContextEl) {
+        if (organizationContext) {
+          const seatText = organizationContext.seatsUsed && organizationContext.seatLimit
+            ? ` • Seats ${organizationContext.seatsUsed}/${organizationContext.seatLimit}`
+            : '';
+          const roleLabel = organizationContext.role ? organizationContext.role.toUpperCase() : 'MEMBER';
+          orgContextEl.textContent = `${organizationContext.name} • ${roleLabel}${seatText}`;
+        } else {
+          orgContextEl.textContent = '';
+        }
+      }
 
       document.getElementById('workspaceLicensePersonal').checked = user.licenseTier === 'personal';
       document.getElementById('workspaceLicenseBusiness').checked = user.licenseTier === 'business';
