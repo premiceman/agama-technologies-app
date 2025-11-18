@@ -18,12 +18,13 @@ const ProcurementVendor = require('./models/ProcurementVendor');
 const RevenueAccount = require('./models/RevenueAccount');
 
 const app = express();
+app.set('trust proxy', 1);
 const isProduction = process.env.NODE_ENV === 'production';
 const APP_BASE_URL = (process.env.APP_BASE_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000').replace(/\/$/, '');
 const WORKOS_LOGOUT_REDIRECT = process.env.WORKOS_LOGOUT_REDIRECT || 'https://www.agamatechnologies.com';
 const workosClient = process.env.WORKOS_API_KEY ? new WorkOS(process.env.WORKOS_API_KEY) : null;
 const WORKOS_CLIENT_ID = process.env.WORKOS_CLIENT_ID;
-const WORKOS_REDIRECT_URI = process.env.WORKOS_REDIRECT_URI || `${APP_BASE_URL}/api/auth/workos/callback`;
+const WORKOS_REDIRECT_URI = process.env.WORKOS_REDIRECT_URI;
 const WORKOS_SUCCESS_REDIRECT = process.env.WORKOS_SUCCESS_REDIRECT || '/workspace.html';
 const WORKOS_STATE_COOKIE = 'workos_auth_state';
 
@@ -159,6 +160,12 @@ function resolveWorkOSSuccessRedirect(req) {
     return `${origin}${target}`;
   }
   return `${origin}/${target}`;
+}
+
+function resolveWorkOSRedirectUri(req) {
+  if (WORKOS_REDIRECT_URI) return WORKOS_REDIRECT_URI;
+  const origin = APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
+  return `${origin}/api/auth/workos/callback`;
 }
 
 function normalisePlatformAccess(licenseTier, requested) {
@@ -393,7 +400,7 @@ function startWorkOSAuthorization(req, res, screenHint = 'sign-in') {
     const authorizationUrl = workosClient.userManagement.getAuthorizationUrl({
       provider: 'authkit',
       clientId: WORKOS_CLIENT_ID,
-      redirectUri: WORKOS_REDIRECT_URI,
+      redirectUri: resolveWorkOSRedirectUri(req),
       state,
       screenHint
     });
@@ -471,7 +478,7 @@ app.get('/api/auth/workos/callback', async (req, res) => {
     const authentication = await workosClient.userManagement.authenticateWithCode({
       code,
       clientId: WORKOS_CLIENT_ID,
-      redirectUri: WORKOS_REDIRECT_URI
+      redirectUri: resolveWorkOSRedirectUri(req)
     });
 
     const profile = authentication?.user || authentication?.profile;
