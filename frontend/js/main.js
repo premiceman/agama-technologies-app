@@ -1,3 +1,5 @@
+const WORKOS_SIGNUP_PATH = '/api/auth/workos/signup';
+
 const PLATFORM_CONTENT = {
   valuesphere: {
     eyebrow: 'ValueSphere Consulting Suite',
@@ -5,7 +7,7 @@ const PLATFORM_CONTENT = {
     description:
       'ValueSphere Consulting combines Navigator assessments for individuals with Catalyst advisory squads for enterprises. It anchors the Agama platform suite.',
     primaryCta: { href: '/valuesphere.html', label: 'Explore ValueSphere' },
-    secondaryCta: { href: '/signup.html', label: 'Launch your workspace' },
+    secondaryCta: { href: WORKOS_SIGNUP_PATH, label: 'Launch your workspace' },
     highlightTitle: 'VALUESPHERE HIGHLIGHTS',
     highlightHeading: 'Navigator & Catalyst programs',
     highlights: [
@@ -37,7 +39,7 @@ const PLATFORM_CONTENT = {
     description:
       'ProcurePath gives sourcing teams contract health, negotiation guardrails, and vendor relationship intelligence in one workspace.',
     primaryCta: { href: '/procurepath.html', label: 'Discover ProcurePath' },
-    secondaryCta: { href: '/signup.html', label: 'Activate a business license' },
+    secondaryCta: { href: WORKOS_SIGNUP_PATH, label: 'Activate a business license' },
     highlightTitle: 'PROCUREPATH SNAPSHOT',
     highlightHeading: 'Vendor orchestration playbooks',
     highlights: [
@@ -69,7 +71,7 @@ const PLATFORM_CONTENT = {
     description:
       'RevenueForge helps teams design sales lifecycles, generate AI-qualified leads, and collaborate on every opportunity dossier.',
     primaryCta: { href: '/revenueforge.html', label: 'Tour RevenueForge' },
-    secondaryCta: { href: '/signup.html', label: 'Enable for your org' },
+    secondaryCta: { href: WORKOS_SIGNUP_PATH, label: 'Enable for your org' },
     highlightTitle: 'REVENUEFORGE HIGHLIGHTS',
     highlightHeading: 'AI-assisted commercial execution',
     highlights: [

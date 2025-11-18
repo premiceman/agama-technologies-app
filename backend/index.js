@@ -1,5 +1,6 @@
 require('dotenv').config();
 const path = require('path');
+const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
@@ -18,11 +19,13 @@ const RevenueAccount = require('./models/RevenueAccount');
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
+const APP_BASE_URL = (process.env.APP_BASE_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000').replace(/\/$/, '');
+const WORKOS_LOGOUT_REDIRECT = process.env.WORKOS_LOGOUT_REDIRECT || 'https://www.agamatechnologies.com';
 const workosClient = process.env.WORKOS_API_KEY ? new WorkOS(process.env.WORKOS_API_KEY) : null;
 const WORKOS_CLIENT_ID = process.env.WORKOS_CLIENT_ID;
-const WORKOS_REDIRECT_URI =
-  process.env.WORKOS_REDIRECT_URI || `${process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000'}/api/auth/workos/callback`;
-const WORKOS_SUCCESS_REDIRECT = process.env.WORKOS_SUCCESS_REDIRECT || process.env.RENDER_EXTERNAL_URL || '/';
+const WORKOS_REDIRECT_URI = process.env.WORKOS_REDIRECT_URI || `${APP_BASE_URL}/api/auth/workos/callback`;
+const WORKOS_SUCCESS_REDIRECT = process.env.WORKOS_SUCCESS_REDIRECT || '/workspace.html';
+const WORKOS_STATE_COOKIE = 'workos_auth_state';
 
 app.use(helmet({
   contentSecurityPolicy: false,
@@ -124,11 +127,34 @@ const PLATFORM_IDS = new Set(PLATFORM_DEFINITIONS.map(platform => platform.id));
 const PERSONAL_ALLOWED_PLATFORMS = new Set(['valuesphere']);
 const LICENSE_OPTIONS = ['personal', 'business'];
 
+function storeWorkOSState(res) {
+  const value = crypto.randomBytes(24).toString('hex');
+  res.cookie(WORKOS_STATE_COOKIE, value, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: 'lax',
+    maxAge: 10 * 60 * 1000,
+    path: '/api/auth'
+  });
+  return value;
+}
+
+function consumeWorkOSState(req, res) {
+  const value = req.cookies?.[WORKOS_STATE_COOKIE];
+  res.clearCookie(WORKOS_STATE_COOKIE, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: 'lax',
+    path: '/api/auth'
+  });
+  return value;
+}
+
 function resolveWorkOSSuccessRedirect(req) {
   const target = WORKOS_SUCCESS_REDIRECT || '/';
   if (/^https?:\/\//i.test(target)) return target;
 
-  const origin = process.env.RENDER_EXTERNAL_URL || `${req.protocol}://${req.get('host')}`;
+  const origin = APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
   if (target.startsWith('/')) {
     return `${origin}${target}`;
   }
@@ -349,6 +375,46 @@ app.get('/api/platforms', (req, res) => {
   res.json({ ok: true, platforms: PLATFORM_DEFINITIONS });
 });
 
+function handleWorkOSNotConfigured(req, res) {
+  const message = 'WorkOS is not configured';
+  if (req.accepts(['json']) && !req.accepts(['html'])) {
+    return res.status(503).json({ error: message });
+  }
+  return res.status(503).send(message);
+}
+
+function startWorkOSAuthorization(req, res, screenHint = 'sign-in') {
+  if (!workosClient || !WORKOS_CLIENT_ID) {
+    return handleWorkOSNotConfigured(req, res);
+  }
+
+  try {
+    const state = storeWorkOSState(res);
+    const authorizationUrl = workosClient.userManagement.getAuthorizationUrl({
+      provider: 'authkit',
+      clientId: WORKOS_CLIENT_ID,
+      redirectUri: WORKOS_REDIRECT_URI,
+      state,
+      screenHint
+    });
+
+    if (req.accepts(['json']) && !req.accepts(['html'])) {
+      return res.json({ ok: true, authorizationUrl });
+    }
+
+    return res.redirect(authorizationUrl);
+  } catch (err) {
+    console.error('Unable to start WorkOS authorization', err);
+    if (req.accepts(['json']) && !req.accepts(['html'])) {
+      return res.status(500).json({ error: 'Unable to start WorkOS authorization' });
+    }
+    return res.status(500).send('Unable to start WorkOS authorization');
+  }
+}
+
+app.get('/api/auth/workos/login', (req, res) => startWorkOSAuthorization(req, res, 'sign-in'));
+app.get('/api/auth/workos/signup', (req, res) => startWorkOSAuthorization(req, res, 'sign-up'));
+
 app.post('/api/auth/signup', validateBody(signupSchema), async (req, res) => {
   try {
     const { name, email, password, company, role, industry, licenseTier, platformAccess: requested } = req.validatedBody;
@@ -383,11 +449,23 @@ app.post('/api/auth/signup', validateBody(signupSchema), async (req, res) => {
 
 app.get('/api/auth/workos/callback', async (req, res) => {
   if (!workosClient || !WORKOS_CLIENT_ID) {
-    return res.status(503).json({ error: 'WorkOS is not configured' });
+    return handleWorkOSNotConfigured(req, res);
   }
 
-  const { code } = req.query;
-  if (!code) return res.status(400).json({ error: 'Missing authorization code' });
+  const wantsJson = req.accepts(['json']) && !req.accepts(['html']);
+  const redirectUrl = resolveWorkOSSuccessRedirect(req);
+  const storedState = consumeWorkOSState(req, res);
+
+  const { code, state } = req.query;
+  if (!code) {
+    if (wantsJson) return res.status(400).json({ error: 'Missing authorization code' });
+    return res.redirect(`${redirectUrl}?error=missing_workos_code`);
+  }
+
+  if (!state || !storedState || state !== storedState) {
+    if (wantsJson) return res.status(400).json({ error: 'Invalid authorization state' });
+    return res.redirect(`${redirectUrl}?error=invalid_workos_state`);
+  }
 
   try {
     const authentication = await workosClient.userManagement.authenticateWithCode({
@@ -403,17 +481,14 @@ app.get('/api/auth/workos/callback', async (req, res) => {
 
     const user = await User.findOrCreateFromWorkOSProfile(profile);
     const token = issueTokenCookie(res, { uid: user._id.toString() });
-    const redirectUrl = resolveWorkOSSuccessRedirect(req);
-
-    if (req.accepts(['json']) && !req.accepts(['html'])) {
+    if (wantsJson) {
       return res.json({ ok: true, user: user.public(), token, redirect: redirectUrl });
     }
 
     return res.redirect(redirectUrl);
   } catch (err) {
     console.error('WorkOS callback error', err);
-    const redirectUrl = resolveWorkOSSuccessRedirect(req);
-    if (req.accepts(['json']) && !req.accepts(['html'])) {
+    if (wantsJson) {
       return res.status(500).json({ error: 'Unable to complete WorkOS sign-in' });
     }
 
@@ -441,7 +516,11 @@ app.post('/api/auth/login', validateBody(loginSchema), async (req, res) => {
 
 app.post('/api/auth/logout', requireAuth, (req, res) => {
   clearTokenCookie(res);
-  res.json({ ok: true });
+  const wantsJson = req.accepts(['json']) && !req.accepts(['html']);
+  if (wantsJson) {
+    return res.json({ ok: true, redirect: WORKOS_LOGOUT_REDIRECT });
+  }
+  return res.redirect(WORKOS_LOGOUT_REDIRECT);
 });
 
 app.get('/api/auth/me', requireAuth, async (req, res) => {
