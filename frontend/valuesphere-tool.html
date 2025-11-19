@@ -64,6 +64,35 @@
       </nav>
     </aside>
 
+    <aside class="app-subnav glass" aria-label="ValueSphere navigation">
+      <div class="subnav-header">
+        <span class="eyebrow d-block mb-1">ValueSphere</span>
+        <strong>Navigator</strong>
+      </div>
+      <nav class="subnav-nav">
+        <a class="subnav-link" href="#vsDashboard">
+          <i class="bi bi-compass"></i>
+          <span>Dashboard</span>
+        </a>
+        <button class="subnav-link subnav-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#templateSubnav" aria-expanded="true" aria-controls="templateSubnav">
+          <span class="d-flex align-items-center gap-2"><i class="bi bi-kanban"></i> Templates</span>
+          <i class="bi bi-chevron-down small"></i>
+        </button>
+        <div class="collapse show" id="templateSubnav">
+          <a class="subnav-sublink" href="#templateStudio">New Template</a>
+          <a class="subnav-sublink" href="#templateLibrary">Template Library</a>
+        </div>
+        <a class="subnav-link" href="#accountsPanel">
+          <i class="bi bi-building"></i>
+          <span>Accounts</span>
+        </a>
+        <a class="subnav-link" href="#completedAssessments">
+          <i class="bi bi-clipboard-check"></i>
+          <span>Completed assessments</span>
+        </a>
+      </nav>
+    </aside>
+
     <div class="app-content">
       <nav class="navbar navbar-expand-lg bg-glass border-bottom mb-4">
         <div class="container-fluid">
@@ -79,7 +108,7 @@
       </nav>
 
       <main class="container py-4" style="max-width: 1340px;">
-        <header class="card glass p-4 mb-4">
+        <header class="card glass p-4 mb-4" id="vsDashboard">
           <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
             <div>
               <span class="eyebrow d-block">ValueSphere Navigator</span>
@@ -173,6 +202,17 @@
               </form>
             </section>
 
+            <section class="card glass p-4 mb-3" id="templateLibrary">
+              <div class="d-flex justify-content-between flex-wrap align-items-start gap-3 mb-3">
+                <div>
+                  <h2 class="h5 mb-1">Template library</h2>
+                  <p class="text-fg-3 small mb-0">Reuse your own blueprints or pull in company-wide templates when they arrive.</p>
+                </div>
+                <div class="badge-soft">Reusable assets</div>
+              </div>
+              <div id="templateLibraryList" class="d-flex flex-column gap-2"></div>
+            </section>
+
             <section class="card glass p-4" id="assessmentBuilder">
               <div class="d-flex justify-content-between flex-wrap align-items-start gap-3 mb-3">
                 <div>
@@ -204,6 +244,14 @@
                     <label class="form-label" for="assessmentDate">Assessment date</label>
                     <input class="form-control" id="assessmentDate" type="date">
                   </div>
+                  <div class="col-md-6">
+                    <label class="form-label" for="assessmentTakenBy">Assessed by</label>
+                    <input class="form-control" id="assessmentTakenBy" placeholder="e.g., CFO or value leader" required>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label" for="customerContributors">Customer collaborators</label>
+                    <input class="form-control" id="customerContributors" placeholder="e.g., Ops lead, RevOps partner">
+                  </div>
                 </div>
                 <div class="d-flex justify-content-end gap-2 mt-3">
                   <button class="btn btn-outline-light" type="button" id="generateAiSummary">Generate AI summary</button>
@@ -212,7 +260,19 @@
                 <div class="small text-fg-3 mt-2">AI summary uses OpenAI to synthesize findings into a maturity narrative and is stored against the account.</div>
               </form>
 
+              <div class="glass p-3 mb-3 d-none" id="assessmentMeta"></div>
               <div id="assessmentDetail" class="accordion"></div>
+            </section>
+
+            <section class="card glass p-4" id="completedAssessments">
+              <div class="d-flex justify-content-between flex-wrap align-items-start mb-2">
+                <div>
+                  <h2 class="h5 mb-1">Completed assessments</h2>
+                  <p class="text-fg-3 small mb-0">View recently finished cycles with timestamps, owners, and contributors.</p>
+                </div>
+                <span class="badge-soft" id="completedAssessmentsCount">0 recorded</span>
+              </div>
+              <div id="completedAssessmentsList" class="d-flex flex-column gap-2"></div>
             </section>
           </div>
 
