@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agama Workspace Docs — Accounts, Licenses & SSO</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css">
+  <link rel="stylesheet" href="/css/styles.v2.css">
+</head>
+<body class="bg-body text-fg">
+  <!-- Background -->
+  <div class="liquid-bg" aria-hidden="true">
+    <div class="blob blob-blue"></div>
+    <div class="blob blob-teal"></div>
+    <div class="blob blob-magenta"></div>
+  </div>
+
+  <!-- Header -->
+  <header class="border-bottom border-soft py-3 bg-body">
+    <div class="container d-flex flex-wrap align-items-center justify-content-between gap-3">
+      <a href="/" class="d-flex align-items-center gap-2 text-decoration-none">
+        <span class="brand-dot"></span>
+        <span class="fw-semibold">
+          Agama <span class="text-fg-2">Technologies</span>
+        </span>
+      </a>
+      <span class="badge-pill">Workspace Documentation</span>
+    </div>
+  </header>
+
+  <!-- Main content -->
+  <main class="py-5">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-lg-11 col-xl-10">
+
+          <!-- Intro -->
+          <section class="card glass panel-elevated pad-md mb-4" data-aos="fade-up">
+            <h1 class="h3 mb-3">Agama Workspace Accounts, Licenses &amp; SSO</h1>
+            <p class="text-fg-2 mb-2">
+              This documentation explains how authentication, personal and business licenses, organizations,
+              roles, and seats work across the Agama platform:
+              <strong>ValueSphere</strong>, <strong>ProcurePath Control Tower</strong>, and
+              <strong>RevenueForge AI Studio</strong>.
+            </p>
+            <p class="text-fg-3 mb-0">
+              It is designed for:
+            </p>
+            <ul class="panel-list">
+              <li><strong>Individual users</strong> using personal accounts.</li>
+              <li><strong>Business customers</strong> using SSO and seat-based licensing.</li>
+              <li><strong>Org admins</strong> responsible for user access and SSO.</li>
+              <li><strong>Agama team members</strong> onboarding new enterprise tenants.</li>
+            </ul>
+          </section>
+
+          <!-- 1. Terminology -->
+          <section class="card glass panel-elevated pad-md mb-4" data-aos="fade-up">
+            <h2 class="h4 mb-3">1. Core terminology &amp; architecture</h2>
+            <p class="text-fg-2">
+              Agama is a multi-tenant platform with both individual and organization-aware features.
+              These terms appear throughout this documentation:
+            </p>
+
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="summary-tile">
+                  <strong>Personal account</strong>
+                  <p class="mb-1 text-fg-3">
+                    A single user account not tied to a business organization. Best for individual consultants,
+                    early adopters, and small experiments.
+                  </p>
+                  <p class="mb-0 text-fg-3 small">
+                    Internally: the <code>User</code> has <code>licenseTier = "personal"</code> and
+                    platform access is stored on the user record.
+                  </p>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="summary-tile">
+                  <strong>Business organization</strong>
+                  <p class="mb-1 text-fg-3">
+                    A tenant representing a customer company. Many users belong to the same organization and
+                    share a business license and seat pool.
+                  </p>
+                  <p class="mb-0 text-fg-3 small">
+                    Internally: records live in the <code>Organization</code> and
+                    <code>OrganizationMembership</code> collections.
+                  </p>
+                </div>
+              </div>
+
+              <div class="col-md-6">
+                <div class="summary-tile">
+                  <strong>Seat</strong>
+                  <p class="mb-1 text-fg-3">
+                    A seat is an <strong>active membership</strong> in an organization. Each active member
+                    consumes one seat.
+                  </p>
+                  <p class="mb-0 text-fg-3 small">
+                    Internally: one <code>OrganizationMembership</code> document with
+                    <code>status = "active"</code> counts towards the org&#8217;s
+                    <code>seatLimit</code>.
+                  </p>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="summary-tile">
+                  <strong>Platform modules</strong>
+                  <p class="mb-1 text-fg-3">
+                    Agama exposes three main modules:
+                  </p>
+                  <ul class="mb-0 text-fg-3 small">
+                    <li><code>valuesphere</code>&nbsp;&mdash; ValueSphere Consulting suite.</li>
+                    <li><code>procurepath</code>&nbsp;&mdash; ProcurePath Control Tower.</li>
+                    <li><code>revenueforge</code>&nbsp;&mdash; RevenueForge AI Studio.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="col-md-6">
+                <div class="summary-tile">
+                  <strong>WorkOS &amp; SSO</strong>
+                  <p class="mb-1 text-fg-3">
+                    All production authentication uses <strong>WorkOS AuthKit</strong>. WorkOS handles
+                    user identities, password resets, and SSO (Okta, Azure AD, etc).
+                  </p>
+                  <p class="mb-0 text-fg-3 small">
+                    Agama receives trusted identity data from WorkOS and maps it into MongoDB users,
+                    organizations, and memberships.
+                  </p>
+                </div>
+              </div>
+
+              <div class="col-md-6">
+                <div class="summary-tile">
+                  <strong>Default organization</strong>
+                  <p class="mb-1 text-fg-3">
+                    A user can belong to many organizations but has a single <em>default organization</em>.
+                    This is the context used by the workspace and Settings screens.
+                  </p>
+                  <p class="mb-0 text-fg-3 small">
+                    Internally: <code>User.defaultOrganization</code> plus JWT payload
+                    <code>{ uid, orgId }</code>.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 2. Personal accounts -->
+          <section class="card glass panel-elevated pad-md mb-4" data-aos="fade-up">
+            <h2 class="h4 mb-3">2. Personal accounts</h2>
+            <p class="text-fg-2">
+              Personal accounts are best for solo users or early testing. They do not belong to a business
+              organization, and they are not governed by seats or org-level roles.
+            </p>
+
+            <h3 class="h6 mt-3 mb-2">2.1 Creating a personal account</h3>
+            <ul class="panel-list">
+              <li>From the landing page, click <strong>Create account</strong> or go to <code>/signup.html</code>.</li>
+              <li>You are redirected to <strong>WorkOS AuthKit</strong> to complete sign-up.</li>
+              <li>On successful sign-up, WorkOS redirects back to Agama and a user record is created in MongoDB.</li>
+              <li>By default, new WorkOS sign-ups are treated as <strong>personal</strong>:
+                <ul>
+                  <li><code>licenseTier = "personal"</code></li>
+                  <li><code>platformAccess = ["valuesphere"]</code></li>
+                </ul>
+              </li>
+            </ul>
+
+            <h3 class="h6 mt-3 mb-2">2.2 Signing in with a personal account</h3>
+            <ul class="panel-list">
+              <li>Visit <code>/login.html</code> or click <strong>Client workspace</strong> in the footer.</li>
+              <li>Click <strong>Continue to WorkOS</strong> to sign in via WorkOS AuthKit.</li>
+              <li>On success, Agama sets a secure session cookie and redirects you to <code>/workspace.html</code>.</li>
+            </ul>
+
+            <h3 class="h6 mt-3 mb-2">2.3 Personal license behaviour</h3>
+            <ul class="panel-list">
+              <li>Personal users can adjust their license configuration in the workspace
+                  (for example, preparing to upgrade to business features).</li>
+              <li>However, certain products (ProcurePath, RevenueForge) require a
+                  <strong>business license</strong> and may be gated by backend checks.</li>
+              <li>Personal users do not have:
+                <ul>
+                  <li>Organizations or seats</li>
+                  <li>Org roles (owner/admin/member/viewer)</li>
+                  <li>Access to the organization admin console</li>
+                </ul>
+              </li>
+            </ul>
+          </section>
+
+          <!-- 3. Business organizations & licenses -->
+          <section class="card glass panel-elevated pad-md mb-4" data-aos="fade-up">
+            <h2 class="h4 mb-3">3. Business organizations &amp; licenses</h2>
+            <p class="text-fg-2">
+              Business customers use <strong>organizations</strong> to share access across teams. Each organization
+              has a license, a seat pool, and a set of enabled platform modules.
+            </p>
+
+            <h3 class="h6 mt-3 mb-2">3.1 Organization model</h3>
+            <p class="text-fg-3">
+              Each organization record contains:
+            </p>
+            <ul class="panel-list">
+              <li><code>name</code> &mdash; customer-facing org name (e.g. “BigCo Ltd”).</li>
+              <li><code>slug</code> &mdash; URL-safe identifier used internally.</li>
+              <li><code>workosOrganizationId</code> &mdash; the corresponding WorkOS Organization ID.</li>
+              <li><code>domains</code> &mdash; email domains associated with the customer (e.g. <code>bigco.com</code>).</li>
+              <li><code>tier</code> &mdash; currently <code>"business"</code> for org tenants.</li>
+              <li><code>platformAccess</code> &mdash; e.g. <code>["valuesphere", "procurepath", "revenueforge"]</code>.</li>
+              <li><code>seatLimit</code> &mdash; the maximum active members (seats) allowed.</li>
+            </ul>
+
+            <h3 class="h6 mt-3 mb-2">3.2 Seats and seat limits</h3>
+            <ul class="panel-list">
+              <li>Each <strong>active</strong> membership in an organization consumes one seat.</li>
+              <li>Seat usage is computed as the count of <code>OrganizationMembership</code> documents with
+                  <code>status = "active"</code> for that organization.</li>
+              <li>If a new member would exceed <code>seatLimit</code>:
+                <ul>
+                  <li>The membership is created or updated with <code>status = "suspended"</code>.</li>
+                  <li>The API returns a <strong>seat limit exceeded</strong> error.</li>
+                  <li>The user cannot log in as an active member until a seat is freed or the limit is increased.</li>
+                </ul>
+              </li>
+            </ul>
+
+            <h3 class="h6 mt-3 mb-2">3.3 Organization vs. personal licensing</h3>
+            <ul class="panel-list">
+              <li>For business orgs, licensing is driven by the <strong>organization</strong>:
+                <ul>
+                  <li>Org tier (<code>tier = "business"</code>)</li>
+                  <li>Org-level <code>platformAccess</code></li>
+                  <li>Seat count <code>seatLimit</code></li>
+                </ul>
+              </li>
+              <li>Per-user <code>licenseTier</code> and <code>platformAccess</code> are still tracked but org checks
+                  take precedence for business workspaces.</li>
+              <li>Personal accounts are not associated with organizations and ignore org-seat logic.</li>
+            </ul>
+          </section>
+
+          <!-- 4. Roles & RBAC -->
+          <section class="card glass panel-elevated pad-md mb-4" data-aos="fade-up">
+            <h2 class="h4 mb-3">4. Roles &amp; role-based access control</h2>
+            <p class="text-fg-2">
+              Agama uses organization-level roles to control who can change settings, manage members,
+              and access the WorkOS Admin Portal.
+            </p>
+
+            <div class="table-like mb-3">
+              <div class="row">
+                <strong>Role</strong>
+                <span>Description</span>
+              </div>
+              <div class="row">
+                <strong>owner</strong>
+                <span>Top-level admin for the organization; can manage org settings and members.</span>
+              </div>
+              <div class="row">
+                <strong>admin</strong>
+                <span>Operational admin; can manage members and open the WorkOS Admin Portal.</span>
+              </div>
+              <div class="row">
+                <strong>member</strong>
+                <span>Standard user; can access products enabled for the organization.</span>
+              </div>
+              <div class="row">
+                <strong>viewer</strong>
+                <span>Read-oriented user; can see org details where permitted but not perform admin actions.</span>
+              </div>
+            </div>
+
+            <h3 class="h6 mt-3 mb-2">4.1 Effective permissions</h3>
+            <ul class="panel-list">
+              <li><strong>Owners</strong> can:
+                <ul>
+                  <li>Update organization settings (name, seat limit, platform access).</li>
+                  <li>Manage members and roles (promote/demote users, except removing the last owner).</li>
+                  <li>Open the WorkOS Admin Portal for SSO / directory configuration.</li>
+                </ul>
+              </li>
+              <li><strong>Admins</strong> can:
+                <ul>
+                  <li>View and manage members (add, suspend, remove) within seat limits.</li>
+                  <li>Open the WorkOS Admin Portal for SSO / directory configuration.</li>
+                </ul>
+              </li>
+              <li><strong>Members</strong> can:
+                <ul>
+                  <li>Sign in and use the products granted to their organization.</li>
+                  <li>Do not see the organization admin console.</li>
+                </ul>
+              </li>
+              <li><strong>Viewers</strong> (if used) can:
+                <ul>
+                  <li>View org details where allowed.</li>
+                  <li>Do not have admin capabilities.</li>
+                </ul>
+              </li>
+            </ul>
+
+            <p class="text-fg-3 small mb-0">
+              Internally, APIs use a helper like <code>requireOrgRole(minRole)</code> to enforce that only users with
+              sufficient role (owner/admin/member/viewer) can access specific endpoints.
+            </p>
+          </section>
+
+          <!-- 5. Vendor guide: onboarding a new business customer -->
+          <section class="card glass panel-elevated pad-md mb-4" data-aos="fade-up">
+            <h2 class="h4 mb-3">5. Vendor guide &mdash; onboarding a new business customer</h2>
+            <p class="text-fg-2">
+              This section is for the Agama team. It describes what needs to happen when a new enterprise
+              customer wants SSO and seat-based licensing.
+            </p>
+
+            <h3 class="h6 mt-3 mb-2">5.1 Set up the customer in WorkOS</h3>
+            <ol class="panel-list">
+              <li>In the WorkOS dashboard, select the <strong>Production</strong> environment.</li>
+              <li>Create a new <strong>Organization</strong> with the customer&#8217;s name (e.g. “BigCo Ltd”).</li>
+              <li>Add their email domain(s) (e.g. <code>bigco.com</code>) to that WorkOS organization.</li>
+              <li>Configure an SSO connection (Okta, Azure AD, etc.) for this organization:
+                <ul>
+                  <li>Either use the WorkOS Admin Portal from the dashboard, or</li>
+                  <li>Let the customer&#8217;s admin use the in-app “Open WorkOS Admin Portal” button (see below).</li>
+                </ul>
+              </li>
+            </ol>
+
+            <h3 class="h6 mt-3 mb-2">5.2 First login and org creation in Agama</h3>
+            <ol class="panel-list">
+              <li>Ask the customer to choose a designated initial admin (e.g. the lead for this rollout).</li>
+              <li>Have them visit the Agama login page (<code>/login.html</code>) and sign in via SSO.</li>
+              <li>On first successful login from that WorkOS organization, Agama will:
+                <ul>
+                  <li>Create a corresponding <strong>Organization</strong> record in MongoDB (if one does not exist).</li>
+                  <li>Create an <strong>OrganizationMembership</strong> for that user with role
+                      <strong>owner</strong>.</li>
+                  <li>Set this organization as their <strong>defaultOrganization</strong>.</li>
+                </ul>
+              </li>
+              <li>By default, Agama will initialise the org with:
+                <ul>
+                  <li><code>tier = "business"</code></li>
+                  <li><code>platformAccess</code> including the main modules (ValueSphere, ProcurePath, RevenueForge).</li>
+                  <li><code>seatLimit</code> (e.g. 10) which can be adjusted later.</li>
+                </ul>
+              </li>
+            </ol>
+
+            <h3 class="h6 mt-3 mb-2">5.3 Adjusting seat limits and platforms</h3>
+            <p class="text-fg-3">
+              After the first login and org creation:
+            </p>
+            <ul class="panel-list">
+              <li>The Agama team or the org owner can adjust the seat limit and platform access (depending on UI and plan).</li>
+              <li>These settings determine:
+                <ul>
+                  <li>How many users can be active at once (<code>seatLimit</code>).</li>
+                  <li>Which modules (ValueSphere, ProcurePath, RevenueForge) are available to all members.</li>
+                </ul>
+              </li>
+            </ul>
+          </section>
+
+          <!-- 6. Org admin guide -->
+          <section class="card glass panel-elevated pad-md mb-4" data-aos="fade-up">
+            <h2 class="h4 mb-3">6. Organization admin guide</h2>
+            <p class="text-fg-2">
+              This section is for customer-side admins and owners. It explains how to use the in-app admin
+              console and how it relates to your identity provider (Okta, Azure AD, etc).
+            </p>
+
+            <h3 class="h6 mt-3 mb-2">6.1 Accessing the organization admin console</h3>
+            <ul class="panel-list">
+              <li>Sign in to Agama and navigate to <strong>Settings</strong> from the workspace.</li>
+              <li>In Settings, locate the <strong>Organization &amp; SSO</strong> section.</li>
+              <li>If your role is <strong>owner</strong> or <strong>admin</strong>, you will see:
+                <ul>
+                  <li>Organization name, role, and current seat usage (e.g. <code>7 / 10 seats used</code>).</li>
+                  <li>A “Members” list showing users, roles, and statuses.</li>
+                  <li>An <strong>Open WorkOS Admin Portal (SSO &amp; Directory)</strong> button.</li>
+                </ul>
+              </li>
+            </ul>
+
+            <h3 class="h6 mt-3 mb-2">6.2 Configuring SSO via WorkOS Admin Portal</h3>
+            <ul class="panel-list">
+              <li>From the <strong>Organization &amp; SSO</strong> card, click
+                  <strong>Open WorkOS Admin Portal (SSO &amp; Directory)</strong>.</li>
+              <li>You are redirected to a WorkOS-hosted admin experience scoped to your organization.</li>
+              <li>Your internal IT / security team uses this portal to:
+                <ul>
+                  <li>Configure SSO integrations (Okta, Azure AD, etc.).</li>
+                  <li>Review and update SSO connections in a secure, audited way.</li>
+                  <li>Optionally configure directory sync (if enabled by Agama).</li>
+                </ul>
+              </li>
+              <li>Once SSO is configured, any user assigned to the Agama app in your IdP can sign in via the standard
+                  Agama login page.</li>
+            </ul>
+
+            <h3 class="h6 mt-3 mb-2">6.3 Managing members and seats</h3>
+            <p class="text-fg-3">
+              Members are created in one of two ways:
+            </p>
+            <ul class="panel-list">
+              <li><strong>Automatic on first login</strong>:
+                <ul>
+                  <li>When a user signs in via SSO and WorkOS reports they belong to your WorkOS organization.</li>
+                  <li>Agama creates or updates an <code>OrganizationMembership</code> for that user.</li>
+                  <li>The membership is activated if there is a free seat; otherwise it is suspended.</li>
+                </ul>
+              </li>
+              <li><strong>Admin-driven via membership APIs</strong> (and UI where available):
+                <ul>
+                  <li>Admins can view all members and see their roles and statuses.</li>
+                  <li>Admins can suspend or remove members to free seats.</li>
+                </ul>
+              </li>
+            </ul>
+
+            <p class="text-fg-3 mb-2">
+              To rotate seats:
+            </p>
+            <ul class="panel-list">
+              <li>Identify inactive users in the members list.</li>
+              <li>Change their status to <strong>suspended</strong> or remove them entirely.</li>
+              <li>Seat usage will drop, allowing new members to be activated on sign-in.</li>
+            </ul>
+
+            <p class="text-fg-3 mb-0">
+              Note: Removing a user from your IdP (e.g. removing them from the Okta group) prevents future logins but
+              does not automatically free the seat in Agama until their membership is suspended or removed.
+            </p>
+          </section>
+
+          <!-- 7. End-user sign-in flows -->
+          <section class="card glass panel-elevated pad-md mb-4" data-aos="fade-up">
+            <h2 class="h4 mb-3">7. End-user sign-in flows</h2>
+            <p class="text-fg-2">
+              From the end-user perspective, sign-in is always simple, whether they are personal or business users.
+            </p>
+
+            <h3 class="h6 mt-3 mb-2">7.1 Personal users</h3>
+            <ul class="panel-list">
+              <li>Visit <code>/login.html</code> or click <strong>Client workspace</strong> from the landing page.</li>
+              <li>Click <strong>Continue to WorkOS</strong> and sign in with your email and password.</li>
+              <li>On success, you are redirected to the Agama workspace.</li>
+              <li>If you forgot your password, use the <strong>Reset your password</strong> link on the login page.
+                  WorkOS handles password reset securely.</li>
+            </ul>
+
+            <h3 class="h6 mt-3 mb-2">7.2 Business users with SSO</h3>
+            <ul class="panel-list">
+              <li>Visit the same login page (<code>/login.html</code>).</li>
+              <li>If SSO is configured for your organization in WorkOS, you are routed through your IdP
+                  (Okta, Azure AD, etc.).</li>
+              <li>Once you authenticate with your corporate identity, Agama:
+                <ul>
+                  <li>Receives your profile from WorkOS.</li>
+                  <li>Associates you with your organization via <code>workosOrganizationId</code>.</li>
+                  <li>Activates or reuses your membership, subject to seat limits.</li>
+                </ul>
+              </li>
+              <li>If the seat pool is full, you will see a seat-limit error and should contact your org admin.</li>
+            </ul>
+          </section>
+
+          <!-- 8. Troubleshooting -->
+          <section class="card glass panel-elevated pad-md mb-4" data-aos="fade-up">
+            <h2 class="h4 mb-3">8. Troubleshooting</h2>
+
+            <h3 class="h6 mt-3 mb-2">8.1 Invalid redirect URI</h3>
+            <p class="text-fg-3">
+              If you see an <strong>Invalid redirect URI</strong> page from WorkOS:
+            </p>
+            <ul class="panel-list">
+              <li>Ensure the redirect URI configured in WorkOS matches
+                  <code>https://www.agamatechnologies.com/api/auth/workos/callback</code> exactly.</li>
+              <li>Verify that the API key and client ID used by the backend belong to the same environment
+                  (Production vs. Test) where redirect URIs are configured.</li>
+            </ul>
+
+            <h3 class="h6 mt-3 mb-2">8.2 Seat limit exceeded</h3>
+            <p class="text-fg-3">
+              If a user sees a <strong>seat limit exceeded</strong> message:
+            </p>
+            <ul class="panel-list">
+              <li>The organization has reached its <code>seatLimit</code> for active members.</li>
+              <li>An org admin should:
+                <ul>
+                  <li>Suspend or remove inactive members to free seats, or</li>
+                  <li>Work with Agama to increase the seat limit for that organization.</li>
+                </ul>
+              </li>
+            </ul>
+
+            <h3 class="h6 mt-3 mb-2">8.3 No organization context</h3>
+            <p class="text-fg-3">
+              If a business user signs in but is not mapped to an organization:
+            </p>
+            <ul class="panel-list">
+              <li>Verify that the user is assigned to the correct application in your IdP.</li>
+              <li>Confirm that the WorkOS organization and SSO connection are configured against the right domain(s).</li>
+              <li>Contact Agama support if the behaviour persists; provide the user&#8217;s email and your organization name.</li>
+            </ul>
+          </section>
+
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-top border-soft py-4 bg-body">
+    <div class="container d-flex flex-wrap justify-content-between gap-3 text-fg-3 small">
+      <span>&copy; <span id="year"></span> Agama Technologies. All rights reserved.</span>
+      <div class="d-flex gap-3">
+        <a href="/" class="text-fg-3">Back to homepage</a>
+        <a href="/api/auth/workos/login" class="text-fg-3">Client workspace</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+  <script src="/js/main.js" type="module"></script>
+</body>
+</html>
