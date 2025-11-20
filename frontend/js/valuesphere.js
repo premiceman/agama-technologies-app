@@ -97,6 +97,9 @@
   const objectivesList = document.getElementById('objectives');
   const addObjectiveBtn = document.getElementById('addObjective');
   const generateAiSummaryBtn = document.getElementById('generateAiSummary');
+  const dashboardTemplateCount = document.getElementById('dashboardTemplateCount');
+  const dashboardAccountCount = document.getElementById('dashboardAccountCount');
+  const dashboardAssessmentCount = document.getElementById('dashboardAssessmentCount');
   let activeAssessment = null;
 
   function renderArea(area, index) {
@@ -236,10 +239,11 @@
   }
 
   function populateTemplateFormDefaults() {
-    templateStages.value = state.maturityStages;
+    if (templateStages) templateStages.value = state.maturityStages;
   }
 
   function renderTemplateOptions() {
+    if (!assessmentTemplate) return;
     assessmentTemplate.innerHTML = '';
     state.templates.forEach(template => {
       const option = document.createElement('option');
@@ -250,6 +254,7 @@
   }
 
   function renderTemplateLibrary() {
+    if (!templateLibraryList) return;
     templateLibraryList.innerHTML = '';
     if (!state.templates.length) {
       templateLibraryList.innerHTML = '<p class="text-fg-3 small mb-0">No templates yet. Create one to seed your library.</p>';
@@ -281,6 +286,7 @@
   }
 
   function renderAccountOptions() {
+    if (!assessmentAccount) return;
     assessmentAccount.innerHTML = '';
     state.accounts.forEach(account => {
       const option = document.createElement('option');
@@ -291,6 +297,7 @@
   }
 
   function renderAccounts() {
+    if (!accountList) return;
     accountList.innerHTML = '';
     if (!state.accounts.length) {
       accountList.innerHTML = '<p class="text-fg-3 small mb-0">No accounts yet. Create one to begin.</p>';
@@ -314,6 +321,7 @@
   }
 
   function renderCompletedAssessments() {
+    if (!completedAssessmentsList || !completedAssessmentsCount) return;
     completedAssessmentsList.innerHTML = '';
     completedAssessmentsCount.textContent = `${state.assessments.length} recorded`;
     if (!state.assessments.length) {
@@ -345,6 +353,7 @@
   }
 
   function handleAccountSubmit(event) {
+    if (!accountForm) return;
     event.preventDefault();
     const name = document.getElementById('accountName').value.trim();
     const tcv = Number(document.getElementById('accountTcv').value) || 0;
@@ -368,6 +377,7 @@
   }
 
   function renderAssessmentDetail(assessment) {
+    if (!assessmentDetail) return;
     assessmentDetail.innerHTML = '';
     assessment.areas.forEach((area, idx) => {
       const item = document.createElement('div');
@@ -394,6 +404,7 @@
   }
 
   function renderAssessmentMeta(assessment) {
+    if (!assessmentMeta) return;
     if (!assessment) {
       assessmentMeta.classList.add('d-none');
       assessmentMeta.innerHTML = '';
@@ -464,7 +475,7 @@
     attachAssessmentListeners(assessment);
     if (!assessment) {
       renderAssessmentMeta();
-      assessmentDetail.innerHTML = '';
+      if (assessmentDetail) assessmentDetail.innerHTML = '';
       return;
     }
     renderAssessmentMeta(assessment);
@@ -510,8 +521,9 @@
   }
 
   function renderAnalytics() {
+    if (!analyticsPanel || !analyticsTotal) return;
     analyticsPanel.innerHTML = '';
-    analyticsTotal.textContent = `${state.assessments.length} assessments`;
+    analyticsTotal.textContent = `${state.assessments.length} assessments captured`;
     if (!state.assessments.length) {
       analyticsPanel.innerHTML = '<p class="text-fg-3 small mb-0">Complete an assessment to see urgency and maturity trends.</p>';
       return;
@@ -560,6 +572,7 @@
   }
 
   function renderObjectives() {
+    if (!objectivesList) return;
     objectivesList.innerHTML = '';
     if (!state.objectives.length) {
       objectivesList.innerHTML = '<p class="text-fg-3 small mb-0">No objectives yet.</p>';
@@ -603,6 +616,7 @@
   }
 
   function bindAreaEvents() {
+    if (!areaList) return;
     areaList.addEventListener('click', event => {
       if (event.target.closest('[data-add-question]')) {
         const areaId = event.target.closest('[data-add-question]').dataset.addQuestion;
@@ -683,8 +697,8 @@
   function handleTemplateLibraryClick(event) {
     const loadBtn = event.target.closest('[data-load-template]');
     if (!loadBtn) return;
-    loadTemplateToBuilder(loadBtn.dataset.loadTemplate);
-    document.getElementById('templateStudio').scrollIntoView({ behavior: 'smooth' });
+    localStorage.setItem('valuesphereBuilderTemplateId', loadBtn.dataset.loadTemplate);
+    window.location.href = '/valuesphere-template-new.html';
   }
 
   function handleCompletedAssessmentOpen(event) {
@@ -695,7 +709,7 @@
   }
 
   function render() {
-    globalStages.value = state.maturityStages;
+    if (globalStages) globalStages.value = state.maturityStages;
     renderTemplateOptions();
     renderTemplateLibrary();
     renderAccountOptions();
@@ -704,17 +718,25 @@
     renderAnalytics();
     renderCompletedAssessments();
     renderAssessmentMeta(activeAssessment);
+    updateDashboard();
   }
 
   function initDefaults() {
     populateTemplateFormDefaults();
-    seedBuilderFromTemplate(state.templates[0]);
+    const builderSeedId = localStorage.getItem('valuesphereBuilderTemplateId');
+    if (builderSeedId && state.templates.some(t => t.id === builderSeedId)) {
+      loadTemplateToBuilder(builderSeedId);
+      localStorage.removeItem('valuesphereBuilderTemplateId');
+    } else {
+      seedBuilderFromTemplate(state.templates[0]);
+    }
     if (state.assessments[0]) {
       setActiveAssessment(state.assessments[0]);
     }
   }
 
   function refreshQuestionTargets() {
+    if (!areaList || !templateStages) return;
     const maxStage = Number(templateStages.value || state.maturityStages);
     areaList.querySelectorAll('[data-question-id]').forEach(questionEl => {
       const select = questionEl.querySelector('select');
@@ -730,23 +752,41 @@
     });
   }
 
+  function updateDashboard() {
+    if (!dashboardTemplateCount || !dashboardAccountCount || !dashboardAssessmentCount) return;
+    dashboardTemplateCount.textContent = state.templates.length;
+    dashboardAccountCount.textContent = state.accounts.length;
+    dashboardAssessmentCount.textContent = state.assessments.length;
+  }
+
   bindAreaEvents();
   render();
-  initDefaults();
+  if (templateForm || areaList) {
+    initDefaults();
+  } else if (state.assessments[0]) {
+    setActiveAssessment(state.assessments[0]);
+  }
 
-  document.getElementById('addArea').addEventListener('click', addArea);
-  templateForm.addEventListener('submit', handleTemplateSubmit);
-  templateForm.addEventListener('reset', handleResetTemplate);
-  templateStages.addEventListener('change', refreshQuestionTargets);
-  accountForm.addEventListener('submit', handleAccountSubmit);
-  assessmentForm.addEventListener('submit', handleAssessmentSubmit);
-  globalStages.addEventListener('change', handleGlobalStagesChange);
-  addObjectiveBtn.addEventListener('click', addObjective);
-  objectivesList.addEventListener('change', handleObjectiveToggle);
-  objectivesList.addEventListener('click', handleObjectiveRemove);
-  generateAiSummaryBtn.addEventListener('click', handleGenerateAiSummary);
-  assessmentDetail.addEventListener('input', handleAssessmentChange);
-  assessmentDetail.addEventListener('change', handleAssessmentChange);
-  templateLibraryList.addEventListener('click', handleTemplateLibraryClick);
-  completedAssessmentsList.addEventListener('click', handleCompletedAssessmentOpen);
+  const addAreaBtn = document.getElementById('addArea');
+  if (addAreaBtn) addAreaBtn.addEventListener('click', addArea);
+  if (templateForm) {
+    templateForm.addEventListener('submit', handleTemplateSubmit);
+    templateForm.addEventListener('reset', handleResetTemplate);
+  }
+  if (templateStages) templateStages.addEventListener('change', refreshQuestionTargets);
+  if (accountForm) accountForm.addEventListener('submit', handleAccountSubmit);
+  if (assessmentForm) assessmentForm.addEventListener('submit', handleAssessmentSubmit);
+  if (globalStages) globalStages.addEventListener('change', handleGlobalStagesChange);
+  if (addObjectiveBtn) addObjectiveBtn.addEventListener('click', addObjective);
+  if (objectivesList) {
+    objectivesList.addEventListener('change', handleObjectiveToggle);
+    objectivesList.addEventListener('click', handleObjectiveRemove);
+  }
+  if (generateAiSummaryBtn) generateAiSummaryBtn.addEventListener('click', handleGenerateAiSummary);
+  if (assessmentDetail) {
+    assessmentDetail.addEventListener('input', handleAssessmentChange);
+    assessmentDetail.addEventListener('change', handleAssessmentChange);
+  }
+  if (templateLibraryList) templateLibraryList.addEventListener('click', handleTemplateLibraryClick);
+  if (completedAssessmentsList) completedAssessmentsList.addEventListener('click', handleCompletedAssessmentOpen);
 })();
