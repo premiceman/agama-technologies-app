@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ValueSphere — Template Studio</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="/css/styles.v2.css">
+</head>
+<body class="bg-body text-fg">
+  <div class="liquid-bg" aria-hidden="true">
+    <div class="blob blob-blue"></div>
+    <div class="blob blob-teal"></div>
+    <div class="blob blob-magenta"></div>
+  </div>
+
+  <div class="app-shell">
+    <aside class="app-sidebar glass" aria-label="Primary navigation">
+      <div class="sidebar-brand">
+        <div class="mark">AT</div>
+        <div class="sidebar-label">
+          <span class="eyebrow d-block mb-1">Agama</span>
+          <strong>Workspace</strong>
+        </div>
+      </div>
+      <nav class="sidebar-nav" aria-label="Workspace">
+        <a class="sidebar-link" href="/workspace.html">
+          <i class="bi bi-grid"></i>
+          <span class="sidebar-label">Dashboard</span>
+        </a>
+        <div class="sidebar-section-label">Applications</div>
+        <div class="sidebar-section">
+          <a class="sidebar-link" href="/revenueforge-tool.html">
+            <i class="bi bi-lightning-charge"></i>
+            <span class="sidebar-label">RevenueForge</span>
+          </a>
+          <a class="sidebar-link active" href="/valuesphere-tool.html">
+            <i class="bi bi-kanban"></i>
+            <span class="sidebar-label">ValueSphere</span>
+          </a>
+          <a class="sidebar-link" href="/procurepath-tool.html">
+            <i class="bi bi-diagram-3"></i>
+            <span class="sidebar-label">ProcurePath</span>
+          </a>
+        </div>
+        <div class="sidebar-section-label">Account &amp; Settings</div>
+        <div class="sidebar-section">
+          <a class="sidebar-link" href="/profile.html">
+            <i class="bi bi-person"></i>
+            <span class="sidebar-label">Profile</span>
+          </a>
+          <a class="sidebar-link" href="/settings.html">
+            <i class="bi bi-gear"></i>
+            <span class="sidebar-label">Settings</span>
+          </a>
+          <a class="sidebar-link" href="/billing.html">
+            <i class="bi bi-credit-card"></i>
+            <span class="sidebar-label">Billing</span>
+          </a>
+        </div>
+      </nav>
+    </aside>
+
+    <aside class="app-subnav glass" aria-label="ValueSphere navigation">
+      <div class="subnav-header">
+        <span class="eyebrow d-block mb-1">ValueSphere</span>
+        <strong>Navigator</strong>
+      </div>
+      <nav class="subnav-nav">
+        <a class="subnav-link" href="/valuesphere-tool.html">
+          <i class="bi bi-compass"></i>
+          <span>Dashboard</span>
+        </a>
+        <button class="subnav-link subnav-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#templateSubnav" aria-expanded="true" aria-controls="templateSubnav">
+          <span class="d-flex align-items-center gap-2"><i class="bi bi-kanban"></i> Templates</span>
+          <i class="bi bi-chevron-down small"></i>
+        </button>
+        <div class="collapse show" id="templateSubnav">
+          <a class="subnav-sublink active" href="/valuesphere-template-new.html">New Template</a>
+          <a class="subnav-sublink" href="/valuesphere-template-library.html">Template Library</a>
+        </div>
+        <a class="subnav-link" href="/valuesphere-accounts.html">
+          <i class="bi bi-building"></i>
+          <span>Accounts</span>
+        </a>
+        <a class="subnav-link" href="/valuesphere-completed.html">
+          <i class="bi bi-clipboard-check"></i>
+          <span>Completed assessments</span>
+        </a>
+      </nav>
+    </aside>
+
+    <div class="app-content">
+      <nav class="navbar navbar-expand-lg bg-glass border-bottom mb-4">
+        <div class="container-fluid">
+          <a class="navbar-brand d-flex align-items-center gap-2" href="/">
+            <span class="brand-dot"></span>
+            Agama <strong>Technologies</strong>
+          </a>
+          <div class="d-flex align-items-center gap-2">
+            <a class="btn btn-outline-light btn-sm" href="/workspace.html">Back to workspace</a>
+            <button class="btn btn-primary btn-sm" id="logout">Logout</button>
+          </div>
+        </div>
+      </nav>
+
+      <main class="container py-4" style="max-width: 1240px;">
+        <header class="card glass p-4 mb-4">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+            <div>
+              <span class="eyebrow d-block">Template studio</span>
+              <h1 class="h4 mb-1">Design BVC assessments</h1>
+              <p class="text-fg-3 mb-0">Create categories, questions, and maturity targets for reusable engagements.</p>
+            </div>
+            <div class="text-end">
+              <label class="form-label mb-1" for="globalStages">Global maturity stages</label>
+              <div class="d-flex align-items-center gap-2">
+                <input class="form-control form-control-sm" type="number" id="globalStages" min="2" max="7" value="5" style="width:96px;">
+                <span class="text-fg-3 small">default for new templates</span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <section class="card glass p-4" id="templateStudio">
+          <div class="d-flex justify-content-between flex-wrap align-items-start gap-3 mb-3">
+            <div>
+              <h2 class="h5 mb-1">BVC template studio</h2>
+              <p class="text-fg-3 small mb-0">Create categories like Inframon, APM, and RUM, define questions and maturity targets, then reuse templates across customers.</p>
+            </div>
+          </div>
+
+          <form id="templateForm" class="glass p-3">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label" for="templateName">Template name</label>
+                <input class="form-control" id="templateName" required placeholder="e.g., Datadog GTM Value Path">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="templateStages">Maturity stages</label>
+                <input class="form-control" id="templateStages" type="number" min="2" max="7" value="5" required>
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="templateDescription">Purpose</label>
+                <textarea class="form-control" id="templateDescription" rows="2" placeholder="Who is this for and what outcomes does it drive?"></textarea>
+              </div>
+            </div>
+
+            <div class="mt-4">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                  <h3 class="h6 mb-0">Assessment areas</h3>
+                  <p class="small text-fg-3 mb-0">Add categories and questions with target maturity expectations.</p>
+                </div>
+                <button class="btn btn-outline-light btn-sm" type="button" id="addArea"><i class="bi bi-plus"></i> Add area</button>
+              </div>
+              <div id="areaList" class="d-flex flex-column gap-3"></div>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 mt-4">
+              <button class="btn btn-outline-light" type="reset" id="resetTemplate">Reset</button>
+              <button class="btn btn-primary" type="submit">Save template</button>
+            </div>
+          </form>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/valuesphere.js"></script>
+</body>
+</html>

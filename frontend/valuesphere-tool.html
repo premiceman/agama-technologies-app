@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ValueSphere Navigator — Workspace</title>
+  <title>ValueSphere Navigator — Dashboard</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
@@ -64,6 +64,35 @@
       </nav>
     </aside>
 
+    <aside class="app-subnav glass" aria-label="ValueSphere navigation">
+      <div class="subnav-header">
+        <span class="eyebrow d-block mb-1">ValueSphere</span>
+        <strong>Navigator</strong>
+      </div>
+      <nav class="subnav-nav">
+        <a class="subnav-link active" href="/valuesphere-tool.html">
+          <i class="bi bi-compass"></i>
+          <span>Dashboard</span>
+        </a>
+        <button class="subnav-link subnav-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#templateSubnav" aria-expanded="true" aria-controls="templateSubnav">
+          <span class="d-flex align-items-center gap-2"><i class="bi bi-kanban"></i> Templates</span>
+          <i class="bi bi-chevron-down small"></i>
+        </button>
+        <div class="collapse show" id="templateSubnav">
+          <a class="subnav-sublink" href="/valuesphere-template-new.html">New Template</a>
+          <a class="subnav-sublink" href="/valuesphere-template-library.html">Template Library</a>
+        </div>
+        <a class="subnav-link" href="/valuesphere-accounts.html">
+          <i class="bi bi-building"></i>
+          <span>Accounts</span>
+        </a>
+        <a class="subnav-link" href="/valuesphere-completed.html">
+          <i class="bi bi-clipboard-check"></i>
+          <span>Completed assessments</span>
+        </a>
+      </nav>
+    </aside>
+
     <div class="app-content">
       <nav class="navbar navbar-expand-lg bg-glass border-bottom mb-4">
         <div class="container-fluid">
@@ -78,7 +107,7 @@
         </div>
       </nav>
 
-      <main class="container py-4" style="max-width: 1340px;">
+      <main class="container py-4" style="max-width: 1240px;">
         <header class="card glass p-4 mb-4">
           <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
             <div>
@@ -122,169 +151,111 @@
           </div>
         </header>
 
-        <div class="row g-4">
-          <div class="col-lg-8">
-            <section class="card glass p-4 mb-3" id="templateStudio">
-              <div class="d-flex justify-content-between flex-wrap align-items-start gap-3 mb-3">
+        <section class="row g-3 mb-4">
+          <div class="col-md-4">
+            <div class="glass p-3 h-100">
+              <div class="d-flex justify-content-between align-items-start">
                 <div>
-                  <h2 class="h5 mb-1">BVC template studio</h2>
-                  <p class="text-fg-3 small mb-0">Create categories like Inframon, APM, and RUM, define questions and maturity targets, then reuse templates across customers.</p>
+                  <span class="eyebrow d-block">Templates</span>
+                  <h2 class="h5 mb-1">Reusable playbooks</h2>
+                  <p class="small text-fg-3 mb-2">Create and reuse BVC templates for assessments.</p>
+                  <a class="btn btn-primary btn-sm" href="/valuesphere-template-new.html">Launch studio</a>
                 </div>
-                <div class="text-end">
-                  <label class="form-label mb-1" for="globalStages">Global maturity stages</label>
-                  <div class="d-flex align-items-center gap-2">
-                    <input class="form-control form-control-sm" type="number" id="globalStages" min="2" max="7" value="5" style="width:96px;">
-                    <span class="text-fg-3 small">default for new templates</span>
-                  </div>
-                </div>
+                <div class="display-6" id="dashboardTemplateCount">0</div>
               </div>
-
-              <form id="templateForm" class="glass p-3">
-                <div class="row g-3">
-                  <div class="col-md-6">
-                    <label class="form-label" for="templateName">Template name</label>
-                    <input class="form-control" id="templateName" required placeholder="e.g., Datadog GTM Value Path">
-                  </div>
-                  <div class="col-md-6">
-                    <label class="form-label" for="templateStages">Maturity stages</label>
-                    <input class="form-control" id="templateStages" type="number" min="2" max="7" value="5" required>
-                  </div>
-                  <div class="col-12">
-                    <label class="form-label" for="templateDescription">Purpose</label>
-                    <textarea class="form-control" id="templateDescription" rows="2" placeholder="Who is this for and what outcomes does it drive?"></textarea>
-                  </div>
-                </div>
-
-                <div class="mt-4">
-                  <div class="d-flex justify-content-between align-items-center mb-2">
-                    <div>
-                      <h3 class="h6 mb-0">Assessment areas</h3>
-                      <p class="small text-fg-3 mb-0">Add categories and questions with target maturity expectations.</p>
-                    </div>
-                    <button class="btn btn-outline-light btn-sm" type="button" id="addArea"><i class="bi bi-plus"></i> Add area</button>
-                  </div>
-                  <div id="areaList" class="d-flex flex-column gap-3"></div>
-                </div>
-
-                <div class="d-flex justify-content-end gap-2 mt-4">
-                  <button class="btn btn-outline-light" type="reset" id="resetTemplate">Reset</button>
-                  <button class="btn btn-primary" type="submit">Save template</button>
-                </div>
-              </form>
-            </section>
-
-            <section class="card glass p-4" id="assessmentBuilder">
-              <div class="d-flex justify-content-between flex-wrap align-items-start gap-3 mb-3">
-                <div>
-                  <h2 class="h5 mb-1">Assessment workspace</h2>
-                  <p class="text-fg-3 small mb-0">Generate timestamped customer assessments from any template and capture urgency, maturity, answers and notes.</p>
-                </div>
-                <div class="badge-soft">Ready for consulting teams</div>
-              </div>
-
-              <form id="assessmentForm" class="glass p-3 mb-3">
-                <div class="row g-3">
-                  <div class="col-md-4">
-                    <label class="form-label" for="assessmentAccount">Account</label>
-                    <select class="form-select" id="assessmentAccount" required></select>
-                  </div>
-                  <div class="col-md-4">
-                    <label class="form-label" for="assessmentTemplate">Template</label>
-                    <select class="form-select" id="assessmentTemplate" required></select>
-                  </div>
-                  <div class="col-md-4">
-                    <label class="form-label" for="assessmentName">Assessment name</label>
-                    <input class="form-control" id="assessmentName" placeholder="e.g., FY25 Discovery" required>
-                  </div>
-                  <div class="col-md-6">
-                    <label class="form-label" for="assessmentOwner">Account team</label>
-                    <input class="form-control" id="assessmentOwner" placeholder="e.g., Amanda (GTM), Priya (Consulting)">
-                  </div>
-                  <div class="col-md-6">
-                    <label class="form-label" for="assessmentDate">Assessment date</label>
-                    <input class="form-control" id="assessmentDate" type="date">
-                  </div>
-                </div>
-                <div class="d-flex justify-content-end gap-2 mt-3">
-                  <button class="btn btn-outline-light" type="button" id="generateAiSummary">Generate AI summary</button>
-                  <button class="btn btn-primary" type="submit">Create assessment</button>
-                </div>
-                <div class="small text-fg-3 mt-2">AI summary uses OpenAI to synthesize findings into a maturity narrative and is stored against the account.</div>
-              </form>
-
-              <div id="assessmentDetail" class="accordion"></div>
-            </section>
+            </div>
           </div>
-
-          <div class="col-lg-4">
-            <section class="card glass p-4 mb-3" id="accountsPanel">
-              <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+          <div class="col-md-4">
+            <div class="glass p-3 h-100">
+              <div class="d-flex justify-content-between align-items-start">
                 <div>
-                  <h2 class="h6 mb-1">Accounts</h2>
-                  <p class="text-fg-3 small mb-0">Create an account to attach templates, AI outputs, and timelines.</p>
+                  <span class="eyebrow d-block">Accounts</span>
+                  <h2 class="h5 mb-1">In-flight engagements</h2>
+                  <p class="small text-fg-3 mb-2">Capture account teams, TCV, and link assessments.</p>
+                  <a class="btn btn-outline-light btn-sm" href="/valuesphere-accounts.html">Manage accounts</a>
                 </div>
-                <button class="btn btn-outline-light btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#accountFormShell">New</button>
+                <div class="display-6" id="dashboardAccountCount">0</div>
               </div>
-
-              <div class="collapse show" id="accountFormShell">
-                <form id="accountForm" class="glass p-3 mb-3">
-                  <div class="mb-2">
-                    <label class="form-label" for="accountName">Account name</label>
-                    <input class="form-control" id="accountName" required placeholder="Customer or business unit">
-                  </div>
-                  <div class="row g-2">
-                    <div class="col-6">
-                      <label class="form-label" for="accountTcv">Account TCV</label>
-                      <input class="form-control" id="accountTcv" type="number" min="0" step="10000" placeholder="e.g., 250000">
-                    </div>
-                    <div class="col-6">
-                      <label class="form-label" for="accountTeam">Account team</label>
-                      <input class="form-control" id="accountTeam" placeholder="e.g., Sales pod / squad">
-                    </div>
-                  </div>
-                  <div class="mt-3 d-flex justify-content-end">
-                    <button class="btn btn-primary btn-sm" type="submit">Create</button>
-                  </div>
-                </form>
-              </div>
-
-              <div id="accountList" class="d-flex flex-column gap-2"></div>
-            </section>
-
-            <section class="card glass p-4 mb-3">
-              <div class="d-flex justify-content-between align-items-start mb-2">
-                <div>
-                  <h2 class="h6 mb-1">Key objectives</h2>
-                  <p class="small text-fg-3 mb-0">Checklist for critical customer outcomes.</p>
-                </div>
-                <button class="btn btn-outline-light btn-sm" type="button" id="addObjective"><i class="bi bi-plus"></i></button>
-              </div>
-              <div id="objectives" class="d-flex flex-column gap-2"></div>
-            </section>
-
-            <section class="card glass p-4">
-              <div class="d-flex justify-content-between align-items-start mb-2">
-                <div>
-                  <h2 class="h6 mb-1">Analytics</h2>
-                  <p class="small text-fg-3 mb-0">Track urgency mix, maturity distribution, and template reuse.</p>
-                </div>
-                <span class="badge-soft" id="analyticsTotal">0 assessments</span>
-              </div>
-              <div class="d-flex flex-column gap-2" id="analyticsPanel"></div>
-            </section>
+            </div>
           </div>
-        </div>
+          <div class="col-md-4">
+            <div class="glass p-3 h-100">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <span class="eyebrow d-block">Assessments</span>
+                  <h2 class="h5 mb-1">Cycles &amp; outcomes</h2>
+                  <p class="small text-fg-3 mb-2">Timestamped assessments with owners and collaborators.</p>
+                  <a class="btn btn-outline-light btn-sm" href="/valuesphere-completed.html">View history</a>
+                </div>
+                <div class="display-6" id="dashboardAssessmentCount">0</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card glass p-4">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+            <div>
+              <h2 class="h5 mb-1">Navigator quick links</h2>
+              <p class="small text-fg-3 mb-0">Jump into the areas you need to work on next.</p>
+            </div>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="glass p-3 h-100">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-pencil"></i></div>
+                  <div class="flex-grow-1">
+                    <strong>Create a new template</strong>
+                    <p class="small text-fg-3 mb-2">Model questions, maturity stages, and reusable areas.</p>
+                    <a class="btn btn-outline-light btn-sm" href="/valuesphere-template-new.html">Open template studio</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="glass p-3 h-100">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-journals"></i></div>
+                  <div class="flex-grow-1">
+                    <strong>Browse template library</strong>
+                    <p class="small text-fg-3 mb-2">Reuse past engagements or company-wide playbooks.</p>
+                    <a class="btn btn-outline-light btn-sm" href="/valuesphere-template-library.html">View library</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="glass p-3 h-100">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-people"></i></div>
+                  <div class="flex-grow-1">
+                    <strong>Record an assessment</strong>
+                    <p class="small text-fg-3 mb-2">Pick an account, assign a template, and capture collaborators.</p>
+                    <a class="btn btn-outline-light btn-sm" href="/valuesphere-accounts.html">Start from accounts</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="glass p-3 h-100">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-clipboard-check"></i></div>
+                  <div class="flex-grow-1">
+                    <strong>Review completed cycles</strong>
+                    <p class="small text-fg-3 mb-2">See who contributed, when it happened, and reopen details.</p>
+                    <a class="btn btn-outline-light btn-sm" href="/valuesphere-completed.html">Open assessments</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/js/valuesphere.js"></script>
-  <script>
-    document.getElementById('logout').addEventListener('click', async () => {
-      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-      window.location.href = '/';
-    });
-  </script>
 </body>
 </html>

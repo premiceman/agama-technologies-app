@@ -7,6 +7,7 @@
     name: 'Datadog GTM Value Path',
     description: 'Sample BVC assessment for a GTM team covering Inframon, APM, and RUM motions.',
     stages: 5,
+    createdAt: new Date().toISOString(),
     areas: [
       {
         id: crypto.randomUUID(),
@@ -80,18 +81,25 @@
   const templateName = document.getElementById('templateName');
   const templateDescription = document.getElementById('templateDescription');
   const templateStages = document.getElementById('templateStages');
+  const templateLibraryList = document.getElementById('templateLibraryList');
   const globalStages = document.getElementById('globalStages');
   const assessmentAccount = document.getElementById('assessmentAccount');
   const assessmentTemplate = document.getElementById('assessmentTemplate');
   const assessmentForm = document.getElementById('assessmentForm');
   const assessmentDetail = document.getElementById('assessmentDetail');
+  const assessmentMeta = document.getElementById('assessmentMeta');
   const analyticsPanel = document.getElementById('analyticsPanel');
   const analyticsTotal = document.getElementById('analyticsTotal');
+  const completedAssessmentsList = document.getElementById('completedAssessmentsList');
+  const completedAssessmentsCount = document.getElementById('completedAssessmentsCount');
   const accountForm = document.getElementById('accountForm');
   const accountList = document.getElementById('accountList');
   const objectivesList = document.getElementById('objectives');
   const addObjectiveBtn = document.getElementById('addObjective');
   const generateAiSummaryBtn = document.getElementById('generateAiSummary');
+  const dashboardTemplateCount = document.getElementById('dashboardTemplateCount');
+  const dashboardAccountCount = document.getElementById('dashboardAccountCount');
+  const dashboardAssessmentCount = document.getElementById('dashboardAssessmentCount');
   let activeAssessment = null;
 
   function renderArea(area, index) {
@@ -188,6 +196,15 @@
     refreshQuestionTargets();
   }
 
+  function loadTemplateToBuilder(templateId) {
+    const template = state.templates.find(t => t.id === templateId);
+    if (!template) return;
+    templateName.value = template.name || '';
+    templateDescription.value = template.description || '';
+    templateStages.value = template.stages || state.maturityStages;
+    seedBuilderFromTemplate(template);
+  }
+
   function addBlankArea() {
     return { id: crypto.randomUUID(), name: '', description: '', questions: [{ id: crypto.randomUUID(), text: '', targetStage: 1 }] };
   }
@@ -209,7 +226,8 @@
       name: templateName.value.trim(),
       description: templateDescription.value.trim(),
       stages: Number(templateStages.value) || state.maturityStages,
-      areas
+      areas,
+      createdAt: new Date().toISOString()
     };
     state.templates.unshift(template);
     saveState();
@@ -221,10 +239,11 @@
   }
 
   function populateTemplateFormDefaults() {
-    templateStages.value = state.maturityStages;
+    if (templateStages) templateStages.value = state.maturityStages;
   }
 
   function renderTemplateOptions() {
+    if (!assessmentTemplate) return;
     assessmentTemplate.innerHTML = '';
     state.templates.forEach(template => {
       const option = document.createElement('option');
@@ -234,7 +253,40 @@
     });
   }
 
+  function renderTemplateLibrary() {
+    if (!templateLibraryList) return;
+    templateLibraryList.innerHTML = '';
+    if (!state.templates.length) {
+      templateLibraryList.innerHTML = '<p class="text-fg-3 small mb-0">No templates yet. Create one to seed your library.</p>';
+      return;
+    }
+
+    state.templates.forEach(template => {
+      const card = document.createElement('div');
+      card.className = 'glass p-3';
+      const createdLabel = template.createdAt ? new Date(template.createdAt).toLocaleDateString() : 'Recently added';
+      card.innerHTML = `
+        <div class="d-flex justify-content-between align-items-start gap-3">
+          <div>
+            <strong>${template.name}</strong>
+            <p class="mb-1 small text-fg-3">${template.description || 'Template ready to reuse.'}</p>
+            <p class="mb-0 small text-fg-3">${template.areas.length} areas · ${template.stages || state.maturityStages} stages</p>
+          </div>
+          <div class="text-end">
+            <span class="badge-soft">${createdLabel}</span>
+          </div>
+        </div>
+        <div class="d-flex justify-content-between align-items-center gap-2 mt-2 flex-wrap">
+          <div class="small text-fg-3">Ready for Navigator &amp; assessments</div>
+          <button class="btn btn-outline-light btn-sm" type="button" data-load-template="${template.id}">Load in builder</button>
+        </div>
+      `;
+      templateLibraryList.appendChild(card);
+    });
+  }
+
   function renderAccountOptions() {
+    if (!assessmentAccount) return;
     assessmentAccount.innerHTML = '';
     state.accounts.forEach(account => {
       const option = document.createElement('option');
@@ -245,6 +297,7 @@
   }
 
   function renderAccounts() {
+    if (!accountList) return;
     accountList.innerHTML = '';
     if (!state.accounts.length) {
       accountList.innerHTML = '<p class="text-fg-3 small mb-0">No accounts yet. Create one to begin.</p>';
@@ -267,7 +320,40 @@
     });
   }
 
+  function renderCompletedAssessments() {
+    if (!completedAssessmentsList || !completedAssessmentsCount) return;
+    completedAssessmentsList.innerHTML = '';
+    completedAssessmentsCount.textContent = `${state.assessments.length} recorded`;
+    if (!state.assessments.length) {
+      completedAssessmentsList.innerHTML = '<p class="text-fg-3 small mb-0">Complete an assessment to see it appear here.</p>';
+      return;
+    }
+
+    state.assessments.slice(0, 6).forEach(assessment => {
+      const account = state.accounts.find(acc => acc.id === assessment.accountId);
+      const template = state.templates.find(t => t.id === assessment.templateId);
+      const card = document.createElement('div');
+      card.className = 'glass p-3';
+      card.innerHTML = `
+        <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+          <div>
+            <strong>${assessment.name || 'Assessment'}</strong>
+            <p class="mb-1 small text-fg-3">${assessment.date || 'Not dated'} · ${template?.name || 'Template removed'}</p>
+            <p class="mb-0 small text-fg-3">Account: ${account?.name || 'Unknown'} · Owner: ${assessment.takenBy || assessment.owner || 'Not recorded'}</p>
+            <p class="mb-0 small text-fg-3">Customer team: ${assessment.customerContributors || 'Not captured'}</p>
+          </div>
+          <div class="text-end">
+            <span class="badge-soft">${new Date(assessment.date || new Date()).toLocaleDateString()}</span>
+            <button class="btn btn-outline-light btn-sm mt-2" type="button" data-open-assessment="${assessment.id}">Open</button>
+          </div>
+        </div>
+      `;
+      completedAssessmentsList.appendChild(card);
+    });
+  }
+
   function handleAccountSubmit(event) {
+    if (!accountForm) return;
     event.preventDefault();
     const name = document.getElementById('accountName').value.trim();
     const tcv = Number(document.getElementById('accountTcv').value) || 0;
@@ -291,6 +377,7 @@
   }
 
   function renderAssessmentDetail(assessment) {
+    if (!assessmentDetail) return;
     assessmentDetail.innerHTML = '';
     assessment.areas.forEach((area, idx) => {
       const item = document.createElement('div');
@@ -314,6 +401,33 @@
       `;
       assessmentDetail.appendChild(item);
     });
+  }
+
+  function renderAssessmentMeta(assessment) {
+    if (!assessmentMeta) return;
+    if (!assessment) {
+      assessmentMeta.classList.add('d-none');
+      assessmentMeta.innerHTML = '';
+      return;
+    }
+    const account = state.accounts.find(acc => acc.id === assessment.accountId);
+    const template = state.templates.find(t => t.id === assessment.templateId);
+    const customerTeam = assessment.customerContributors || 'Not captured yet';
+    const owner = assessment.takenBy || assessment.owner || 'Not recorded';
+    assessmentMeta.innerHTML = `
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+        <div>
+          <strong>${assessment.name || 'Assessment'}</strong>
+          <p class="mb-1 small text-fg-3">${template?.name || 'Template removed'} · ${account?.name || 'No account selected'}</p>
+          <p class="mb-0 small text-fg-3">Taken by ${owner} · Customer contributors: ${customerTeam}</p>
+        </div>
+        <div class="text-end small text-fg-3">
+          <div>${assessment.date || 'Not dated'}</div>
+          ${assessment.owner ? `<div>Account team: ${assessment.owner}</div>` : ''}
+        </div>
+      </div>
+    `;
+    assessmentMeta.classList.remove('d-none');
   }
 
   function renderAssessmentQuestion(question, assessmentId) {
@@ -357,6 +471,17 @@
     activeAssessment = currentAssessment;
   }
 
+  function setActiveAssessment(assessment) {
+    attachAssessmentListeners(assessment);
+    if (!assessment) {
+      renderAssessmentMeta();
+      if (assessmentDetail) assessmentDetail.innerHTML = '';
+      return;
+    }
+    renderAssessmentMeta(assessment);
+    renderAssessmentDetail(assessment);
+  }
+
   function persistAssessment(assessment) {
     const index = state.assessments.findIndex(a => a.id === assessment.id);
     if (index > -1) {
@@ -374,6 +499,8 @@
       alert('Select a template to continue.');
       return;
     }
+    const takenBy = document.getElementById('assessmentTakenBy').value.trim();
+    const customerContributors = document.getElementById('customerContributors').value.trim();
     const assessment = {
       id: crypto.randomUUID(),
       name: document.getElementById('assessmentName').value.trim(),
@@ -381,19 +508,22 @@
       date: document.getElementById('assessmentDate').value || new Date().toISOString().split('T')[0],
       accountId,
       templateId,
+      takenBy,
+      customerContributors,
+      createdAt: new Date().toISOString(),
       areas: templatePayload.areas
     };
     state.assessments.unshift(assessment);
     saveState();
-    renderAssessmentDetail(assessment);
-    attachAssessmentListeners(assessment);
+    setActiveAssessment(assessment);
     renderAnalytics();
     alert('Assessment created. Sections are ready for input.');
   }
 
   function renderAnalytics() {
+    if (!analyticsPanel || !analyticsTotal) return;
     analyticsPanel.innerHTML = '';
-    analyticsTotal.textContent = `${state.assessments.length} assessments`;
+    analyticsTotal.textContent = `${state.assessments.length} assessments captured`;
     if (!state.assessments.length) {
       analyticsPanel.innerHTML = '<p class="text-fg-3 small mb-0">Complete an assessment to see urgency and maturity trends.</p>';
       return;
@@ -442,6 +572,7 @@
   }
 
   function renderObjectives() {
+    if (!objectivesList) return;
     objectivesList.innerHTML = '';
     if (!state.objectives.length) {
       objectivesList.innerHTML = '<p class="text-fg-3 small mb-0">No objectives yet.</p>';
@@ -485,6 +616,7 @@
   }
 
   function bindAreaEvents() {
+    if (!areaList) return;
     areaList.addEventListener('click', event => {
       if (event.target.closest('[data-add-question]')) {
         const areaId = event.target.closest('[data-add-question]').dataset.addQuestion;
@@ -562,25 +694,49 @@
     persistAssessment(activeAssessment);
   }
 
+  function handleTemplateLibraryClick(event) {
+    const loadBtn = event.target.closest('[data-load-template]');
+    if (!loadBtn) return;
+    localStorage.setItem('valuesphereBuilderTemplateId', loadBtn.dataset.loadTemplate);
+    window.location.href = '/valuesphere-template-new.html';
+  }
+
+  function handleCompletedAssessmentOpen(event) {
+    const btn = event.target.closest('[data-open-assessment]');
+    if (!btn) return;
+    const assessment = state.assessments.find(a => a.id === btn.dataset.openAssessment);
+    if (assessment) setActiveAssessment(assessment);
+  }
+
   function render() {
-    globalStages.value = state.maturityStages;
+    if (globalStages) globalStages.value = state.maturityStages;
     renderTemplateOptions();
+    renderTemplateLibrary();
     renderAccountOptions();
     renderAccounts();
     renderObjectives();
     renderAnalytics();
+    renderCompletedAssessments();
+    renderAssessmentMeta(activeAssessment);
+    updateDashboard();
   }
 
   function initDefaults() {
     populateTemplateFormDefaults();
-    seedBuilderFromTemplate(state.templates[0]);
+    const builderSeedId = localStorage.getItem('valuesphereBuilderTemplateId');
+    if (builderSeedId && state.templates.some(t => t.id === builderSeedId)) {
+      loadTemplateToBuilder(builderSeedId);
+      localStorage.removeItem('valuesphereBuilderTemplateId');
+    } else {
+      seedBuilderFromTemplate(state.templates[0]);
+    }
     if (state.assessments[0]) {
-      renderAssessmentDetail(state.assessments[0]);
-      attachAssessmentListeners(state.assessments[0]);
+      setActiveAssessment(state.assessments[0]);
     }
   }
 
   function refreshQuestionTargets() {
+    if (!areaList || !templateStages) return;
     const maxStage = Number(templateStages.value || state.maturityStages);
     areaList.querySelectorAll('[data-question-id]').forEach(questionEl => {
       const select = questionEl.querySelector('select');
@@ -596,21 +752,41 @@
     });
   }
 
+  function updateDashboard() {
+    if (!dashboardTemplateCount || !dashboardAccountCount || !dashboardAssessmentCount) return;
+    dashboardTemplateCount.textContent = state.templates.length;
+    dashboardAccountCount.textContent = state.accounts.length;
+    dashboardAssessmentCount.textContent = state.assessments.length;
+  }
+
   bindAreaEvents();
   render();
-  initDefaults();
+  if (templateForm || areaList) {
+    initDefaults();
+  } else if (state.assessments[0]) {
+    setActiveAssessment(state.assessments[0]);
+  }
 
-  document.getElementById('addArea').addEventListener('click', addArea);
-  templateForm.addEventListener('submit', handleTemplateSubmit);
-  templateForm.addEventListener('reset', handleResetTemplate);
-  templateStages.addEventListener('change', refreshQuestionTargets);
-  accountForm.addEventListener('submit', handleAccountSubmit);
-  assessmentForm.addEventListener('submit', handleAssessmentSubmit);
-  globalStages.addEventListener('change', handleGlobalStagesChange);
-  addObjectiveBtn.addEventListener('click', addObjective);
-  objectivesList.addEventListener('change', handleObjectiveToggle);
-  objectivesList.addEventListener('click', handleObjectiveRemove);
-  generateAiSummaryBtn.addEventListener('click', handleGenerateAiSummary);
-  assessmentDetail.addEventListener('input', handleAssessmentChange);
-  assessmentDetail.addEventListener('change', handleAssessmentChange);
+  const addAreaBtn = document.getElementById('addArea');
+  if (addAreaBtn) addAreaBtn.addEventListener('click', addArea);
+  if (templateForm) {
+    templateForm.addEventListener('submit', handleTemplateSubmit);
+    templateForm.addEventListener('reset', handleResetTemplate);
+  }
+  if (templateStages) templateStages.addEventListener('change', refreshQuestionTargets);
+  if (accountForm) accountForm.addEventListener('submit', handleAccountSubmit);
+  if (assessmentForm) assessmentForm.addEventListener('submit', handleAssessmentSubmit);
+  if (globalStages) globalStages.addEventListener('change', handleGlobalStagesChange);
+  if (addObjectiveBtn) addObjectiveBtn.addEventListener('click', addObjective);
+  if (objectivesList) {
+    objectivesList.addEventListener('change', handleObjectiveToggle);
+    objectivesList.addEventListener('click', handleObjectiveRemove);
+  }
+  if (generateAiSummaryBtn) generateAiSummaryBtn.addEventListener('click', handleGenerateAiSummary);
+  if (assessmentDetail) {
+    assessmentDetail.addEventListener('input', handleAssessmentChange);
+    assessmentDetail.addEventListener('change', handleAssessmentChange);
+  }
+  if (templateLibraryList) templateLibraryList.addEventListener('click', handleTemplateLibraryClick);
+  if (completedAssessmentsList) completedAssessmentsList.addEventListener('click', handleCompletedAssessmentOpen);
 })();
