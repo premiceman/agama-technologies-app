@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Room — Agama Technologies</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="/css/styles.v2.css">
+</head>
+<body class="bg-body">
+  <div class="liquid-bg" aria-hidden="true">
+    <div class="blob blob-blue"></div>
+    <div class="blob blob-teal"></div>
+    <div class="blob blob-magenta"></div>
+  </div>
+
+  <div class="app-shell">
+    <aside class="app-sidebar glass" aria-label="Primary navigation">
+      <div class="sidebar-brand">
+        <div class="mark">AT</div>
+        <div class="sidebar-label">
+          <span class="eyebrow d-block mb-1">Agama</span>
+          <strong>Workspace</strong>
+        </div>
+      </div>
+      <nav class="sidebar-nav" aria-label="Workspace">
+        <a class="sidebar-link" href="/workspace.html">
+          <i class="bi bi-grid"></i>
+          <span class="sidebar-label">Dashboard</span>
+        </a>
+        <div class="sidebar-section-label">Applications</div>
+        <div class="sidebar-section">
+          <a class="sidebar-link active" href="/rooms.html">
+            <i class="bi bi-people"></i>
+            <span class="sidebar-label">Engagement Rooms</span>
+          </a>
+          <a class="sidebar-link" href="/revenueforge-tool.html">
+            <i class="bi bi-lightning-charge"></i>
+            <span class="sidebar-label">RevenueForge</span>
+          </a>
+          <a class="sidebar-link" href="/valuesphere-tool.html">
+            <i class="bi bi-kanban"></i>
+            <span class="sidebar-label">ValueSphere</span>
+          </a>
+          <a class="sidebar-link" href="/procurepath-tool.html">
+            <i class="bi bi-diagram-3"></i>
+            <span class="sidebar-label">ProcurePath</span>
+          </a>
+        </div>
+        <div class="sidebar-section-label">Account &amp; Settings</div>
+        <div class="sidebar-section">
+          <a class="sidebar-link" href="/profile.html">
+            <i class="bi bi-person"></i>
+            <span class="sidebar-label">Profile</span>
+          </a>
+          <a class="sidebar-link" href="/settings.html">
+            <i class="bi bi-gear"></i>
+            <span class="sidebar-label">Settings</span>
+          </a>
+          <a class="sidebar-link" href="/billing.html">
+            <i class="bi bi-credit-card"></i>
+            <span class="sidebar-label">Billing</span>
+          </a>
+        </div>
+      </nav>
+    </aside>
+
+    <div class="app-content">
+      <div class="container py-5">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+          <div>
+            <span class="eyebrow">Engagement room</span>
+            <h1 class="h3 mb-1" id="roomTitle">Loading room...</h1>
+            <div class="text-fg-3 small" id="roomMeta">Preparing context...</div>
+          </div>
+          <div class="d-flex gap-2 align-items-center">
+            <span class="badge-soft" id="roomRole">Role</span>
+            <a class="btn btn-outline-light" href="/rooms.html">Back to rooms</a>
+            <button class="btn btn-primary" id="logoutButton">Logout</button>
+          </div>
+        </div>
+
+        <div class="card glass p-3 mb-4">
+          <div class="d-flex flex-wrap gap-2 align-items-center" role="tablist">
+            <a class="btn btn-outline-light btn-sm" href="#messages" role="tab">Messages</a>
+            <a class="btn btn-outline-light btn-sm" href="#issues" role="tab">Project board</a>
+            <a class="btn btn-outline-light btn-sm" href="#deliverables" role="tab">Deliverables</a>
+            <a class="btn btn-outline-light btn-sm" href="#documents" role="tab">Documents</a>
+            <a class="btn btn-outline-light btn-sm" href="#members" role="tab">Members</a>
+          </div>
+        </div>
+
+        <section id="messages" class="card glass p-4 mb-4">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+            <div>
+              <h2 class="h5 mb-1">Messages</h2>
+              <p class="text-fg-3 small mb-0">Chronological feed of collaboration updates.</p>
+            </div>
+            <span class="badge-soft" id="messageCount">0</span>
+          </div>
+          <form id="messageForm" class="mb-3">
+            <label class="form-label" for="messageBody">Post an update</label>
+            <div class="d-flex gap-2 flex-column flex-md-row">
+              <textarea id="messageBody" class="form-control" rows="2" placeholder="Share an update"></textarea>
+              <button type="submit" class="btn btn-primary">Send</button>
+            </div>
+            <div class="form-text" id="messageFeedback"></div>
+          </form>
+          <div id="messageList" class="d-flex flex-column gap-3"></div>
+        </section>
+
+        <section id="issues" class="card glass p-4 mb-4">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+            <div>
+              <h2 class="h5 mb-1">Project board</h2>
+              <p class="text-fg-3 small mb-0">Track issues, owners, and delivery status.</p>
+            </div>
+            <span class="badge-soft" id="issueCount">0</span>
+          </div>
+          <form id="issueForm" class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label" for="issueTitle">Title</label>
+              <input type="text" class="form-control" id="issueTitle" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="issueStatus">Status</label>
+              <select class="form-select" id="issueStatus">
+                <option value="not_started">Not started</option>
+                <option value="in_progress">In progress</option>
+                <option value="blocked">Blocked</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="issuePriority">Priority</label>
+              <select class="form-select" id="issuePriority">
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="issueDueDate">Due date</label>
+              <input type="date" class="form-control" id="issueDueDate">
+            </div>
+            <div class="col-md-8">
+              <label class="form-label" for="assigneeSearch">Assignees</label>
+              <div class="input-group">
+                <input type="text" id="assigneeSearch" class="form-control" placeholder="Search org users" list="assigneeOptions">
+                <button class="btn btn-outline-light" type="button" id="addAssigneeButton">Add</button>
+              </div>
+              <datalist id="assigneeOptions"></datalist>
+              <div class="small text-fg-3" id="assigneeHelp">Use org directory to add collaborators.</div>
+              <div class="d-flex flex-wrap gap-2 mt-2" id="assigneePills"></div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="issueNotes">Notes</label>
+              <textarea id="issueNotes" class="form-control" rows="1" placeholder="Optional notes"></textarea>
+            </div>
+            <div class="col-12 d-flex justify-content-end gap-2">
+              <button class="btn btn-primary" type="submit" id="issueSubmit">Create issue</button>
+            </div>
+            <div class="col-12"><div class="form-text" id="issueFeedback"></div></div>
+          </form>
+          <div id="issueList" class="d-flex flex-column gap-3"></div>
+        </section>
+
+        <section id="deliverables" class="card glass p-4 mb-4">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+            <div>
+              <h2 class="h5 mb-1">Deliverables</h2>
+              <p class="text-fg-3 small mb-0">Milestones, owners, and expected outcomes.</p>
+            </div>
+            <span class="badge-soft" id="deliverableCount">0</span>
+          </div>
+          <form id="deliverableForm" class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label" for="deliverableTitle">Title</label>
+              <input type="text" id="deliverableTitle" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="deliverableStatus">Status</label>
+              <select id="deliverableStatus" class="form-select">
+                <option value="not_started">Not started</option>
+                <option value="in_progress">In progress</option>
+                <option value="at_risk">At risk</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="deliverableOwner">Owner</label>
+              <select id="deliverableOwner" class="form-select"></select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="deliverableDueDate">Due date</label>
+              <input type="date" id="deliverableDueDate" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="deliverableIssues">Related issues</label>
+              <select id="deliverableIssues" class="form-select" multiple></select>
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="deliverableDescription">Description</label>
+              <textarea id="deliverableDescription" class="form-control" rows="2"></textarea>
+            </div>
+            <div class="col-12 d-flex justify-content-end gap-2">
+              <button class="btn btn-primary" type="submit" id="deliverableSubmit">Add deliverable</button>
+            </div>
+            <div class="col-12"><div class="form-text" id="deliverableFeedback"></div></div>
+          </form>
+          <div id="deliverableList" class="d-flex flex-column gap-3"></div>
+        </section>
+
+        <section id="documents" class="card glass p-4 mb-4">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+            <div>
+              <h2 class="h5 mb-1">Documents</h2>
+              <p class="text-fg-3 small mb-0">Upload files, review versions, and capture comments.</p>
+            </div>
+            <span class="badge-soft" id="fileCount">0</span>
+          </div>
+          <form id="fileUploadForm" class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label" for="fileUploadInput">Upload document</label>
+              <input type="file" class="form-control" id="fileUploadInput" accept="application/pdf,.doc,.docx,.txt">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="fileMimeType">Type</label>
+              <input type="text" class="form-control" id="fileMimeType" placeholder="application/pdf">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button class="btn btn-primary w-100" type="submit">Upload</button>
+            </div>
+            <div class="col-12"><div class="form-text" id="fileFeedback"></div></div>
+          </form>
+          <div id="fileList" class="row g-3 mb-3"></div>
+          <div class="card glass p-3" id="fileDetails" hidden>
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+              <div>
+                <h3 class="h6 mb-1" id="fileDetailTitle">File</h3>
+                <div class="text-fg-3 small" id="fileDetailMeta"></div>
+              </div>
+              <div class="d-flex gap-2 align-items-center">
+                <a class="btn btn-outline-light btn-sm" id="fileDownload" target="_blank" rel="noreferrer">Download</a>
+                <button class="btn btn-primary btn-sm" id="fileValidate">AI validate</button>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="fileValidationContext">Validation context</label>
+              <textarea id="fileValidationContext" class="form-control" rows="2" placeholder="What should AI check?">
+              </textarea>
+              <div class="form-text" id="validationFeedback"></div>
+            </div>
+            <div class="mb-3">
+              <h4 class="h6">Versions</h4>
+              <ul class="list-unstyled mb-0" id="fileVersions"></ul>
+            </div>
+            <div>
+              <h4 class="h6">Comments</h4>
+              <form id="fileCommentForm" class="d-flex flex-column gap-2 mb-2">
+                <textarea id="fileCommentBody" class="form-control" rows="2" placeholder="Add a comment"></textarea>
+                <button class="btn btn-outline-light" type="submit">Post comment</button>
+                <div class="form-text" id="fileCommentFeedback"></div>
+              </form>
+              <div class="d-flex flex-column gap-2" id="fileComments"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="members" class="card glass p-4 mb-4">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+            <div>
+              <h2 class="h5 mb-1">Members</h2>
+              <p class="text-fg-3 small mb-0">Invite collaborators and manage room access.</p>
+            </div>
+            <span class="badge-soft" id="memberCount">0</span>
+          </div>
+          <div class="row g-3 mb-3" id="memberActions">
+            <div class="col-lg-6">
+              <div class="card glass p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h3 class="h6 mb-0">Add organization user</h3>
+                  <span class="badge-soft" id="memberRoleReminder">Admin only</span>
+                </div>
+                <form id="memberForm" class="d-flex flex-column gap-2">
+                  <input type="text" id="memberSearch" class="form-control" placeholder="Search org directory" list="memberOptions">
+                  <datalist id="memberOptions"></datalist>
+                  <div class="row g-2">
+                    <div class="col-md-6">
+                      <label class="form-label" for="memberOrg">Organization</label>
+                      <select id="memberOrg" class="form-select"></select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="memberRole">Role</label>
+                      <select id="memberRole" class="form-select">
+                        <option value="viewer">Viewer</option>
+                        <option value="editor">Editor</option>
+                        <option value="room_admin">Room admin</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button class="btn btn-primary" type="submit">Add member</button>
+                  <div class="form-text" id="memberFeedback"></div>
+                </form>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="card glass p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h3 class="h6 mb-0">Email invites</h3>
+                  <span class="badge-soft">Guest friendly</span>
+                </div>
+                <form id="inviteForm" class="d-flex flex-column gap-2">
+                  <input type="email" id="inviteEmail" class="form-control" placeholder="guest@example.com">
+                  <div class="row g-2">
+                    <div class="col-md-6">
+                      <label class="form-label" for="inviteOrg">Organization</label>
+                      <select id="inviteOrg" class="form-select"></select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="inviteRole">Role</label>
+                      <select id="inviteRole" class="form-select">
+                        <option value="viewer">Viewer</option>
+                        <option value="editor">Editor</option>
+                        <option value="room_admin">Room admin</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="inviteGuest">
+                    <label class="form-check-label" for="inviteGuest">Mark as guest invite</label>
+                  </div>
+                  <button class="btn btn-outline-light" type="submit">Send invite</button>
+                  <div class="form-text" id="inviteFeedback"></div>
+                </form>
+              </div>
+            </div>
+          </div>
+          <div id="memberList" class="d-flex flex-column gap-2"></div>
+          <div id="inviteList" class="d-flex flex-column gap-2 mt-3"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/rooms.js"></script>
+</body>
+</html>
