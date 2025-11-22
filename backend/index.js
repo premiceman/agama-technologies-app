@@ -18,6 +18,9 @@ const ProcurementVendor = require('./models/ProcurementVendor');
 const RevenueAccount = require('./models/RevenueAccount');
 const Organization = require('./models/Organization');
 const OrganizationMembership = require('./models/OrganizationMembership');
+const EngagementRoom = require('./models/EngagementRoom');
+const EngagementRoomMembership = require('./models/EngagementRoomMembership');
+const EngagementRoomIssue = require('./models/EngagementRoomIssue');
 const { requireOrgRole } = require('./middleware/orgAuth');
 
 const app = express();
@@ -275,6 +278,99 @@ const membershipCreateSchema = z.object({
   email: z.string().email(),
   role: z.enum(['owner', 'admin', 'member', 'viewer']).default('member')
 });
+
+const objectIdPattern = /^[a-fA-F0-9]{24}$/;
+
+const roomCreateSchema = z.object({
+  title: z.string().trim().min(1),
+  vendorOrg: z.string().regex(objectIdPattern),
+  buyerOrg: z.string().regex(objectIdPattern),
+  revenueAccount: z.string().regex(objectIdPattern).optional(),
+  procurementVendor: z.string().regex(objectIdPattern).optional()
+});
+
+const issueCreateSchema = z.object({
+  title: z.string().trim().min(1),
+  description: z.string().trim().optional(),
+  status: z.enum(['not_started', 'in_progress', 'completed', 'stuck']).optional(),
+  assignees: z.array(z.string().regex(objectIdPattern)).optional(),
+  dueDate: z.coerce.date().optional(),
+  notes: z.string().trim().optional(),
+  priority: z.enum(['low', 'medium', 'high']).optional()
+});
+
+const issueUpdateSchema = z.object({
+  title: z.string().trim().min(1).optional(),
+  description: z.string().trim().optional(),
+  status: z.enum(['not_started', 'in_progress', 'completed', 'stuck']).optional(),
+  assignees: z.array(z.string().regex(objectIdPattern)).optional(),
+  dueDate: z.coerce.date().optional(),
+  notes: z.string().trim().optional(),
+  priority: z.enum(['low', 'medium', 'high']).optional()
+});
+
+const ROOM_ROLE_ORDER = ['viewer', 'editor', 'room_admin'];
+
+function isValidObjectId(value) {
+  return objectIdPattern.test(String(value || ''));
+}
+
+function hasRoomRole(membership, minRole) {
+  if (!membership) return false;
+  const current = ROOM_ROLE_ORDER.indexOf(membership.role || 'viewer');
+  const required = ROOM_ROLE_ORDER.indexOf(minRole);
+  return current >= required;
+}
+
+async function findActiveOrgMembership(userId, orgId) {
+  if (!orgId) return null;
+  return OrganizationMembership.findOne({ organization: orgId, user: userId, status: 'active' });
+}
+
+async function loadRoomWithMembership(roomId, userId) {
+  if (!isValidObjectId(roomId)) return { room: null, membership: null };
+  const membership = await EngagementRoomMembership.findOne({ room: roomId, user: userId });
+  if (!membership) return { room: null, membership: null };
+  const room = await EngagementRoom.findById(roomId);
+  return { room, membership };
+}
+
+function serializeRoom(room, membership) {
+  if (!room) return null;
+  return {
+    id: room._id.toString(),
+    title: room.title,
+    status: room.status,
+    vendorOrg: room.vendorOrg ? room.vendorOrg.toString() : null,
+    buyerOrg: room.buyerOrg ? room.buyerOrg.toString() : null,
+    revenueAccount: room.revenueAccount ? room.revenueAccount.toString() : null,
+    procurementVendor: room.procurementVendor ? room.procurementVendor.toString() : null,
+    lastActivityAt: room.lastActivityAt,
+    membership: membership
+      ? {
+          role: membership.role,
+          organization: membership.organization ? membership.organization.toString() : null
+        }
+      : null
+  };
+}
+
+function serializeIssue(issue) {
+  return {
+    id: issue._id.toString(),
+    room: issue.room ? issue.room.toString() : null,
+    title: issue.title,
+    description: issue.description || null,
+    status: issue.status,
+    assignees: Array.isArray(issue.assignees) ? issue.assignees.map(id => id.toString()) : [],
+    dueDate: issue.dueDate || null,
+    notes: issue.notes || null,
+    priority: issue.priority || null,
+    createdBy: issue.createdBy ? issue.createdBy.toString() : null,
+    createdAt: issue.createdAt,
+    updatedAt: issue.updatedAt
+  };
+}
 
 const procurementVendorSchema = z.object({
   name: z.string().trim().min(2).max(200),
@@ -677,6 +773,54 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
   }
 });
 
+app.get('/api/org/current', requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.auth.uid);
+    if (!user) return res.status(404).json({ error: 'Not found' });
+
+    const orgId = req.auth.orgId || user.defaultOrganization;
+    let organizationPayload = null;
+
+    if (orgId) {
+      const organization = await Organization.findById(orgId);
+      const membership = organization
+        ? await OrganizationMembership.findOne({ organization: orgId, user: user._id, status: 'active' })
+        : null;
+
+      if (organization && membership) {
+        const productAccess = Array.isArray(organization.productAccess)
+          ? [...organization.productAccess]
+          : Array.isArray(organization.platformAccess)
+            ? [...organization.platformAccess]
+            : [];
+
+        organizationPayload = {
+          id: organization._id.toString(),
+          name: organization.name,
+          orgType: organization.orgType || 'both',
+          productAccess
+        };
+      }
+    }
+
+    const licenseTier = user.licenseTier === 'guest' ? 'guest' : 'full';
+
+    res.json({
+      ok: true,
+      organization: organizationPayload,
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        name: user.name,
+        licenseTier
+      }
+    });
+  } catch (err) {
+    console.error('Org current error', err);
+    res.status(500).json({ error: 'Unable to fetch organization context' });
+  }
+});
+
 app.put('/api/auth/me', requireAuth, validateBody(profileUpdateSchema), async (req, res) => {
   try {
     const user = await User.findById(req.auth.uid);
@@ -770,6 +914,8 @@ app.post('/api/orgs', requireAuth, validateBody(organizationCreateSchema), async
       seatLimit: payload.seatLimit || 10,
       tier: 'business',
       platformAccess: payload.platformAccess || ['valuesphere'],
+      productAccess: payload.platformAccess || ['valuesphere'],
+      orgType: payload.orgType || 'both',
       createdBy: req.auth.uid
     });
 
@@ -830,11 +976,15 @@ app.get('/api/orgs/:orgId', requireAuth, requireOrgRole('viewer'), async (req, r
 app.put('/api/orgs/:orgId', requireAuth, requireOrgRole('owner'), validateBody(organizationUpdateSchema), async (req, res) => {
   try {
     const payload = req.validatedBody;
-    ['name', 'seatLimit', 'platformAccess'].forEach(field => {
-      if (payload[field] !== undefined) {
-        req.organization[field] = payload[field];
+    if (payload.name !== undefined) req.organization.name = payload.name.trim();
+    if (payload.seatLimit !== undefined) req.organization.seatLimit = payload.seatLimit;
+    if (payload.platformAccess) {
+      const normalized = payload.platformAccess.filter(id => PLATFORM_IDS.has(id));
+      if (normalized.length > 0) {
+        req.organization.platformAccess = normalized;
+        req.organization.productAccess = normalized;
       }
-    });
+    }
     await req.organization.save();
 
     const seatsUsed = await OrganizationMembership.countActiveSeats(req.organization._id);
@@ -1063,6 +1213,195 @@ app.post(
     }
   }
 );
+
+app.get('/api/rooms', requireAuth, async (req, res) => {
+  try {
+    const memberships = await EngagementRoomMembership.find({ user: req.auth.uid }).populate('room');
+
+    const rooms = memberships
+      .filter(m => m.room)
+      .map(m => serializeRoom(m.room, m));
+
+    rooms.sort((a, b) => {
+      const aDate = a?.lastActivityAt ? new Date(a.lastActivityAt).getTime() : 0;
+      const bDate = b?.lastActivityAt ? new Date(b.lastActivityAt).getTime() : 0;
+      return bDate - aDate;
+    });
+
+    res.json({ ok: true, rooms });
+  } catch (err) {
+    console.error('List rooms error', err);
+    res.status(500).json({ error: 'Unable to list rooms' });
+  }
+});
+
+app.post('/api/rooms', requireAuth, validateBody(roomCreateSchema), async (req, res) => {
+  try {
+    const payload = req.validatedBody;
+    if (payload.vendorOrg === payload.buyerOrg) {
+      return res.status(400).json({ error: 'Vendor and buyer organizations must differ.' });
+    }
+
+    const vendorOrg = await Organization.findById(payload.vendorOrg);
+    const buyerOrg = await Organization.findById(payload.buyerOrg);
+    if (!vendorOrg || !buyerOrg) {
+      return res.status(404).json({ error: 'Organization not found' });
+    }
+
+    if (vendorOrg.orgType === 'buyer') {
+      return res.status(400).json({ error: 'Vendor organization must allow vendor engagements.' });
+    }
+    if (buyerOrg.orgType === 'vendor') {
+      return res.status(400).json({ error: 'Buyer organization must allow buyer engagements.' });
+    }
+
+    const vendorMembership = await findActiveOrgMembership(req.auth.uid, vendorOrg._id);
+    const buyerMembership = await findActiveOrgMembership(req.auth.uid, buyerOrg._id);
+    if (!vendorMembership && !buyerMembership) {
+      return res.status(403).json({ error: 'No active membership for either organization.' });
+    }
+
+    if (payload.revenueAccount) {
+      const revenueAccount = await RevenueAccount.findById(payload.revenueAccount);
+      if (!revenueAccount) return res.status(404).json({ error: 'Revenue account not found' });
+    }
+
+    if (payload.procurementVendor) {
+      const procurementVendor = await ProcurementVendor.findById(payload.procurementVendor);
+      if (!procurementVendor) return res.status(404).json({ error: 'Procurement vendor not found' });
+    }
+
+    const room = await EngagementRoom.create({
+      title: payload.title,
+      vendorOrg: vendorOrg._id,
+      buyerOrg: buyerOrg._id,
+      revenueAccount: payload.revenueAccount,
+      procurementVendor: payload.procurementVendor,
+      createdBy: req.auth.uid,
+      status: 'active',
+      lastActivityAt: new Date()
+    });
+
+    const membershipOrg = vendorMembership ? vendorOrg._id : buyerOrg._id;
+    const user = await User.findById(req.auth.uid);
+    await EngagementRoomMembership.create({
+      room: room._id,
+      user: req.auth.uid,
+      organization: membershipOrg,
+      role: 'room_admin',
+      isGuest: user && user.licenseTier === 'guest'
+    });
+
+    res.status(201).json({ ok: true, room: serializeRoom(room, { role: 'room_admin', organization: membershipOrg }) });
+  } catch (err) {
+    console.error('Create room error', err);
+    res.status(500).json({ error: 'Unable to create room' });
+  }
+});
+
+app.get('/api/rooms/:roomId', requireAuth, async (req, res) => {
+  try {
+    const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+    if (!room || !membership) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    res.json({ ok: true, room: serializeRoom(room, membership) });
+  } catch (err) {
+    console.error('Get room error', err);
+    res.status(500).json({ error: 'Unable to fetch room' });
+  }
+});
+
+app.get('/api/rooms/:roomId/issues', requireAuth, async (req, res) => {
+  try {
+    const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+    if (!room || !membership) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    const issues = await EngagementRoomIssue.find({ room: room._id }).sort({ createdAt: -1 });
+    res.json({ ok: true, issues: issues.map(serializeIssue) });
+  } catch (err) {
+    console.error('List issues error', err);
+    res.status(500).json({ error: 'Unable to list issues' });
+  }
+});
+
+app.post('/api/rooms/:roomId/issues', requireAuth, validateBody(issueCreateSchema), async (req, res) => {
+  try {
+    const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+    if (!room || !membership) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    if (!hasRoomRole(membership, 'editor')) {
+      return res.status(403).json({ error: 'Insufficient room role.' });
+    }
+
+    const payload = req.validatedBody;
+    const issue = await EngagementRoomIssue.create({
+      room: room._id,
+      title: payload.title,
+      description: payload.description,
+      status: payload.status || 'not_started',
+      assignees: payload.assignees || [],
+      dueDate: payload.dueDate,
+      notes: payload.notes,
+      priority: payload.priority || 'medium',
+      createdBy: req.auth.uid
+    });
+
+    room.lastActivityAt = new Date();
+    await room.save();
+
+    res.status(201).json({ ok: true, issue: serializeIssue(issue) });
+  } catch (err) {
+    console.error('Create issue error', err);
+    res.status(500).json({ error: 'Unable to create issue' });
+  }
+});
+
+app.patch('/api/rooms/:roomId/issues/:issueId', requireAuth, validateBody(issueUpdateSchema), async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.issueId)) {
+      return res.status(404).json({ error: 'Issue not found' });
+    }
+
+    const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+    if (!room || !membership) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    if (!hasRoomRole(membership, 'editor')) {
+      return res.status(403).json({ error: 'Insufficient room role.' });
+    }
+
+    const issue = await EngagementRoomIssue.findOne({ _id: req.params.issueId, room: room._id });
+    if (!issue) {
+      return res.status(404).json({ error: 'Issue not found' });
+    }
+
+    const payload = req.validatedBody;
+    ['title', 'description', 'status', 'notes', 'priority'].forEach(field => {
+      if (payload[field] !== undefined) {
+        issue[field] = payload[field];
+      }
+    });
+    if (payload.assignees !== undefined) issue.assignees = payload.assignees;
+    if (payload.dueDate !== undefined) issue.dueDate = payload.dueDate;
+
+    await issue.save();
+
+    room.lastActivityAt = new Date();
+    await room.save();
+
+    res.json({ ok: true, issue: serializeIssue(issue) });
+  } catch (err) {
+    console.error('Update issue error', err);
+    res.status(500).json({ error: 'Unable to update issue' });
+  }
+});
 
 async function loadProcurePathUser(req, res) {
   const user = await User.findById(req.auth.uid);
