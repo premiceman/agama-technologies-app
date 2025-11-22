@@ -27,6 +27,9 @@ const EngagementRoomIssue = require('./models/EngagementRoomIssue');
 const EngagementRoomIssueComment = require('./models/EngagementRoomIssueComment');
 const EngagementRoomDeliverable = require('./models/EngagementRoomDeliverable');
 const EngagementRoomMessage = require('./models/EngagementRoomMessage');
+const EngagementRoomFile = require('./models/EngagementRoomFile');
+const EngagementRoomFileVersion = require('./models/EngagementRoomFileVersion');
+const EngagementRoomFileComment = require('./models/EngagementRoomFileComment');
 const { requireOrgRole } = require('./middleware/orgAuth');
 
 const app = express();
