@@ -1,5 +1,7 @@
 require('dotenv').config();
 const path = require('path');
+const fs = require('fs');
+const fsPromises = fs.promises;
 const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');
@@ -37,6 +39,10 @@ const WORKOS_CLIENT_ID = process.env.WORKOS_CLIENT_ID;
 const WORKOS_REDIRECT_URI = process.env.WORKOS_REDIRECT_URI;
 const WORKOS_SUCCESS_REDIRECT = process.env.WORKOS_SUCCESS_REDIRECT || '/workspace.html';
 const WORKOS_STATE_COOKIE = 'workos_auth_state';
+const UPLOAD_DIR = path.join(__dirname, 'uploads');
+if (!fs.existsSync(UPLOAD_DIR)) {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
 
 app.use(helmet({
   contentSecurityPolicy: false,
@@ -345,6 +351,45 @@ const issueCommentCreateSchema = z.object({
   body: z.string().trim().min(1)
 });
 
+const fileCreateSchema = z
+  .object({
+    name: z.string().trim().min(1),
+    mimeType: z.string().trim().min(1),
+    sizeBytes: z.number().int().positive(),
+    storageKey: z.string().trim().optional(),
+    base64: z.string().trim().optional()
+  })
+  .refine(payload => payload.storageKey || payload.base64, {
+    message: 'storageKey or base64 is required for file uploads'
+  });
+
+const fileCommentSchema = z.object({
+  body: z.string().trim().min(1),
+  version: z.string().regex(objectIdPattern).optional()
+});
+
+const fileValidationSchema = z.object({
+  version: z.string().regex(objectIdPattern).optional(),
+  context: z.string().trim().optional()
+});
+
+const aiSummarySchema = z.object({
+  timeWindowHours: z.number().int().positive().max(720).default(24)
+});
+
+const aiStatusReportSchema = z.object({
+  audience: z.enum(['internal', 'customer', 'joint']).default('joint')
+});
+
+const aiIssuesGroomingSchema = z.object({
+  focus: z.string().trim().optional(),
+  limit: z.number().int().positive().max(50).optional()
+});
+
+const aiRenewalInsightsSchema = z.object({
+  segment: z.string().trim().optional()
+});
+
 const roomMembershipCreateSchema = z.object({
   userId: z.string().regex(objectIdPattern),
   organization: z.string().regex(objectIdPattern),
@@ -472,6 +517,45 @@ function serializeIssueComment(comment) {
   };
 }
 
+function serializeFileVersion(version) {
+  return {
+    id: version._id.toString(),
+    file: version.file ? version.file.toString() : null,
+    storageKey: version.storageKey,
+    sizeBytes: version.sizeBytes,
+    uploadedBy: version.uploadedBy ? version.uploadedBy.toString() : null,
+    uploadedAt: version.uploadedAt || version.createdAt,
+    createdAt: version.createdAt,
+    updatedAt: version.updatedAt
+  };
+}
+
+function serializeFile(file, currentVersion) {
+  return {
+    id: file._id.toString(),
+    room: file.room ? file.room.toString() : null,
+    name: file.name,
+    mimeType: file.mimeType,
+    currentVersion: currentVersion ? serializeFileVersion(currentVersion) : file.currentVersion?.toString?.(),
+    createdBy: file.createdBy ? file.createdBy.toString() : null,
+    createdAt: file.createdAt,
+    updatedAt: file.updatedAt
+  };
+}
+
+function serializeFileComment(comment) {
+  return {
+    id: comment._id.toString(),
+    room: comment.room ? comment.room.toString() : null,
+    file: comment.file ? comment.file.toString() : null,
+    version: comment.version ? comment.version.toString() : null,
+    author: comment.author ? comment.author.toString() : null,
+    body: comment.body,
+    createdAt: comment.createdAt,
+    updatedAt: comment.updatedAt
+  };
+}
+
 function serializeRoomSummary(summary) {
   if (!summary) return null;
   return {
@@ -550,6 +634,58 @@ async function buildRoomSummaries(roomIds) {
   });
 
   return summaries;
+}
+
+async function saveBase64ToStorage(base64, fileName) {
+  const safeName = path.basename(fileName || 'upload.bin');
+  const storageKey = path.join('room-files', `${Date.now()}-${crypto.randomBytes(6).toString('hex')}-${safeName}`);
+  const filePath = path.join(UPLOAD_DIR, storageKey);
+  await fsPromises.mkdir(path.dirname(filePath), { recursive: true });
+  await fsPromises.writeFile(filePath, Buffer.from(base64, 'base64'));
+  return storageKey;
+}
+
+function resolveStoragePath(storageKey) {
+  if (!storageKey) return null;
+  const normalised = path.normalize(storageKey);
+  if (normalised.startsWith('..')) return null;
+  return path.join(UPLOAD_DIR, normalised);
+}
+
+async function callOpenAIJson(systemPrompt, userContent, temperature = 0.3) {
+  if (!OPENAI_API_KEY) {
+    throw new Error('OpenAI is not configured');
+  }
+
+  const completion = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${OPENAI_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent }
+      ],
+      temperature,
+      response_format: { type: 'json_object' }
+    })
+  });
+
+  if (!completion.ok) {
+    const details = await completion.text();
+    throw new Error(`OpenAI request failed: ${details}`);
+  }
+
+  const data = await completion.json();
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error('OpenAI did not return content');
+  }
+
+  return { content, raw: data };
 }
 
 function serializeRoomMembership(membership) {
@@ -1888,6 +2024,255 @@ app.post(
   }
 );
 
+app.get('/api/rooms/:roomId/files', requireAuth, async (req, res) => {
+  try {
+    const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+    if (!room || !membership) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    const files = await EngagementRoomFile.find({ room: room._id })
+      .populate('currentVersion')
+      .sort({ createdAt: -1 });
+
+    res.json({ ok: true, files: files.map(file => serializeFile(file, file.currentVersion)) });
+  } catch (err) {
+    console.error('List room files error', err);
+    res.status(500).json({ error: 'Unable to list files' });
+  }
+});
+
+app.post('/api/rooms/:roomId/files', requireAuth, validateBody(fileCreateSchema), async (req, res) => {
+  try {
+    const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+    if (!room || !membership) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    if (!hasRoomRole(membership, 'editor')) {
+      return res.status(403).json({ error: 'Insufficient room role.' });
+    }
+
+    const payload = req.validatedBody;
+
+    let storageKey = payload.storageKey || null;
+    if (!storageKey && payload.base64) {
+      storageKey = await saveBase64ToStorage(payload.base64, payload.name);
+    }
+
+    const file = await EngagementRoomFile.create({
+      room: room._id,
+      name: payload.name,
+      mimeType: payload.mimeType,
+      createdBy: req.auth.uid
+    });
+
+    const version = await EngagementRoomFileVersion.create({
+      file: file._id,
+      storageKey: storageKey || `placeholder-${file._id.toString()}`,
+      sizeBytes: payload.sizeBytes,
+      uploadedBy: req.auth.uid
+    });
+
+    file.currentVersion = version._id;
+    await file.save();
+
+    room.lastActivityAt = new Date();
+    await room.save();
+
+    res.status(201).json({ ok: true, file: serializeFile(file, version) });
+  } catch (err) {
+    console.error('Create room file error', err);
+    res.status(500).json({ error: 'Unable to create file' });
+  }
+});
+
+app.get('/api/rooms/:roomId/files/:fileId', requireAuth, async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.fileId)) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+    if (!room || !membership) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    const file = await EngagementRoomFile.findOne({ _id: req.params.fileId, room: room._id }).populate('currentVersion');
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    const versions = await EngagementRoomFileVersion.find({ file: file._id }).sort({ createdAt: -1 });
+    const comments = await EngagementRoomFileComment.find({ file: file._id }).sort({ createdAt: -1 });
+
+    res.json({
+      ok: true,
+      file: serializeFile(file, file.currentVersion),
+      versions: versions.map(serializeFileVersion),
+      comments: comments.map(serializeFileComment)
+    });
+  } catch (err) {
+    console.error('Get room file error', err);
+    res.status(500).json({ error: 'Unable to fetch file' });
+  }
+});
+
+app.get('/api/rooms/:roomId/files/:fileId/download', requireAuth, async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.fileId)) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+    if (!room || !membership) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    const file = await EngagementRoomFile.findOne({ _id: req.params.fileId, room: room._id }).populate('currentVersion');
+    if (!file || !file.currentVersion) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    const version = file.currentVersion;
+    const storagePath = resolveStoragePath(version.storageKey);
+    if (!storagePath || !fs.existsSync(storagePath)) {
+      return res.status(404).json({ error: 'File content not found' });
+    }
+
+    res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${file.name}"`);
+
+    const stream = fs.createReadStream(storagePath);
+    stream.on('error', err => {
+      console.error('File download stream error', err);
+      res.status(500).end();
+    });
+    stream.pipe(res);
+  } catch (err) {
+    console.error('Download room file error', err);
+    res.status(500).json({ error: 'Unable to download file' });
+  }
+});
+
+app.post(
+  '/api/rooms/:roomId/files/:fileId/comments',
+  requireAuth,
+  validateBody(fileCommentSchema),
+  async (req, res) => {
+    try {
+      if (!isValidObjectId(req.params.fileId)) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+
+      const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+      if (!room || !membership) {
+        return res.status(404).json({ error: 'Room not found' });
+      }
+
+      const file = await EngagementRoomFile.findOne({ _id: req.params.fileId, room: room._id });
+      if (!file) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+
+      const payload = req.validatedBody;
+      let version = null;
+      if (payload.version) {
+        version = await EngagementRoomFileVersion.findOne({ _id: payload.version, file: file._id });
+        if (!version) {
+          return res.status(400).json({ error: 'Version does not belong to the file.' });
+        }
+      }
+
+      const comment = await EngagementRoomFileComment.create({
+        file: file._id,
+        version: version ? version._id : undefined,
+        room: room._id,
+        author: req.auth.uid,
+        body: payload.body
+      });
+
+      room.lastActivityAt = new Date();
+      await room.save();
+
+      res.status(201).json({ ok: true, comment: serializeFileComment(comment) });
+    } catch (err) {
+      console.error('Create file comment error', err);
+      res.status(500).json({ error: 'Unable to add comment' });
+    }
+  }
+);
+
+app.post(
+  '/api/rooms/:roomId/files/:fileId/validate',
+  requireAuth,
+  validateBody(fileValidationSchema),
+  async (req, res) => {
+    try {
+      if (!isValidObjectId(req.params.fileId)) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+
+      const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+      if (!room || !membership) {
+        return res.status(404).json({ error: 'Room not found' });
+      }
+
+      if (!hasRoomRole(membership, 'editor')) {
+        return res.status(403).json({ error: 'Insufficient room role.' });
+      }
+
+      const file = await EngagementRoomFile.findOne({ _id: req.params.fileId, room: room._id }).populate('currentVersion');
+      if (!file) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+
+      const payload = req.validatedBody;
+      let version = file.currentVersion;
+      if (payload.version) {
+        version = await EngagementRoomFileVersion.findOne({ _id: payload.version, file: file._id });
+      }
+      if (!version) {
+        return res.status(404).json({ error: 'File version not found' });
+      }
+
+      const recentComments = await EngagementRoomFileComment.find({ file: file._id })
+        .sort({ createdAt: -1 })
+        .limit(5);
+
+      const promptLines = [
+        `Room: ${room.title || room._id.toString()}`,
+        `File: ${file.name} (${file.mimeType})`,
+        `Version: ${version._id.toString()} size ${version.sizeBytes} bytes`,
+        payload.context ? `Additional context: ${payload.context}` : null,
+        recentComments.length > 0
+          ? `Recent comments: ${recentComments.map(c => c.body).join(' | ')}`
+          : null
+      ].filter(Boolean);
+
+      const systemPrompt = [
+        'You are an agreement and statement of work reviewer.',
+        'Return a concise JSON object with keys summary, risks, missingItems, and recommendations.',
+        'Risks and missingItems should be arrays of short bullet strings.'
+      ].join('\n');
+
+      const { content } = await callOpenAIJson(systemPrompt, promptLines.join('\n'), 0.2);
+      let parsed;
+      try {
+        parsed = JSON.parse(content);
+      } catch (parseErr) {
+        console.error('AI validation parse error', parseErr, content);
+        return res.status(500).json({ error: 'AI validation could not be parsed' });
+      }
+
+      res.json({ ok: true, validation: parsed });
+    } catch (err) {
+      console.error('File validation error', err);
+      res.status(500).json({ error: 'Unable to validate file' });
+    }
+  }
+);
+
 app.get('/api/rooms/:roomId/members', requireAuth, async (req, res) => {
   try {
     const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
@@ -2102,6 +2487,186 @@ app.post('/api/room-invites/:token/accept', requireAuth, async (req, res) => {
     res.status(500).json({ error: 'Unable to accept invite' });
   }
 });
+
+app.post('/api/rooms/:roomId/ai/summary', requireAuth, validateBody(aiSummarySchema), async (req, res) => {
+  try {
+    const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+    if (!room || !membership) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    const { timeWindowHours } = req.validatedBody;
+    const since = new Date(Date.now() - timeWindowHours * 60 * 60 * 1000);
+
+    const [messages, issues, deliverables] = await Promise.all([
+      EngagementRoomMessage.find({ room: room._id, createdAt: { $gte: since } })
+        .sort({ createdAt: -1 })
+        .limit(50),
+      EngagementRoomIssue.find({ room: room._id }).sort({ createdAt: -1 }).limit(50),
+      EngagementRoomDeliverable.find({ room: room._id }).sort({ createdAt: -1 }).limit(50)
+    ]);
+
+    const contextLines = [
+      `Room title: ${room.title}`,
+      `Messages: ${messages.map(m => m.body).join(' | ')}`,
+      `Issues: ${issues.map(i => `[${i.status}] ${i.title}`).join(' | ')}`,
+      `Deliverables: ${deliverables.map(d => `[${d.status}] ${d.title}`).join(' | ')}`
+    ];
+
+    const systemPrompt = [
+      'You are a room collaboration copilot.',
+      'Respond with JSON containing summary (string), highlights (string array), risks (string array), and nextSteps (string array).'
+    ].join('\n');
+
+    const { content } = await callOpenAIJson(systemPrompt, contextLines.join('\n'));
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch (err) {
+      console.error('AI summary parse error', err, content);
+      return res.status(500).json({ error: 'Unable to parse AI summary' });
+    }
+
+    res.json({ ok: true, summary: parsed });
+  } catch (err) {
+    console.error('AI summary error', err);
+    res.status(500).json({ error: 'Unable to generate summary' });
+  }
+});
+
+app.post(
+  '/api/rooms/:roomId/ai/status-report',
+  requireAuth,
+  validateBody(aiStatusReportSchema),
+  async (req, res) => {
+    try {
+      const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+      if (!room || !membership) {
+        return res.status(404).json({ error: 'Room not found' });
+      }
+
+      const [issues, deliverables] = await Promise.all([
+        EngagementRoomIssue.find({ room: room._id }).sort({ createdAt: -1 }).limit(50),
+        EngagementRoomDeliverable.find({ room: room._id }).sort({ createdAt: -1 }).limit(50)
+      ]);
+
+      const audience = req.validatedBody.audience;
+      const contextLines = [
+        `Audience: ${audience}`,
+        `Issues: ${issues.map(i => `[${i.status}] ${i.title}`).join(' | ')}`,
+        `Deliverables: ${deliverables.map(d => `[${d.status}] ${d.title}`).join(' | ')}`
+      ];
+
+      const systemPrompt = [
+        'You are a program manager drafting a concise status report.',
+        'Return JSON with headline (string), overallStatus (on_track|at_risk|off_track),',
+        'completed (string array), inProgress (string array), blockers (string array), and recommendedActions (string array).'
+      ].join('\n');
+
+      const { content } = await callOpenAIJson(systemPrompt, contextLines.join('\n'));
+      let parsed;
+      try {
+        parsed = JSON.parse(content);
+      } catch (err) {
+        console.error('AI status report parse error', err, content);
+        return res.status(500).json({ error: 'Unable to parse status report' });
+      }
+
+      res.json({ ok: true, report: parsed });
+    } catch (err) {
+      console.error('Status report error', err);
+      res.status(500).json({ error: 'Unable to generate status report' });
+    }
+  }
+);
+
+app.post(
+  '/api/rooms/:roomId/ai/issues-grooming',
+  requireAuth,
+  validateBody(aiIssuesGroomingSchema),
+  async (req, res) => {
+    try {
+      const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+      if (!room || !membership) {
+        return res.status(404).json({ error: 'Room not found' });
+      }
+
+      const issues = await EngagementRoomIssue.find({ room: room._id })
+        .sort({ updatedAt: -1 })
+        .limit(req.validatedBody.limit || 30);
+
+      const contextLines = [
+        req.validatedBody.focus ? `Focus: ${req.validatedBody.focus}` : null,
+        `Issues: ${issues.map(i => `[${i.status}] ${i.title}`).join(' | ')}`
+      ].filter(Boolean);
+
+      const systemPrompt = [
+        'You are an agile coach helping prioritise issues.',
+        'Return JSON with priorities (array of strings), risks (array of strings), and recommendations (array of strings).'
+      ].join('\n');
+
+      const { content } = await callOpenAIJson(systemPrompt, contextLines.join('\n'));
+      let parsed;
+      try {
+        parsed = JSON.parse(content);
+      } catch (err) {
+        console.error('Issues grooming parse error', err, content);
+        return res.status(500).json({ error: 'Unable to parse issues grooming result' });
+      }
+
+      res.json({ ok: true, grooming: parsed });
+    } catch (err) {
+      console.error('Issues grooming error', err);
+      res.status(500).json({ error: 'Unable to generate issues grooming insights' });
+    }
+  }
+);
+
+app.post(
+  '/api/rooms/:roomId/ai/renewal-insights',
+  requireAuth,
+  validateBody(aiRenewalInsightsSchema),
+  async (req, res) => {
+    try {
+      const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+      if (!room || !membership) {
+        return res.status(404).json({ error: 'Room not found' });
+      }
+
+      const [issues, deliverables, messages] = await Promise.all([
+        EngagementRoomIssue.find({ room: room._id }).sort({ updatedAt: -1 }).limit(30),
+        EngagementRoomDeliverable.find({ room: room._id }).sort({ updatedAt: -1 }).limit(30),
+        EngagementRoomMessage.find({ room: room._id }).sort({ createdAt: -1 }).limit(30)
+      ]);
+
+      const contextLines = [
+        req.validatedBody.segment ? `Customer segment: ${req.validatedBody.segment}` : null,
+        `Issues: ${issues.map(i => `[${i.status}] ${i.title}`).join(' | ')}`,
+        `Deliverables: ${deliverables.map(d => `[${d.status}] ${d.title}`).join(' | ')}`,
+        `Recent notes: ${messages.map(m => m.body).join(' | ')}`
+      ].filter(Boolean);
+
+      const systemPrompt = [
+        'You are a renewals strategist identifying expansion and risk signals.',
+        'Return JSON with summary (string), renewalSignals (array of strings), riskFlags (array of strings), and recommendations (array of strings).'
+      ].join('\n');
+
+      const { content } = await callOpenAIJson(systemPrompt, contextLines.join('\n'));
+      let parsed;
+      try {
+        parsed = JSON.parse(content);
+      } catch (err) {
+        console.error('Renewal insights parse error', err, content);
+        return res.status(500).json({ error: 'Unable to parse renewal insights' });
+      }
+
+      res.json({ ok: true, insights: parsed });
+    } catch (err) {
+      console.error('Renewal insights error', err);
+      res.status(500).json({ error: 'Unable to generate renewal insights' });
+    }
+  }
+);
 
 async function loadProcurePathUser(req, res) {
   const user = await User.findById(req.auth.uid);
