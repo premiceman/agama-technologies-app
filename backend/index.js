@@ -20,6 +20,7 @@ const Organization = require('./models/Organization');
 const OrganizationMembership = require('./models/OrganizationMembership');
 const EngagementRoom = require('./models/EngagementRoom');
 const EngagementRoomMembership = require('./models/EngagementRoomMembership');
+const EngagementRoomInvite = require('./models/EngagementRoomInvite');
 const EngagementRoomIssue = require('./models/EngagementRoomIssue');
 const { requireOrgRole } = require('./middleware/orgAuth');
 
@@ -132,7 +133,7 @@ const PLATFORM_DEFINITIONS = [
 
 const PLATFORM_IDS = new Set(PLATFORM_DEFINITIONS.map(platform => platform.id));
 const PERSONAL_ALLOWED_PLATFORMS = new Set(['valuesphere']);
-const LICENSE_OPTIONS = ['personal', 'business'];
+const LICENSE_OPTIONS = ['personal', 'business', 'guest'];
 
 function storeWorkOSState(res) {
   const value = crypto.randomBytes(24).toString('hex');
@@ -181,6 +182,10 @@ function normalisePlatformAccess(licenseTier, requested) {
   const selections = Array.isArray(requested)
     ? Array.from(new Set(requested.map(value => String(value))))
     : [];
+
+  if (licenseTier === 'guest') {
+    return { platformAccess: ['valuesphere'] };
+  }
 
   if (licenseTier === 'personal') {
     const disallowed = selections.filter(id => id && !PERSONAL_ALLOWED_PLATFORMS.has(id));
@@ -309,6 +314,19 @@ const issueUpdateSchema = z.object({
   priority: z.enum(['low', 'medium', 'high']).optional()
 });
 
+const roomMembershipCreateSchema = z.object({
+  userId: z.string().regex(objectIdPattern),
+  organization: z.string().regex(objectIdPattern),
+  role: z.enum(['room_admin', 'editor', 'viewer'])
+});
+
+const roomInviteCreateSchema = z.object({
+  email: z.string().trim().email(),
+  organization: z.string().regex(objectIdPattern),
+  role: z.enum(['room_admin', 'editor', 'viewer']),
+  isGuestInvite: z.boolean().optional()
+});
+
 const ROOM_ROLE_ORDER = ['viewer', 'editor', 'room_admin'];
 
 function isValidObjectId(value) {
@@ -320,6 +338,14 @@ function hasRoomRole(membership, minRole) {
   const current = ROOM_ROLE_ORDER.indexOf(membership.role || 'viewer');
   const required = ROOM_ROLE_ORDER.indexOf(minRole);
   return current >= required;
+}
+
+function isRoomOrganization(room, orgId) {
+  if (!room || !orgId) return false;
+  const value = String(orgId);
+  return (
+    (room.vendorOrg && room.vendorOrg.toString() === value) || (room.buyerOrg && room.buyerOrg.toString() === value)
+  );
 }
 
 async function findActiveOrgMembership(userId, orgId) {
@@ -369,6 +395,35 @@ function serializeIssue(issue) {
     createdBy: issue.createdBy ? issue.createdBy.toString() : null,
     createdAt: issue.createdAt,
     updatedAt: issue.updatedAt
+  };
+}
+
+function serializeRoomMembership(membership) {
+  return {
+    id: membership._id.toString(),
+    userId: membership.user ? membership.user._id.toString() : null,
+    name: membership.user ? membership.user.name : null,
+    email: membership.user ? membership.user.email : null,
+    licenseTier: membership.user ? membership.user.licenseTier : null,
+    organization: membership.organization ? membership.organization.toString() : null,
+    role: membership.role,
+    isGuest: Boolean(membership.isGuest)
+  };
+}
+
+function serializeRoomInvite(invite) {
+  return {
+    id: invite._id.toString(),
+    room: invite.room ? invite.room.toString() : null,
+    email: invite.email,
+    organization: invite.organization ? invite.organization.toString() : null,
+    role: invite.role,
+    status: invite.status,
+    token: invite.token,
+    isGuestInvite: invite.isGuestInvite,
+    invitedBy: invite.invitedBy ? invite.invitedBy.toString() : null,
+    createdAt: invite.createdAt,
+    updatedAt: invite.updatedAt
   };
 }
 
@@ -818,6 +873,53 @@ app.get('/api/org/current', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Org current error', err);
     res.status(500).json({ error: 'Unable to fetch organization context' });
+  }
+});
+
+app.get('/api/org/users/search', requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.auth.uid);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (user.licenseTier === 'guest') {
+      return res.status(403).json({ error: 'Guest users cannot access the directory.' });
+    }
+
+    const orgId = req.auth.orgId || user.defaultOrganization;
+    if (!orgId) {
+      return res.status(400).json({ error: 'No organization selected' });
+    }
+
+    const membership = await OrganizationMembership.findOne({ organization: orgId, user: user._id, status: 'active' });
+    if (!membership) {
+      return res.status(403).json({ error: 'Not a member of this organization.' });
+    }
+
+    const query = String(req.query.q || '').trim().toLowerCase();
+    const orgMembers = await OrganizationMembership.find({ organization: orgId, status: 'active' }).populate({
+      path: 'user',
+      select: 'name email licenseTier'
+    });
+
+    const matches = orgMembers.filter(member => {
+      if (!member.user) return false;
+      if (!query) return true;
+      const haystack = `${member.user.name || ''} ${member.user.email || ''}`.toLowerCase();
+      return haystack.includes(query);
+    });
+
+    res.json({
+      ok: true,
+      users: matches.slice(0, 25).map(member => ({
+        id: member.user._id.toString(),
+        name: member.user.name,
+        email: member.user.email,
+        licenseTier: member.user.licenseTier
+      }))
+    });
+  } catch (err) {
+    console.error('User search error', err);
+    res.status(500).json({ error: 'Unable to search users' });
   }
 });
 
@@ -1400,6 +1502,221 @@ app.patch('/api/rooms/:roomId/issues/:issueId', requireAuth, validateBody(issueU
   } catch (err) {
     console.error('Update issue error', err);
     res.status(500).json({ error: 'Unable to update issue' });
+  }
+});
+
+app.get('/api/rooms/:roomId/members', requireAuth, async (req, res) => {
+  try {
+    const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+    if (!room || !membership) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    const members = await EngagementRoomMembership.find({ room: room._id })
+      .sort({ createdAt: 1 })
+      .populate('user', 'name email licenseTier');
+
+    res.json({ ok: true, members: members.map(serializeRoomMembership) });
+  } catch (err) {
+    console.error('List room members error', err);
+    res.status(500).json({ error: 'Unable to list room members' });
+  }
+});
+
+app.post(
+  '/api/rooms/:roomId/members',
+  requireAuth,
+  validateBody(roomMembershipCreateSchema),
+  async (req, res) => {
+    try {
+      const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+      if (!room || !membership) {
+        return res.status(404).json({ error: 'Room not found' });
+      }
+
+      if (!hasRoomRole(membership, 'room_admin')) {
+        return res.status(403).json({ error: 'Only room admins can manage members.' });
+      }
+
+      const payload = req.validatedBody;
+      if (!isRoomOrganization(room, payload.organization)) {
+        return res.status(400).json({ error: 'Organization must match the room vendor or buyer.' });
+      }
+
+      const targetUser = await User.findById(payload.userId);
+      if (!targetUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      let roomMembership = await EngagementRoomMembership.findOne({ room: room._id, user: targetUser._id });
+      const isNew = !roomMembership;
+      if (!roomMembership) {
+        roomMembership = new EngagementRoomMembership({
+          room: room._id,
+          user: targetUser._id,
+          organization: payload.organization
+        });
+      }
+
+      roomMembership.role = payload.role;
+      roomMembership.organization = payload.organization;
+      roomMembership.isGuest = targetUser.licenseTier === 'guest';
+      await roomMembership.save();
+
+      res.status(isNew ? 201 : 200).json({ ok: true, member: serializeRoomMembership(roomMembership) });
+    } catch (err) {
+      console.error('Add room member error', err);
+      res.status(500).json({ error: 'Unable to add room member' });
+    }
+  }
+);
+
+app.delete('/api/rooms/:roomId/members/:userId', requireAuth, async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.userId)) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+    if (!room || !membership) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    if (!hasRoomRole(membership, 'room_admin')) {
+      return res.status(403).json({ error: 'Only room admins can remove members.' });
+    }
+
+    const targetMembership = await EngagementRoomMembership.findOne({ room: room._id, user: req.params.userId });
+    if (!targetMembership) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    if (targetMembership.role === 'room_admin') {
+      const otherAdmins = await EngagementRoomMembership.countDocuments({
+        room: room._id,
+        role: 'room_admin',
+        _id: { $ne: targetMembership._id }
+      });
+      if (otherAdmins === 0) {
+        return res.status(400).json({ error: 'At least one room admin is required.' });
+      }
+    }
+
+    await targetMembership.deleteOne();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Remove room member error', err);
+    res.status(500).json({ error: 'Unable to remove room member' });
+  }
+});
+
+app.get('/api/rooms/:roomId/invites', requireAuth, async (req, res) => {
+  try {
+    const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+    if (!room || !membership) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    if (!hasRoomRole(membership, 'room_admin')) {
+      return res.status(403).json({ error: 'Only room admins can view invites.' });
+    }
+
+    const invites = await EngagementRoomInvite.find({ room: room._id }).sort({ createdAt: -1 });
+    res.json({ ok: true, invites: invites.map(serializeRoomInvite) });
+  } catch (err) {
+    console.error('List room invites error', err);
+    res.status(500).json({ error: 'Unable to list invites' });
+  }
+});
+
+app.post(
+  '/api/rooms/:roomId/invites',
+  requireAuth,
+  validateBody(roomInviteCreateSchema),
+  async (req, res) => {
+    try {
+      const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+      if (!room || !membership) {
+        return res.status(404).json({ error: 'Room not found' });
+      }
+
+      if (!hasRoomRole(membership, 'room_admin')) {
+        return res.status(403).json({ error: 'Only room admins can create invites.' });
+      }
+
+      const payload = req.validatedBody;
+      if (!isRoomOrganization(room, payload.organization)) {
+        return res.status(400).json({ error: 'Organization must match the room vendor or buyer.' });
+      }
+
+      const invite = await EngagementRoomInvite.create({
+        room: room._id,
+        email: payload.email.toLowerCase(),
+        organization: payload.organization,
+        role: payload.role,
+        invitedBy: req.auth.uid,
+        status: 'pending',
+        isGuestInvite: Boolean(payload.isGuestInvite)
+      });
+
+      res.status(201).json({ ok: true, invite: serializeRoomInvite(invite) });
+    } catch (err) {
+      console.error('Create room invite error', err);
+      res.status(500).json({ error: 'Unable to create invite' });
+    }
+  }
+);
+
+app.post('/api/room-invites/:token/accept', requireAuth, async (req, res) => {
+  try {
+    const token = req.params.token;
+    if (!token) return res.status(404).json({ error: 'Invite not found' });
+
+    const invite = await EngagementRoomInvite.findOne({ token });
+    if (!invite || invite.status !== 'pending') {
+      return res.status(404).json({ error: 'Invite not found or already used' });
+    }
+
+    const user = await User.findById(req.auth.uid);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if ((invite.email || '').toLowerCase() !== (user.email || '').toLowerCase()) {
+      return res.status(403).json({ error: 'Invite email does not match your account.' });
+    }
+
+    const room = await EngagementRoom.findById(invite.room);
+    if (!room) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    if (!isRoomOrganization(room, invite.organization)) {
+      return res.status(400).json({ error: 'Invite organization does not match room.' });
+    }
+
+    if (invite.isGuestInvite && user.licenseTier !== 'guest') {
+      user.licenseTier = 'guest';
+      await user.save();
+    }
+
+    let membership = await EngagementRoomMembership.findOne({ room: room._id, user: user._id });
+    if (!membership) {
+      membership = new EngagementRoomMembership({ room: room._id, user: user._id, organization: invite.organization });
+    }
+
+    membership.role = invite.role;
+    membership.organization = invite.organization;
+    membership.isGuest = user.licenseTier === 'guest' || invite.isGuestInvite;
+    await membership.save();
+
+    invite.status = 'accepted';
+    await invite.save();
+
+    res.json({ ok: true, membership: serializeRoomMembership(membership) });
+  } catch (err) {
+    console.error('Accept invite error', err);
+    res.status(500).json({ error: 'Unable to accept invite' });
   }
 });
 

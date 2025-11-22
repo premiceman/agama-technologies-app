@@ -11,7 +11,7 @@ const UserSchema = new Schema(
     company: { type: String, trim: true },
     role: { type: String, trim: true },
     industry: { type: String, trim: true },
-    licenseTier: { type: String, enum: ['personal', 'business'], default: 'personal' },
+    licenseTier: { type: String, enum: ['personal', 'business', 'guest'], default: 'personal' },
     platformAccess: { type: [String], default: ['valuesphere'] },
     defaultOrganization: { type: Schema.Types.ObjectId, ref: 'Organization' }
   },
