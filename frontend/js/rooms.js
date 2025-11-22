@@ -1,6 +1,7 @@
 const state = {
   orgContext: null,
   isGuest: false,
+  organizations: [],
   roomId: null,
   room: null,
   members: [],
@@ -40,6 +41,7 @@ function toggle(el, show) {
 document.addEventListener('DOMContentLoaded', () => {
   const roomsList = document.getElementById('roomsList');
   const roomTitle = document.getElementById('roomTitle');
+  const inviteStatus = document.getElementById('roomInviteStatus');
 
   if (roomsList) {
     initRoomsPage();
@@ -47,6 +49,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (roomTitle) {
     initRoomDetailPage();
+  }
+
+  if (inviteStatus) {
+    initRoomInvitePage();
   }
 
   const logoutButton = document.getElementById('logoutButton');
@@ -63,11 +69,14 @@ async function initRoomsPage() {
     const orgResp = await fetchJson('/api/org/current');
     state.orgContext = orgResp.organization;
     state.isGuest = orgResp.user?.licenseTier === 'guest';
+    const orgsResp = await fetchJson('/api/orgs');
+    state.organizations = orgsResp.organizations || [];
     setText('licenseBadge', state.isGuest ? 'Guest license' : 'Full member');
     setText(
       'roomsOrgContext',
       state.orgContext ? `${state.orgContext.name} • ${state.orgContext.orgType || 'multi-org'}` : 'No organization selected'
     );
+    setupCreateRoomHandlers();
     const roomsResp = await fetchJson('/api/rooms');
     renderRooms(roomsResp.rooms || []);
   } catch (err) {
@@ -114,6 +123,100 @@ function renderRooms(rooms) {
   });
 }
 
+function setupCreateRoomHandlers() {
+  const button = document.getElementById('createRoomButton');
+  const form = document.getElementById('createRoomForm');
+  const modalEl = document.getElementById('createRoomModal');
+  if (!button || !form || !modalEl || button.dataset.bound === 'true') return;
+  button.dataset.bound = 'true';
+
+  const feedback = document.getElementById('createRoomFeedback');
+  const modal = typeof bootstrap !== 'undefined' ? new bootstrap.Modal(modalEl) : null;
+
+  if (state.isGuest) {
+    button.classList.add('disabled');
+    button.setAttribute('aria-disabled', 'true');
+    button.title = 'Guest users cannot create rooms.';
+  }
+
+  button.addEventListener('click', () => {
+    if (state.isGuest || !modal) return;
+    populateCreateRoomModal();
+    if (feedback) feedback.textContent = '';
+    modal.show();
+  });
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (state.isGuest) return;
+    if (feedback) feedback.textContent = '';
+    const title = document.getElementById('createRoomTitle')?.value.trim();
+    const vendorOrg = document.getElementById('createRoomVendorOrg')?.value;
+    const buyerOrg = document.getElementById('createRoomBuyerOrg')?.value;
+    if (!title) {
+      if (feedback) feedback.textContent = 'Title is required.';
+      return;
+    }
+    if (!vendorOrg || !buyerOrg) {
+      if (feedback) feedback.textContent = 'Select both vendor and buyer organizations.';
+      return;
+    }
+    if (vendorOrg === buyerOrg) {
+      if (feedback) feedback.textContent = 'Vendor and buyer must be different organizations.';
+      return;
+    }
+
+    try {
+      const res = await fetchJson('/api/rooms', {
+        method: 'POST',
+        body: JSON.stringify({ title, vendorOrg, buyerOrg })
+      });
+      const createdId = res.room?.id || res.room?._id;
+      if (modal) modal.hide();
+      if (createdId) {
+        window.location.href = `/room.html?id=${createdId}`;
+      } else {
+        window.location.reload();
+      }
+    } catch (err) {
+      if (feedback) feedback.textContent = err.message;
+    }
+  });
+}
+
+function populateCreateRoomModal() {
+  const vendorSelect = document.getElementById('createRoomVendorOrg');
+  const buyerSelect = document.getElementById('createRoomBuyerOrg');
+  if (!vendorSelect || !buyerSelect) return;
+  vendorSelect.innerHTML = '';
+  buyerSelect.innerHTML = '';
+  if (!state.organizations.length) {
+    const emptyVendor = document.createElement('option');
+    emptyVendor.textContent = 'No organizations available';
+    emptyVendor.disabled = true;
+    emptyVendor.selected = true;
+    vendorSelect.appendChild(emptyVendor);
+
+    const emptyBuyer = document.createElement('option');
+    emptyBuyer.textContent = 'No organizations available';
+    emptyBuyer.disabled = true;
+    emptyBuyer.selected = true;
+    buyerSelect.appendChild(emptyBuyer);
+    return;
+  }
+  state.organizations.forEach(org => {
+    const vendorOpt = document.createElement('option');
+    vendorOpt.value = org.id;
+    vendorOpt.textContent = org.name;
+    vendorSelect.appendChild(vendorOpt);
+
+    const buyerOpt = document.createElement('option');
+    buyerOpt.value = org.id;
+    buyerOpt.textContent = org.name;
+    buyerSelect.appendChild(buyerOpt);
+  });
+}
+
 async function initRoomDetailPage() {
   const params = new URLSearchParams(window.location.search);
   const roomId = params.get('id');
@@ -130,6 +233,7 @@ async function initRoomDetailPage() {
     state.room = roomResp.room;
     renderRoomHeader();
     configureOrgControls();
+    bindAiActions();
     await Promise.all([loadMembers(), loadMessages(), loadIssues(), loadDeliverables(), loadFiles(), loadInvites()]);
   } catch (err) {
     setText('roomMeta', err.message || 'Unable to load room');
@@ -678,6 +782,86 @@ function populateDeliverableIssueOptions() {
   });
 }
 
+function bindAiActions() {
+  const summaryButton = document.getElementById('aiRoomSummaryButton');
+  const statusButton = document.getElementById('aiStatusReportButton');
+  if (summaryButton && summaryButton.dataset.bound !== 'true') {
+    summaryButton.dataset.bound = 'true';
+    summaryButton.addEventListener('click', () => triggerAiSummary());
+  }
+  if (statusButton && statusButton.dataset.bound !== 'true') {
+    statusButton.dataset.bound = 'true';
+    statusButton.addEventListener('click', () => triggerAiStatusReport());
+  }
+}
+
+async function triggerAiSummary() {
+  setAiInsightsStatus('Generating summary...');
+  try {
+    const res = await fetchJson(`/api/rooms/${state.roomId}/ai/summary`, {
+      method: 'POST',
+      body: JSON.stringify({ timeWindowHours: 24 })
+    });
+    renderAiSummary(res);
+    setAiInsightsStatus('Summary ready');
+  } catch (err) {
+    renderAiError(err.message || 'Unable to generate summary');
+  }
+}
+
+async function triggerAiStatusReport() {
+  setAiInsightsStatus('Generating status...');
+  try {
+    const res = await fetchJson(`/api/rooms/${state.roomId}/ai/status-report`, {
+      method: 'POST',
+      body: JSON.stringify({ audience: 'joint', includeDetails: true })
+    });
+    renderAiStatus(res);
+    setAiInsightsStatus('Status ready');
+  } catch (err) {
+    renderAiError(err.message || 'Unable to generate status');
+  }
+}
+
+function renderAiSummary(data) {
+  const body = document.getElementById('aiInsightsBody');
+  const title = document.getElementById('aiInsightsTitle');
+  if (!body || !title) return;
+  title.textContent = 'AI room summary';
+  const highlights = (data.highlights || []).map(item => `<li>${item}</li>`).join('');
+  const risks = (data.risks || []).map(item => `<li>${item}</li>`).join('');
+  const nextSteps = (data.nextSteps || []).map(item => `<li>${item}</li>`).join('');
+  body.innerHTML = `
+    <p class="mb-2">${data.summary || 'AI summary generated.'}</p>
+    ${highlights ? `<div class="mb-2"><strong>Highlights</strong><ul class="mb-0">${highlights}</ul></div>` : ''}
+    ${risks ? `<div class="mb-2"><strong>Risks</strong><ul class="mb-0">${risks}</ul></div>` : ''}
+    ${nextSteps ? `<div class="mb-0"><strong>Next steps</strong><ul class="mb-0">${nextSteps}</ul></div>` : ''}
+  `;
+}
+
+function renderAiStatus(data) {
+  const body = document.getElementById('aiInsightsBody');
+  const title = document.getElementById('aiInsightsTitle');
+  if (!body || !title) return;
+  title.textContent = 'AI status report';
+  const actions = (data.recommendedActions || []).map(item => `<li>${item}</li>`).join('');
+  body.innerHTML = `
+    <p class="mb-2 fw-semibold">${data.headline || 'Status update'}</p>
+    <div class="mb-2">Overall status: <strong>${data.overallStatus || 'unknown'}</strong></div>
+    ${actions ? `<div><strong>Recommended actions</strong><ul class="mb-0">${actions}</ul></div>` : ''}
+  `;
+}
+
+function setAiInsightsStatus(text) {
+  setText('aiInsightsStatus', text || 'Idle');
+}
+
+function renderAiError(message) {
+  const body = document.getElementById('aiInsightsBody');
+  if (body) body.textContent = message || 'Unable to complete AI request';
+  setAiInsightsStatus('Error');
+}
+
 function populateOrgSelectors() {
   const orgOptions = [
     { id: state.room?.vendorOrg, label: `Vendor: ${state.room?.vendorOrg || ''}` },
@@ -695,6 +879,30 @@ function populateOrgSelectors() {
       select.appendChild(opt);
     });
   });
+}
+
+async function initRoomInvitePage() {
+  const status = document.getElementById('roomInviteStatus');
+  if (!status) return;
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('token');
+  if (!token) {
+    status.textContent = 'No invite token provided.';
+    return;
+  }
+  try {
+    status.textContent = 'Accepting invite...';
+    const res = await fetchJson(`/api/room-invites/${encodeURIComponent(token)}/accept`, { method: 'POST' });
+    const roomId = res.roomId || res.room?.id;
+    if (roomId) {
+      window.location.href = `/room.html?id=${roomId}`;
+    } else {
+      status.textContent = 'Invite accepted, redirecting...';
+      window.location.href = '/rooms.html';
+    }
+  } catch (err) {
+    status.textContent = err.message || 'Unable to accept invite.';
+  }
 }
 
 function lookupMember(userId) {
