@@ -22,6 +22,9 @@ const EngagementRoom = require('./models/EngagementRoom');
 const EngagementRoomMembership = require('./models/EngagementRoomMembership');
 const EngagementRoomInvite = require('./models/EngagementRoomInvite');
 const EngagementRoomIssue = require('./models/EngagementRoomIssue');
+const EngagementRoomIssueComment = require('./models/EngagementRoomIssueComment');
+const EngagementRoomDeliverable = require('./models/EngagementRoomDeliverable');
+const EngagementRoomMessage = require('./models/EngagementRoomMessage');
 const { requireOrgRole } = require('./middleware/orgAuth');
 
 const app = express();
@@ -314,6 +317,34 @@ const issueUpdateSchema = z.object({
   priority: z.enum(['low', 'medium', 'high']).optional()
 });
 
+const messageCreateSchema = z.object({
+  body: z.string().trim().min(1),
+  type: z.enum(['message', 'system', 'ai_summary']).optional(),
+  metadata: z.record(z.any()).optional()
+});
+
+const deliverableCreateSchema = z.object({
+  title: z.string().trim().min(1),
+  description: z.string().trim().optional(),
+  status: z.enum(['not_started', 'in_progress', 'completed', 'at_risk']).optional(),
+  owner: z.string().regex(objectIdPattern),
+  relatedIssues: z.array(z.string().regex(objectIdPattern)).optional(),
+  dueDate: z.coerce.date().optional()
+});
+
+const deliverableUpdateSchema = z.object({
+  title: z.string().trim().min(1).optional(),
+  description: z.string().trim().optional(),
+  status: z.enum(['not_started', 'in_progress', 'completed', 'at_risk']).optional(),
+  owner: z.string().regex(objectIdPattern).optional(),
+  relatedIssues: z.array(z.string().regex(objectIdPattern)).optional(),
+  dueDate: z.coerce.date().optional()
+});
+
+const issueCommentCreateSchema = z.object({
+  body: z.string().trim().min(1)
+});
+
 const roomMembershipCreateSchema = z.object({
   userId: z.string().regex(objectIdPattern),
   organization: z.string().regex(objectIdPattern),
@@ -396,6 +427,129 @@ function serializeIssue(issue) {
     createdAt: issue.createdAt,
     updatedAt: issue.updatedAt
   };
+}
+
+function serializeMessage(message) {
+  return {
+    id: message._id.toString(),
+    room: message.room ? message.room.toString() : null,
+    author: message.author ? message.author.toString() : null,
+    body: message.body,
+    type: message.type || 'message',
+    metadata: message.metadata || {},
+    createdAt: message.createdAt,
+    updatedAt: message.updatedAt
+  };
+}
+
+function serializeDeliverable(deliverable) {
+  return {
+    id: deliverable._id.toString(),
+    room: deliverable.room ? deliverable.room.toString() : null,
+    title: deliverable.title,
+    description: deliverable.description || null,
+    status: deliverable.status,
+    owner: deliverable.owner ? deliverable.owner.toString() : null,
+    relatedIssues: Array.isArray(deliverable.relatedIssues)
+      ? deliverable.relatedIssues.map(id => id.toString())
+      : [],
+    dueDate: deliverable.dueDate || null,
+    createdBy: deliverable.createdBy ? deliverable.createdBy.toString() : null,
+    createdAt: deliverable.createdAt,
+    updatedAt: deliverable.updatedAt
+  };
+}
+
+function serializeIssueComment(comment) {
+  return {
+    id: comment._id.toString(),
+    room: comment.room ? comment.room.toString() : null,
+    issue: comment.issue ? comment.issue.toString() : null,
+    author: comment.author ? comment.author.toString() : null,
+    body: comment.body,
+    createdAt: comment.createdAt,
+    updatedAt: comment.updatedAt
+  };
+}
+
+function serializeRoomSummary(summary) {
+  if (!summary) return null;
+  return {
+    issues: summary.issues,
+    deliverables: summary.deliverables
+  };
+}
+
+function mergeRoomWithSummary(roomPayload, summary) {
+  if (!summary) return roomPayload;
+  return { ...roomPayload, summary: serializeRoomSummary(summary) };
+}
+
+async function buildRoomSummaries(roomIds) {
+  if (!Array.isArray(roomIds) || roomIds.length === 0) return new Map();
+  const ids = roomIds.map(id =>
+    typeof id === 'object' ? id : mongoose.Types.ObjectId.createFromHexString(String(id))
+  );
+
+  const [issueAgg, deliverableAgg] = await Promise.all([
+    EngagementRoomIssue.aggregate([
+      { $match: { room: { $in: ids } } },
+      {
+        $group: {
+          _id: '$room',
+          total: { $sum: 1 },
+          open: {
+            $sum: {
+              $cond: [{ $ne: ['$status', 'completed'] }, 1, 0]
+            }
+          }
+        }
+      }
+    ]),
+    EngagementRoomDeliverable.aggregate([
+      { $match: { room: { $in: ids } } },
+      {
+        $group: {
+          _id: '$room',
+          total: { $sum: 1 },
+          completed: {
+            $sum: {
+              $cond: [{ $eq: ['$status', 'completed'] }, 1, 0]
+            }
+          },
+          atRisk: {
+            $sum: {
+              $cond: [{ $eq: ['$status', 'at_risk'] }, 1, 0]
+            }
+          }
+        }
+      }
+    ])
+  ]);
+
+  const summaries = new Map();
+  issueAgg.forEach(item => {
+    summaries.set(item._id.toString(), {
+      issues: { total: item.total || 0, open: item.open || 0 },
+      deliverables: { total: 0, completed: 0, atRisk: 0 }
+    });
+  });
+
+  deliverableAgg.forEach(item => {
+    const key = item._id.toString();
+    if (!summaries.has(key)) {
+      summaries.set(key, {
+        issues: { total: 0, open: 0 },
+        deliverables: { total: 0, completed: 0, atRisk: 0 }
+      });
+    }
+    const summary = summaries.get(key);
+    summary.deliverables.total = item.total || 0;
+    summary.deliverables.completed = item.completed || 0;
+    summary.deliverables.atRisk = item.atRisk || 0;
+  });
+
+  return summaries;
 }
 
 function serializeRoomMembership(membership) {
@@ -1320,9 +1474,13 @@ app.get('/api/rooms', requireAuth, async (req, res) => {
   try {
     const memberships = await EngagementRoomMembership.find({ user: req.auth.uid }).populate('room');
 
-    const rooms = memberships
-      .filter(m => m.room)
-      .map(m => serializeRoom(m.room, m));
+    const validMemberships = memberships.filter(m => m.room);
+    const roomIds = validMemberships.map(m => m.room._id);
+    const summaries = await buildRoomSummaries(roomIds);
+
+    const rooms = validMemberships.map(m =>
+      mergeRoomWithSummary(serializeRoom(m.room, m), summaries.get(m.room._id.toString()))
+    );
 
     rooms.sort((a, b) => {
       const aDate = a?.lastActivityAt ? new Date(a.lastActivityAt).getTime() : 0;
@@ -1408,7 +1566,10 @@ app.get('/api/rooms/:roomId', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Room not found' });
     }
 
-    res.json({ ok: true, room: serializeRoom(room, membership) });
+    const summaries = await buildRoomSummaries([room._id]);
+    const summary = summaries.get(room._id.toString());
+
+    res.json({ ok: true, room: mergeRoomWithSummary(serializeRoom(room, membership), summary) });
   } catch (err) {
     console.error('Get room error', err);
     res.status(500).json({ error: 'Unable to fetch room' });
@@ -1504,6 +1665,228 @@ app.patch('/api/rooms/:roomId/issues/:issueId', requireAuth, validateBody(issueU
     res.status(500).json({ error: 'Unable to update issue' });
   }
 });
+
+app.get('/api/rooms/:roomId/messages', requireAuth, async (req, res) => {
+  try {
+    const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+    if (!room || !membership) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    const messages = await EngagementRoomMessage.find({ room: room._id }).sort({ createdAt: -1 });
+    res.json({ ok: true, messages: messages.map(serializeMessage) });
+  } catch (err) {
+    console.error('List room messages error', err);
+    res.status(500).json({ error: 'Unable to list messages' });
+  }
+});
+
+app.post(
+  '/api/rooms/:roomId/messages',
+  requireAuth,
+  validateBody(messageCreateSchema),
+  async (req, res) => {
+    try {
+      const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+      if (!room || !membership) {
+        return res.status(404).json({ error: 'Room not found' });
+      }
+
+      const payload = req.validatedBody;
+      const message = await EngagementRoomMessage.create({
+        room: room._id,
+        author: req.auth.uid,
+        body: payload.body,
+        type: payload.type || 'message',
+        metadata: payload.metadata || {}
+      });
+
+      room.lastActivityAt = new Date();
+      await room.save();
+
+      res.status(201).json({ ok: true, message: serializeMessage(message) });
+    } catch (err) {
+      console.error('Create room message error', err);
+      res.status(500).json({ error: 'Unable to create message' });
+    }
+  }
+);
+
+app.get('/api/rooms/:roomId/deliverables', requireAuth, async (req, res) => {
+  try {
+    const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+    if (!room || !membership) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    const deliverables = await EngagementRoomDeliverable.find({ room: room._id }).sort({ createdAt: -1 });
+    res.json({ ok: true, deliverables: deliverables.map(serializeDeliverable) });
+  } catch (err) {
+    console.error('List deliverables error', err);
+    res.status(500).json({ error: 'Unable to list deliverables' });
+  }
+});
+
+app.post(
+  '/api/rooms/:roomId/deliverables',
+  requireAuth,
+  validateBody(deliverableCreateSchema),
+  async (req, res) => {
+    try {
+      const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+      if (!room || !membership) {
+        return res.status(404).json({ error: 'Room not found' });
+      }
+
+      if (!hasRoomRole(membership, 'editor')) {
+        return res.status(403).json({ error: 'Insufficient room role.' });
+      }
+
+      const payload = req.validatedBody;
+
+      const ownerMembership = await EngagementRoomMembership.findOne({ room: room._id, user: payload.owner });
+      if (!ownerMembership) {
+        return res.status(400).json({ error: 'Owner must be a room member.' });
+      }
+
+      if (payload.relatedIssues && payload.relatedIssues.length > 0) {
+        const relatedCount = await EngagementRoomIssue.countDocuments({
+          _id: { $in: payload.relatedIssues },
+          room: room._id
+        });
+        if (relatedCount !== payload.relatedIssues.length) {
+          return res.status(400).json({ error: 'Related issues must belong to the room.' });
+        }
+      }
+
+      const deliverable = await EngagementRoomDeliverable.create({
+        room: room._id,
+        title: payload.title,
+        description: payload.description,
+        status: payload.status || 'not_started',
+        owner: payload.owner,
+        relatedIssues: payload.relatedIssues || [],
+        dueDate: payload.dueDate,
+        createdBy: req.auth.uid
+      });
+
+      room.lastActivityAt = new Date();
+      await room.save();
+
+      res.status(201).json({ ok: true, deliverable: serializeDeliverable(deliverable) });
+    } catch (err) {
+      console.error('Create deliverable error', err);
+      res.status(500).json({ error: 'Unable to create deliverable' });
+    }
+  }
+);
+
+app.patch(
+  '/api/rooms/:roomId/deliverables/:deliverableId',
+  requireAuth,
+  validateBody(deliverableUpdateSchema),
+  async (req, res) => {
+    try {
+      if (!isValidObjectId(req.params.deliverableId)) {
+        return res.status(404).json({ error: 'Deliverable not found' });
+      }
+
+      const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+      if (!room || !membership) {
+        return res.status(404).json({ error: 'Room not found' });
+      }
+
+      if (!hasRoomRole(membership, 'editor')) {
+        return res.status(403).json({ error: 'Insufficient room role.' });
+      }
+
+      const deliverable = await EngagementRoomDeliverable.findOne({
+        _id: req.params.deliverableId,
+        room: room._id
+      });
+      if (!deliverable) {
+        return res.status(404).json({ error: 'Deliverable not found' });
+      }
+
+      const payload = req.validatedBody;
+
+      if (payload.owner) {
+        const ownerMembership = await EngagementRoomMembership.findOne({ room: room._id, user: payload.owner });
+        if (!ownerMembership) {
+          return res.status(400).json({ error: 'Owner must be a room member.' });
+        }
+      }
+
+      if (payload.relatedIssues && payload.relatedIssues.length > 0) {
+        const relatedCount = await EngagementRoomIssue.countDocuments({
+          _id: { $in: payload.relatedIssues },
+          room: room._id
+        });
+        if (relatedCount !== payload.relatedIssues.length) {
+          return res.status(400).json({ error: 'Related issues must belong to the room.' });
+        }
+      }
+
+      ['title', 'description', 'status', 'owner'].forEach(field => {
+        if (payload[field] !== undefined) {
+          deliverable[field] = payload[field];
+        }
+      });
+      if (payload.relatedIssues !== undefined) deliverable.relatedIssues = payload.relatedIssues;
+      if (payload.dueDate !== undefined) deliverable.dueDate = payload.dueDate;
+
+      await deliverable.save();
+
+      room.lastActivityAt = new Date();
+      await room.save();
+
+      res.json({ ok: true, deliverable: serializeDeliverable(deliverable) });
+    } catch (err) {
+      console.error('Update deliverable error', err);
+      res.status(500).json({ error: 'Unable to update deliverable' });
+    }
+  }
+);
+
+app.post(
+  '/api/rooms/:roomId/issues/:issueId/comments',
+  requireAuth,
+  validateBody(issueCommentCreateSchema),
+  async (req, res) => {
+    try {
+      if (!isValidObjectId(req.params.issueId)) {
+        return res.status(404).json({ error: 'Issue not found' });
+      }
+
+      const { room, membership } = await loadRoomWithMembership(req.params.roomId, req.auth.uid);
+      if (!room || !membership) {
+        return res.status(404).json({ error: 'Room not found' });
+      }
+
+      const issue = await EngagementRoomIssue.findOne({ _id: req.params.issueId, room: room._id });
+      if (!issue) {
+        return res.status(404).json({ error: 'Issue not found' });
+      }
+
+      const payload = req.validatedBody;
+
+      const comment = await EngagementRoomIssueComment.create({
+        room: room._id,
+        issue: issue._id,
+        author: req.auth.uid,
+        body: payload.body
+      });
+
+      room.lastActivityAt = new Date();
+      await room.save();
+
+      res.status(201).json({ ok: true, comment: serializeIssueComment(comment) });
+    } catch (err) {
+      console.error('Create issue comment error', err);
+      res.status(500).json({ error: 'Unable to create issue comment' });
+    }
+  }
+);
 
 app.get('/api/rooms/:roomId/members', requireAuth, async (req, res) => {
   try {
