@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Agama Technologies — ValueSphere, ProcurePath & RevenueForge</title>
+  <title>Agama Technologies — Vendor & Buyer Platform</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
@@ -26,12 +26,14 @@
       </a>
       <button class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#nav"><span class="navbar-toggler-icon"></span></button>
       <div class="collapse navbar-collapse" id="nav">
-        <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-3">
-          <li class="nav-item"><a href="#platforms" class="nav-link">Platforms</a></li>
+        <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-3" id="navLinks">
+          <li class="nav-item"><a href="#hero" class="nav-link">Overview</a></li>
+          <li class="nav-item"><a href="#platforms" class="nav-link">Suites</a></li>
+          <li class="nav-item"><a href="#vendor" class="nav-link">Vendor Suite</a></li>
+          <li class="nav-item"><a href="#buyer" class="nav-link">Buyer Suite</a></li>
+          <li class="nav-item"><a href="#rooms" class="nav-link">Engagement Rooms</a></li>
+          <li class="nav-item"><a href="#ai" class="nav-link">AI</a></li>
           <li class="nav-item"><a href="#licenses" class="nav-link">Licensing</a></li>
-          <li class="nav-item"><a href="/valuesphere.html" class="nav-link">ValueSphere</a></li>
-          <li class="nav-item"><a href="/procurepath.html" class="nav-link">ProcurePath</a></li>
-          <li class="nav-item"><a href="/revenueforge.html" class="nav-link">RevenueForge</a></li>
           <li class="nav-item"><a href="/api/auth/workos/signup" class="btn btn-primary">Create account</a></li>
           <li class="nav-item"><a href="/api/auth/workos/login" class="btn btn-outline-light">Client login</a></li>
         </ul>
@@ -39,40 +41,76 @@
     </div>
   </nav>
 
-  <header class="hero container" id="platforms">
+  <header class="hero container" id="hero">
     <div class="row align-items-center g-5 py-5">
       <div class="col-xl-6" data-aos="fade-right">
-        <div class="d-flex flex-wrap align-items-center gap-2 mb-3" role="group" aria-label="Select platform focus">
-          <button class="btn btn-outline-light active" data-platform-switch="valuesphere">Business Value Consulting</button>
-          <button class="btn btn-outline-light" data-platform-switch="procurepath">Procurement Control Tower</button>
-          <button class="btn btn-outline-light" data-platform-switch="revenueforge">AI Sales Studio</button>
-        </div>
-        <div class="eyebrow" id="platformEyebrow">ValueSphere Consulting Suite</div>
-        <h1 class="display-4 fw-bold my-3" id="platformHeroTitle">
-          Reimagine value creation across consulting, procurement, and revenue orchestration.
+        <div class="eyebrow">Vendor + Buyer + Guests on one platform</div>
+        <h1 class="display-4 fw-bold my-3">
+          Agama unites revenue teams and procurement leaders with AI-powered Engagement Rooms.
         </h1>
-        <p class="lead text-fg mb-4" id="platformHeroDescription">
-          ValueSphere Consulting combines Navigator assessments for individuals with Catalyst advisory squads for enterprises. It anchors the Agama platform suite.
+        <p class="lead text-fg mb-4">
+          Vendor Suite (ValueSphere + RevenueForge) meets Buyer Suite (ProcurePath) on a single, license-aware platform with shared rooms, copilots, and guest collaboration.
         </p>
         <div class="d-flex flex-wrap gap-3">
-          <a class="btn btn-primary btn-lg" id="platformPrimaryCta" href="/valuesphere.html">Explore ValueSphere</a>
-          <a class="btn btn-outline-light btn-lg" id="platformSecondaryCta" href="/api/auth/workos/signup">Launch your workspace</a>
+          <a class="btn btn-primary btn-lg" href="/api/auth/workos/signup">Launch your workspace</a>
+          <a class="btn btn-outline-light btn-lg" href="/valuesphere.html">See Vendor Suite</a>
+          <a class="btn btn-outline-light btn-lg" href="/procurepath.html">See Buyer Suite</a>
         </div>
-        <div class="d-flex align-items-center gap-3 mt-4 text-fg small" id="platformHeroBadges">
-          <span><i class="bi bi-buildings"></i> Business &amp; personal licenses</span>
-          <span><i class="bi bi-stars"></i> Enterprise-grade glass design</span>
+        <div class="d-flex align-items-center gap-3 mt-4 text-fg small flex-wrap">
+          <span><i class="bi bi-stars"></i> Shorter cycles, cleaner deals</span>
+          <span><i class="bi bi-diagram-3"></i> Engagement Rooms with guests</span>
+          <span><i class="bi bi-robot"></i> AI copilots for both sides</span>
         </div>
       </div>
       <div class="col-xl-6" data-aos="fade-left">
         <div class="card glass panel-elevated pad-md">
           <div class="panel-content">
-            <div class="badge-pill text-fg-2" id="platformHighlightTitle">VALUESPHERE HIGHLIGHTS</div>
-            <h3 class="mt-3 panel-title-strong text-contrast-high" id="platformHighlightHeading">Navigator &amp; Catalyst programs</h3>
-            <ul class="panel-list" id="platformHighlights">
-              <li>Personalised Navigator diagnostics for individual leaders.</li>
-              <li>Catalyst advisory guilds co-delivering measurable change.</li>
-              <li>Embedded ROI models aligned to your industry realities.</li>
-            </ul>
+            <div class="badge-pill text-fg-2">Platform snapshot</div>
+            <h3 class="mt-3 panel-title-strong text-contrast-high">Vendor &amp; Buyer tracks, one shared room</h3>
+            <div class="row g-3 mt-3">
+              <div class="col-sm-6">
+                <div class="card glass h-100 shadow-sm" data-aos="zoom-in" data-aos-delay="50">
+                  <div class="card-body">
+                    <div class="d-flex align-items-center gap-2 mb-2 text-brand"><i class="bi bi-graph-up"></i><span>Vendor Suite</span></div>
+                    <p class="text-fg-3 small mb-2">ValueSphere + RevenueForge to coach discovery, deals, and value proofs.</p>
+                    <ul class="text-fg-2 small mb-0">
+                      <li>Navigator diagnostics</li>
+                      <li>Deal intelligence</li>
+                      <li>Value storytelling</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+              <div class="col-sm-6">
+                <div class="card glass h-100 shadow-sm" data-aos="zoom-in" data-aos-delay="100">
+                  <div class="card-body">
+                    <div class="d-flex align-items-center gap-2 mb-2 text-brand"><i class="bi bi-shield-check"></i><span>Buyer Suite</span></div>
+                    <p class="text-fg-3 small mb-2">ProcurePath keeps procurement, finance, legal, and security aligned.</p>
+                    <ul class="text-fg-2 small mb-0">
+                      <li>Vendor graph &amp; contracts</li>
+                      <li>Risk &amp; renewal command</li>
+                      <li>Negotiation guardrails</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="card glass h-100 shadow-sm" data-aos="zoom-in" data-aos-delay="150">
+                  <div class="card-body d-flex flex-wrap gap-3 align-items-center">
+                    <div class="flex-grow-1">
+                      <div class="d-flex align-items-center gap-2 mb-2 text-brand"><i class="bi bi-people"></i><span>Engagement Rooms</span></div>
+                      <p class="text-fg-3 small mb-2">Shared rooms for vendor, buyer, and guests with AI copilots, boards, documents, and deliverables.</p>
+                      <div class="d-flex gap-3 flex-wrap text-fg-2 small mb-0">
+                        <span><i class="bi bi-kanban"></i> Project board</span>
+                        <span><i class="bi bi-chat-square-dots"></i> Messages &amp; summaries</span>
+                        <span><i class="bi bi-cloud-check"></i> Documents &amp; validation</span>
+                      </div>
+                    </div>
+                    <a class="btn btn-outline-light" href="/rooms.html">Open a room</a>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -80,23 +118,78 @@
   </header>
 
   <main>
-    <section class="container py-5" id="platformDetail">
-      <article class="platform-article" data-platform-section="valuesphere">
-        <div class="text-center mb-5" data-aos="fade-up">
-          <span class="eyebrow">ValueSphere Consulting</span>
-          <h2 class="fw-bold">Where business value consulting meets measurable transformation</h2>
-          <p class="text-fg-3">Choose the lens that suits your ambition: Navigator for individuals, Catalyst for organisational value squads.</p>
+    <section class="container py-5" id="platforms">
+      <div class="text-center mb-5" data-aos="fade-up">
+        <span class="eyebrow">Platform overview</span>
+        <h2 class="fw-bold">One platform, three pillars, built for both sides</h2>
+        <p class="text-fg-3">ValueSphere and RevenueForge for vendors, ProcurePath for buyers, all connected by Engagement Rooms and AI copilots.</p>
+      </div>
+      <div class="row g-4">
+        <div class="col-md-4" data-aos="zoom-in">
+          <div class="card glass h-100">
+            <div class="card-body">
+              <div class="d-flex align-items-center gap-2 mb-2 text-brand"><i class="bi bi-briefcase"></i><span>Vendor Suite</span></div>
+              <h5 class="mb-3">ValueSphere + RevenueForge</h5>
+              <ul class="text-fg-2 small mb-0">
+                <li>Strategic value consulting and ROI blueprints.</li>
+                <li>Deal rooms with AI intelligence and coaching.</li>
+                <li>Lifecycle design tuned to every commercial motion.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4" data-aos="zoom-in" data-aos-delay="50">
+          <div class="card glass h-100">
+            <div class="card-body">
+              <div class="d-flex align-items-center gap-2 mb-2 text-brand"><i class="bi bi-diagram-3"></i><span>Buyer Suite</span></div>
+              <h5 class="mb-3">ProcurePath</h5>
+              <ul class="text-fg-2 small mb-0">
+                <li>Vendor graph with contracts, spend, and risk signals.</li>
+                <li>Negotiation guidance rooted in benchmarks.</li>
+                <li>Renewal and compliance command center.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4" data-aos="zoom-in" data-aos-delay="100">
+          <div class="card glass h-100">
+            <div class="card-body">
+              <div class="d-flex align-items-center gap-2 mb-2 text-brand"><i class="bi bi-people"></i><span>Engagement Rooms &amp; AI</span></div>
+              <h5 class="mb-3">Collaboration cockpit</h5>
+              <ul class="text-fg-2 small mb-0">
+                <li>Shared rooms for vendors, buyers, and guests.</li>
+                <li>Project board, documents, deliverables, and messages.</li>
+                <li>AI copilots that brief both sides in their language.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-surface py-5" id="vendor">
+      <div class="container">
+        <div class="row g-4 align-items-center mb-4">
+          <div class="col-lg-7" data-aos="fade-right">
+            <span class="eyebrow">Vendor Suite</span>
+            <h2 class="fw-bold">ValueSphere + RevenueForge for revenue leaders</h2>
+            <p class="text-fg-3">Guide CROs, value consultants, and account teams with playbooks that standardise discovery, sharpen pricing strategy, and prove value without slowing the deal.</p>
+          </div>
+          <div class="col-lg-5 text-lg-end d-flex gap-3 justify-content-lg-end flex-wrap" data-aos="fade-left">
+            <a class="btn btn-primary" href="/valuesphere.html">Explore ValueSphere</a>
+            <a class="btn btn-outline-light" href="/revenueforge.html">Tour RevenueForge</a>
+          </div>
         </div>
         <div class="row g-4">
           <div class="col-md-6" data-aos="zoom-in">
             <div class="card glass h-100">
               <div class="card-body">
-                <h5 class="mb-3">Navigator Assessments</h5>
-                <p class="text-fg-3">Self-directed value discovery experiences for personal and business licenses. Rapid scoring frames help leaders pinpoint growth, efficiency, and resilience levers.</p>
+                <h5 class="mb-3">ValueSphere Navigator</h5>
+                <p class="text-fg-3">Value consulting workspace for exec-ready ROI narratives and stakeholder alignment.</p>
                 <ul class="text-fg-2 small mb-0">
-                  <li>Persona-led discovery flows and ROI dashboards.</li>
-                  <li>Guided executive summaries ready for the boardroom.</li>
-                  <li>Available to individual account holders immediately.</li>
+                  <li>Shorten discovery cycles with guided diagnostics.</li>
+                  <li>Standardise value narratives for every persona.</li>
+                  <li>Boards and documents that stay linked to Engagement Rooms.</li>
                 </ul>
               </div>
             </div>
@@ -104,142 +197,13 @@
           <div class="col-md-6" data-aos="zoom-in" data-aos-delay="50">
             <div class="card glass h-100">
               <div class="card-body">
-                <h5 class="mb-3">Catalyst Advisory Guilds</h5>
-                <p class="text-fg-3">For business licenses, Catalyst embeds seasoned consultants to operationalise value blueprints across finance, product, and go-to-market teams.</p>
+                <h5 class="mb-3">RevenueForge Lifecycle</h5>
+                <p class="text-fg-3">AI revenue studio to design lifecycle stages, coach deals, and automate follow-up.</p>
                 <ul class="text-fg-2 small mb-0">
-                  <li>Quarterly value acceleration ceremonies and impact tracking.</li>
-                  <li>Integrated observability, security, and AI maturity patterns.</li>
-                  <li>Program governance designed for boards and investors.</li>
+                  <li>Deal intelligence to unstick pricing and risk conversations.</li>
+                  <li>AI-supported meeting prep and follow-up with next best actions.</li>
+                  <li>Engagement dossiers that sync with project boards and documents.</li>
                 </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      </article>
-
-      <article class="platform-article d-none" data-platform-section="procurepath">
-        <div class="text-center mb-5" data-aos="fade-up">
-          <span class="eyebrow">ProcurePath Control Tower</span>
-          <h2 class="fw-bold">Command every vendor decision from a single procurement cockpit</h2>
-          <p class="text-fg-3">Built exclusively for business licenses, ProcurePath equips sourcing teams with intelligence, governance, and negotiation muscle.</p>
-        </div>
-        <div class="row g-4">
-          <div class="col-lg-4" data-aos="zoom-in">
-            <div class="card glass h-100">
-              <div class="card-body">
-                <h5 class="mb-3">Vendor Relationship Graphs</h5>
-                <p class="text-fg-3">Map supplier performance, compliance posture, and contractual obligations in living knowledge graphs.</p>
-                <ul class="text-fg-2 small mb-0">
-                  <li>Health scoring with escalation triggers.</li>
-                  <li>AI summaries of obligations and renewal cliffs.</li>
-                  <li>Collaborative notes for category managers.</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-          <div class="col-lg-4" data-aos="zoom-in" data-aos-delay="50">
-            <div class="card glass h-100">
-              <div class="card-body">
-                <h5 class="mb-3">Deal Strategy Engine</h5>
-                <p class="text-fg-3">Run what-if scenarios across pricing models, concessions, and implementation timelines with AI-backed guardrails.</p>
-                <ul class="text-fg-2 small mb-0">
-                  <li>Negotiation workspaces with versioned playbooks.</li>
-                  <li>Financial modelling anchored to risk appetite.</li>
-                  <li>Auto-generated executive briefs for approvals.</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-          <div class="col-lg-4" data-aos="zoom-in" data-aos-delay="100">
-            <div class="card glass h-100">
-              <div class="card-body">
-                <h5 class="mb-3">Contract Lifecycle Ops</h5>
-                <p class="text-fg-3">Unify intake, authoring, and compliance with embedded policy controls and vendor accountability trails.</p>
-                <ul class="text-fg-2 small mb-0">
-                  <li>Clause libraries tuned to security and data residency.</li>
-                  <li>Milestone automation with reminders and owners.</li>
-                  <li>Audit-ready history for every procurement cycle.</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      </article>
-
-      <article class="platform-article d-none" data-platform-section="revenueforge">
-        <div class="text-center mb-5" data-aos="fade-up">
-          <span class="eyebrow">RevenueForge AI Studio</span>
-          <h2 class="fw-bold">Coach every commercial motion with an AI-native revenue studio</h2>
-          <p class="text-fg-3">Define bespoke sales stages, orchestrate qualification, and surface AI-generated leads your teams can pursue instantly.</p>
-        </div>
-        <div class="row g-4">
-          <div class="col-md-4" data-aos="zoom-in">
-            <div class="card glass h-100">
-              <div class="card-body">
-                <h5 class="mb-3">Lifecycle Architect</h5>
-                <p class="text-fg-3">Model every sales stage and align discovery prompts, exit criteria, and asset packs to your motion.</p>
-                <ul class="text-fg-2 small mb-0">
-                  <li>Drag-and-drop stage designer with governance.</li>
-                  <li>AI-suggested qualification frameworks.</li>
-                  <li>Embedded enablement assets for each milestone.</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-4" data-aos="zoom-in" data-aos-delay="50">
-            <div class="card glass h-100">
-              <div class="card-body">
-                <h5 class="mb-3">Deal Intelligence Copilot</h5>
-                <p class="text-fg-3">Generate discovery questions, pricing plays, and risk mitigations that reflect your portfolio and buyer persona.</p>
-                <ul class="text-fg-2 small mb-0">
-                  <li>AI responses anchored to your commercial policy.</li>
-                  <li>Lead briefings surfaced as liquid-glass dossiers.</li>
-                  <li>Signals piped into RevOps and success tooling.</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-4" data-aos="zoom-in" data-aos-delay="100">
-            <div class="card glass h-100">
-              <div class="card-body">
-                <h5 class="mb-3">Engagement Lounge</h5>
-                <p class="text-fg-3">Every AI-generated lead manifests as an interactive dossier your teams can triage, assign, and accelerate.</p>
-                <ul class="text-fg-2 small mb-0">
-                  <li>Shared workspaces with account teams and exec sponsors.</li>
-                  <li>Auto-generated follow-up cadences and collateral.</li>
-                  <li>Pipeline health metrics tuned to revenue leadership.</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      </article>
-    </section>
-
-    <section class="bg-surface py-5" id="licenses">
-      <div class="container">
-        <div class="row g-4 align-items-center">
-          <div class="col-lg-6" data-aos="fade-right">
-            <span class="eyebrow">Licensing clarity</span>
-            <h2 class="fw-bold">Personal explorers &amp; organisational leaders get the right access</h2>
-            <p class="text-fg-3">Every Agama account starts with a license tier. Individuals unlock ValueSphere Navigator immediately. Business licenses add collaborative services across all three platforms.</p>
-            <ul class="text-fg-2 small mb-0">
-              <li>Personal licenses: ValueSphere Navigator assessments for individual operators.</li>
-              <li>Business licenses: ValueSphere Navigator + Catalyst, ProcurePath Control Tower, RevenueForge AI Studio.</li>
-              <li>Manage license tier and platform access anytime in your workspace.</li>
-            </ul>
-          </div>
-          <div class="col-lg-6" data-aos="fade-left">
-            <div class="card glass p-4">
-              <h5 class="mb-3">Get started</h5>
-              <ol class="text-fg-2 small mb-4">
-                <li>Create an account and choose personal or business licensing.</li>
-                <li>Select which platforms you want available for your organisation.</li>
-                <li>Invite teams and begin exploring each product&apos;s roadmap.</li>
-              </ol>
-              <div class="d-flex gap-3 flex-wrap">
-                <a class="btn btn-primary" href="/api/auth/workos/signup">Create your account</a>
-                <a class="btn btn-outline-light" href="/api/auth/workos/login">Sign in to workspace</a>
               </div>
             </div>
           </div>
@@ -247,22 +211,182 @@
       </div>
     </section>
 
-    <section class="container py-5" id="vision">
-      <div class="row g-4 align-items-center">
-        <div class="col-lg-6" data-aos="fade-right">
-          <span class="eyebrow">A unified suite</span>
-          <h2 class="fw-bold">Enterprise-grade, liquid-glass experience preserved</h2>
-          <p class="text-fg-3">Agama&apos;s signature liquid glass aesthetic and dark, cinematic interface remain untouched. Platform toggles shift the hue, while the underlying design language stays consistent.</p>
-          <p class="text-fg-3">Today&apos;s release focuses on storytelling and orientation. Over the coming iterations we&apos;ll co-create the deep workflows across consulting, procurement, and revenue teams.</p>
+    <section class="container py-5" id="buyer">
+      <div class="row g-4 align-items-center mb-4">
+        <div class="col-lg-7" data-aos="fade-right">
+          <span class="eyebrow">Buyer Suite</span>
+          <h2 class="fw-bold">ProcurePath for procurement, finance, legal, and security</h2>
+          <p class="text-fg-3">Give sourcing and risk teams a shared inventory of vendors, contracts, benchmarks, and renewal posture, connected directly into Engagement Rooms.</p>
         </div>
-        <div class="col-lg-6" data-aos="fade-left">
-          <div class="card glass p-4">
-            <h5 class="mb-3">Roadmap preview</h5>
-            <ul class="text-fg-2 small mb-0">
-              <li>Interactive Navigator assessments and benchmarking dashboards.</li>
-              <li>ProcurePath contract intelligence, vendor risk, and negotiation orchestration.</li>
-              <li>RevenueForge AI lead creation, qualification prompts, and engagement tracking.</li>
+        <div class="col-lg-5 text-lg-end d-flex gap-3 justify-content-lg-end flex-wrap" data-aos="fade-left">
+          <a class="btn btn-primary" href="/procurepath.html">Discover ProcurePath</a>
+          <a class="btn btn-outline-light" href="/api/auth/workos/signup">Start a buyer workspace</a>
+        </div>
+      </div>
+      <div class="row g-4">
+        <div class="col-md-6" data-aos="zoom-in">
+          <div class="card glass h-100">
+            <div class="card-body">
+              <h5 class="mb-3">Vendor graph &amp; contracts</h5>
+              <p class="text-fg-3">Centralised view of every vendor with contract lifecycle, obligations, and spend.</p>
+              <ul class="text-fg-2 small mb-0">
+                <li>Single inventory across legal, finance, and security.</li>
+                <li>Benchmarked negotiation guidance surfaced in context.</li>
+                <li>Link contracts directly to Engagement Rooms and issues.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6" data-aos="zoom-in" data-aos-delay="50">
+          <div class="card glass h-100">
+            <div class="card-body">
+              <h5 class="mb-3">Risk, compliance, renewals</h5>
+              <p class="text-fg-3">Command center for renewals, risk scoring, and stakeholder updates.</p>
+              <ul class="text-fg-2 small mb-0">
+                <li>Continuous risk monitoring with renewal countdowns.</li>
+                <li>AI-ready posture that combines issues, files, and milestones.</li>
+                <li>Renewal command center feeding shared status reports.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-surface py-5" id="rooms">
+      <div class="container">
+        <div class="row g-5 align-items-center">
+          <div class="col-lg-6" data-aos="fade-right">
+            <span class="eyebrow">Engagement Rooms</span>
+            <h2 class="fw-bold">Collaboration cockpit for vendors, buyers, and guests</h2>
+            <p class="text-fg-3">Rooms bring messaging, project boards, documents, deliverables, and AI copilots into one glass workspace. Every participant stays aligned without losing governance.</p>
+            <ul class="text-fg-2 small mb-4">
+              <li>Messages with AI summaries for executives and sponsors.</li>
+              <li>Project board with statuses, assignees, and due dates.</li>
+              <li>Documents with AI validation for contracts, SoWs, and designs.</li>
+              <li>Deliverables &amp; milestones tied to renewal and expansion goals.</li>
+              <li>Guest collaboration with scoped permissions and auditability.</li>
             </ul>
+            <div class="d-flex gap-3 flex-wrap">
+              <a class="btn btn-primary" href="/rooms.html">Open Engagement Rooms</a>
+              <a class="btn btn-outline-light" href="/workspace.html">Go to workspace</a>
+            </div>
+          </div>
+          <div class="col-lg-6" data-aos="fade-left">
+            <div class="card glass p-4">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="badge-pill text-fg-2"><i class="bi bi-kanban"></i> Room board</span>
+                <span class="text-fg-2 small">Shared by vendor &amp; buyer</span>
+              </div>
+              <div class="row g-3">
+                <div class="col-sm-6">
+                  <div class="card glass h-100" data-aos="zoom-in" data-aos-delay="50">
+                    <div class="card-body">
+                      <div class="d-flex align-items-center gap-2 text-brand mb-2"><i class="bi bi-chat-dots"></i><span>Messages</span></div>
+                      <p class="text-fg-3 small mb-2">Threaded updates, mentions, and AI summaries for stakeholders.</p>
+                      <span class="badge bg-primary-subtle text-fg-2">Auto briefings</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-sm-6">
+                  <div class="card glass h-100" data-aos="zoom-in" data-aos-delay="100">
+                    <div class="card-body">
+                      <div class="d-flex align-items-center gap-2 text-brand mb-2"><i class="bi bi-table"></i><span>Project board</span></div>
+                      <p class="text-fg-3 small mb-2">Issues with statuses, owners, due dates, and links to deliverables.</p>
+                      <span class="badge bg-primary-subtle text-fg-2">Room-aligned</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-sm-6">
+                  <div class="card glass h-100" data-aos="zoom-in" data-aos-delay="150">
+                    <div class="card-body">
+                      <div class="d-flex align-items-center gap-2 text-brand mb-2"><i class="bi bi-file-earmark-check"></i><span>Documents</span></div>
+                      <p class="text-fg-3 small mb-2">Versioned files with comments plus AI validation for contracts and SoWs.</p>
+                      <span class="badge bg-primary-subtle text-fg-2">AI validation</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-sm-6">
+                  <div class="card glass h-100" data-aos="zoom-in" data-aos-delay="200">
+                    <div class="card-body">
+                      <div class="d-flex align-items-center gap-2 text-brand mb-2"><i class="bi bi-flag"></i><span>Deliverables</span></div>
+                      <p class="text-fg-3 small mb-2">Milestones with owners and status powering renewal readiness.</p>
+                      <span class="badge bg-primary-subtle text-fg-2">Milestone-ready</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="container py-5" id="ai">
+      <div class="text-center mb-5" data-aos="fade-up">
+        <span class="eyebrow">AI &amp; Copilots</span>
+        <h2 class="fw-bold">Copilots that speak vendor and buyer context</h2>
+        <p class="text-fg-3">Room-aware AI that drafts briefs, grooms issues, validates contracts, and delivers status reports for every stakeholder.</p>
+      </div>
+      <div class="row g-4">
+        <div class="col-md-3" data-aos="zoom-in">
+          <div class="card glass h-100">
+            <div class="card-body">
+              <div class="d-flex align-items-center gap-2 text-brand mb-2"><i class="bi bi-journal-text"></i><span>Room summary</span></div>
+              <p class="text-fg-3 small">Executive-ready summaries of messages, files, issues, and milestones.</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3" data-aos="zoom-in" data-aos-delay="50">
+          <div class="card glass h-100">
+            <div class="card-body">
+              <div class="d-flex align-items-center gap-2 text-brand mb-2"><i class="bi bi-clipboard-data"></i><span>Status reports</span></div>
+              <p class="text-fg-3 small">Role-specific status recaps and renewal posture for vendor and buyer sponsors.</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3" data-aos="zoom-in" data-aos-delay="100">
+          <div class="card glass h-100">
+            <div class="card-body">
+              <div class="d-flex align-items-center gap-2 text-brand mb-2"><i class="bi bi-list-check"></i><span>Issue grooming</span></div>
+              <p class="text-fg-3 small">AI triage for project boards: statuses, assignees, risks, and next actions.</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3" data-aos="zoom-in" data-aos-delay="150">
+          <div class="card glass h-100">
+            <div class="card-body">
+              <div class="d-flex align-items-center gap-2 text-brand mb-2"><i class="bi bi-file-earmark-richtext"></i><span>Contract &amp; SOW validation</span></div>
+              <p class="text-fg-3 small">Check clauses, map obligations to issues, and surface negotiation playbooks.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-surface py-5" id="licenses">
+      <div class="container">
+        <div class="row g-4 align-items-center">
+          <div class="col-lg-6" data-aos="fade-right">
+            <span class="eyebrow">Licensing &amp; access</span>
+            <h2 class="fw-bold">Full members and guests on one license-aware platform</h2>
+            <p class="text-fg-3">Start as a vendor or buyer. Invite guests to Engagement Rooms with scoped permissions while full users run RevenueForge, ValueSphere, and ProcurePath.</p>
+            <ul class="text-fg-2 small mb-0">
+              <li>Full access for teams that live in Salesforce, Splunk, Snowflake, and beyond.</li>
+              <li>Guest collaboration without exposing your full directory or billing.</li>
+              <li>Simple entry points for vendors and buyers with the same signup flow.</li>
+            </ul>
+          </div>
+          <div class="col-lg-6" data-aos="fade-left">
+            <div class="card glass p-4">
+              <h5 class="mb-3">Choose your entry point</h5>
+              <div class="d-flex gap-3 flex-wrap mb-3">
+                <a class="btn btn-primary" href="/api/auth/workos/signup">Start as a vendor</a>
+                <a class="btn btn-outline-light" href="/api/auth/workos/signup">Start as a buyer</a>
+                <a class="btn btn-outline-light" href="/api/auth/workos/login">Sign in</a>
+              </div>
+              <p class="text-fg-3 small mb-0">One workspace, license-aware features, and Engagement Rooms ready for vendor, buyer, and guest collaboration.</p>
+            </div>
           </div>
         </div>
       </div>
@@ -271,7 +395,7 @@
 
   <footer class="border-top border-soft py-4">
     <div class="container d-flex flex-wrap justify-content-between gap-3 text-fg-3 small">
-      <span>&copy; <span id="year"></span> Agama Technologies. All rights reserved.</span>
+      <span>&copy; <span id="year"></span> Agama Technologies. Unified vendor, buyer, and guest collaboration.</span>
       <div class="d-flex gap-3">
         <a href="mailto:hello@agamasuite.com" class="text-fg-3">Contact</a>
         <a href="/api/auth/workos/login" class="text-fg-3">Client workspace</a>
