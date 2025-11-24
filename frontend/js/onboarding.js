@@ -150,6 +150,7 @@ async function handleNextStep() {
   const billingEmail = document.getElementById('billingEmail')?.value?.trim();
   const payload = {
     ...onboardingState.answers,
+    useCases: onboardingState.answers.useCases ? [onboardingState.answers.useCases] : [],
     billingDetails: { billingName, email: billingEmail },
     status: 'completed'
   };
