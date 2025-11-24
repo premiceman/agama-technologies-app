@@ -86,6 +86,13 @@
         </header>
 
         <section class="card glass p-4 mb-3">
+          <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <h2 class="h5 mb-1">Profile details</h2>
+              <p class="text-fg-3 small mb-0">Update your name, organisation, and role.</p>
+            </div>
+            <span class="badge-soft" id="profileLicense">Loading...</span>
+          </div>
           <div class="row g-3">
             <div class="col-md-6">
               <label class="form-label" for="profileName">Name</label>
@@ -93,7 +100,7 @@
             </div>
             <div class="col-md-6">
               <label class="form-label" for="profileEmail">Email</label>
-              <input class="form-control" id="profileEmail" type="email" placeholder="you@example.com" />
+              <input class="form-control" id="profileEmail" type="email" placeholder="you@example.com" readonly />
             </div>
             <div class="col-md-6">
               <label class="form-label" for="profileCompany">Organisation</label>
@@ -104,25 +111,46 @@
               <input class="form-control" id="profileRole" type="text" placeholder="Title" />
             </div>
             <div class="col-12">
-              <button class="btn btn-primary" type="button">Save profile</button>
+              <button class="btn btn-primary" type="button" id="saveProfile">Save profile</button>
+              <div class="form-text" id="profileFeedback"></div>
             </div>
           </div>
         </section>
 
+        <section class="card glass p-4 mb-3">
+          <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+            <div>
+              <h2 class="h6 mb-1">Home organisation</h2>
+              <p class="text-fg-3 small mb-0">Where your Business access anchors.</p>
+            </div>
+          </div>
+          <div id="homeOrg" class="text-fg-2 small">Loading...</div>
+        </section>
+
+        <section class="card glass p-4 mb-3">
+          <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <h2 class="h6 mb-1">Memberships</h2>
+              <p class="text-fg-3 small mb-0">Organisations you belong to and your roles.</p>
+            </div>
+          </div>
+          <div id="membershipList"></div>
+        </section>
+
         <section class="card glass p-4">
-          <h2 class="h6 mb-2">Privacy</h2>
-          <p class="text-fg-3 small mb-0">Profile data stays within your Agama workspace. We’ll add granular controls soon.</p>
+          <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <h2 class="h6 mb-1">Your suites</h2>
+              <p class="text-fg-3 small mb-0">See which suites are active and why something might be locked.</p>
+            </div>
+          </div>
+          <div id="profileSuites"></div>
         </section>
       </main>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-    document.getElementById('logout').addEventListener('click', async () => {
-      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-      window.location.href = '/';
-    });
-  </script>
+  <script src="/js/profile.js"></script>
 </body>
 </html>
