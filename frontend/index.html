@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css">
   <link rel="stylesheet" href="/css/styles.v2.css">
 </head>
-<body class="bg-body text-fg">
+<body class="bg-body text-fg" data-theme="vendor">
   <div class="liquid-bg" aria-hidden="true">
     <div class="blob blob-blue"></div>
     <div class="blob blob-teal"></div>
@@ -55,6 +55,13 @@
           <a class="btn btn-primary btn-lg" href="/api/auth/workos/signup">Launch your workspace</a>
           <a class="btn btn-outline-light btn-lg" href="/valuesphere.html">See Vendor Suite</a>
           <a class="btn btn-outline-light btn-lg" href="/procurepath.html">See Buyer Suite</a>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap mt-3">
+          <span class="text-fg-3 small">Explore:</span>
+          <div class="btn-group btn-group-sm" id="landingSuiteToggle" role="group" aria-label="Suite toggle">
+            <button type="button" class="btn btn-outline-light active" data-suite="vendor">Vendor Suite</button>
+            <button type="button" class="btn btn-outline-light" data-suite="buyer">Buyer Suite</button>
+          </div>
         </div>
         <div class="d-flex align-items-center gap-3 mt-4 text-fg small flex-wrap">
           <span><i class="bi bi-stars"></i> Shorter cycles, cleaner deals</span>
@@ -167,29 +174,75 @@
       </div>
     </section>
 
-    <section class="bg-surface py-5" id="vendor">
-      <div class="container">
+    <section id="landingVendorSection">
+      <section class="bg-surface py-5" id="vendor">
+        <div class="container">
+          <div class="row g-4 align-items-center mb-4">
+            <div class="col-lg-7" data-aos="fade-right">
+              <span class="eyebrow">Vendor Suite</span>
+              <h2 class="fw-bold">ValueSphere + RevenueForge for revenue leaders</h2>
+              <p class="text-fg-3">Guide CROs, value consultants, and account teams with playbooks that standardise discovery, sharpen pricing strategy, and prove value without slowing the deal.</p>
+            </div>
+            <div class="col-lg-5 text-lg-end d-flex gap-3 justify-content-lg-end flex-wrap" data-aos="fade-left">
+              <a class="btn btn-primary" href="/valuesphere.html">Explore ValueSphere</a>
+              <a class="btn btn-outline-light" href="/revenueforge.html">Tour RevenueForge</a>
+            </div>
+          </div>
+          <div class="row g-4">
+            <div class="col-md-6" data-aos="zoom-in">
+              <div class="card glass h-100">
+                <div class="card-body">
+                  <h5 class="mb-3">ValueSphere Navigator</h5>
+                  <p class="text-fg-3">Value consulting workspace for exec-ready ROI narratives and stakeholder alignment.</p>
+                  <ul class="text-fg-2 small mb-0">
+                    <li>Shorten discovery cycles with guided diagnostics.</li>
+                    <li>Standardise value narratives for every persona.</li>
+                    <li>Boards and documents that stay linked to Engagement Rooms.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6" data-aos="zoom-in" data-aos-delay="50">
+              <div class="card glass h-100">
+                <div class="card-body">
+                  <h5 class="mb-3">RevenueForge Lifecycle</h5>
+                  <p class="text-fg-3">AI revenue studio to design lifecycle stages, coach deals, and automate follow-up.</p>
+                  <ul class="text-fg-2 small mb-0">
+                    <li>Deal intelligence to unstick pricing and risk conversations.</li>
+                    <li>AI-supported meeting prep and follow-up with next best actions.</li>
+                    <li>Engagement dossiers that sync with project boards and documents.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section id="landingBuyerSection" class="d-none">
+      <section class="container py-5" id="buyer">
         <div class="row g-4 align-items-center mb-4">
           <div class="col-lg-7" data-aos="fade-right">
-            <span class="eyebrow">Vendor Suite</span>
-            <h2 class="fw-bold">ValueSphere + RevenueForge for revenue leaders</h2>
-            <p class="text-fg-3">Guide CROs, value consultants, and account teams with playbooks that standardise discovery, sharpen pricing strategy, and prove value without slowing the deal.</p>
+            <span class="eyebrow">Buyer Suite</span>
+            <h2 class="fw-bold">ProcurePath for procurement, finance, legal, and security</h2>
+            <p class="text-fg-3">Give sourcing and risk teams a shared inventory of vendors, contracts, benchmarks, and renewal posture, connected directly into Engagement Rooms.</p>
           </div>
           <div class="col-lg-5 text-lg-end d-flex gap-3 justify-content-lg-end flex-wrap" data-aos="fade-left">
-            <a class="btn btn-primary" href="/valuesphere.html">Explore ValueSphere</a>
-            <a class="btn btn-outline-light" href="/revenueforge.html">Tour RevenueForge</a>
+            <a class="btn btn-primary" href="/procurepath.html">Discover ProcurePath</a>
+            <a class="btn btn-outline-light" href="/api/auth/workos/signup">Start a buyer workspace</a>
           </div>
         </div>
         <div class="row g-4">
           <div class="col-md-6" data-aos="zoom-in">
             <div class="card glass h-100">
               <div class="card-body">
-                <h5 class="mb-3">ValueSphere Navigator</h5>
-                <p class="text-fg-3">Value consulting workspace for exec-ready ROI narratives and stakeholder alignment.</p>
+                <h5 class="mb-3">Vendor graph &amp; contracts</h5>
+                <p class="text-fg-3">Centralised view of every vendor with contract lifecycle, obligations, and spend.</p>
                 <ul class="text-fg-2 small mb-0">
-                  <li>Shorten discovery cycles with guided diagnostics.</li>
-                  <li>Standardise value narratives for every persona.</li>
-                  <li>Boards and documents that stay linked to Engagement Rooms.</li>
+                  <li>Single inventory across legal, finance, and security.</li>
+                  <li>Benchmarked negotiation guidance surfaced in context.</li>
+                  <li>Link contracts directly to Engagement Rooms and issues.</li>
                 </ul>
               </div>
             </div>
@@ -197,60 +250,18 @@
           <div class="col-md-6" data-aos="zoom-in" data-aos-delay="50">
             <div class="card glass h-100">
               <div class="card-body">
-                <h5 class="mb-3">RevenueForge Lifecycle</h5>
-                <p class="text-fg-3">AI revenue studio to design lifecycle stages, coach deals, and automate follow-up.</p>
+                <h5 class="mb-3">Risk, compliance, renewals</h5>
+                <p class="text-fg-3">Command center for renewals, risk scoring, and stakeholder updates.</p>
                 <ul class="text-fg-2 small mb-0">
-                  <li>Deal intelligence to unstick pricing and risk conversations.</li>
-                  <li>AI-supported meeting prep and follow-up with next best actions.</li>
-                  <li>Engagement dossiers that sync with project boards and documents.</li>
+                  <li>Continuous risk monitoring with renewal countdowns.</li>
+                  <li>AI-ready posture that combines issues, files, and milestones.</li>
+                  <li>Renewal command center feeding shared status reports.</li>
                 </ul>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </section>
-
-    <section class="container py-5" id="buyer">
-      <div class="row g-4 align-items-center mb-4">
-        <div class="col-lg-7" data-aos="fade-right">
-          <span class="eyebrow">Buyer Suite</span>
-          <h2 class="fw-bold">ProcurePath for procurement, finance, legal, and security</h2>
-          <p class="text-fg-3">Give sourcing and risk teams a shared inventory of vendors, contracts, benchmarks, and renewal posture, connected directly into Engagement Rooms.</p>
-        </div>
-        <div class="col-lg-5 text-lg-end d-flex gap-3 justify-content-lg-end flex-wrap" data-aos="fade-left">
-          <a class="btn btn-primary" href="/procurepath.html">Discover ProcurePath</a>
-          <a class="btn btn-outline-light" href="/api/auth/workos/signup">Start a buyer workspace</a>
-        </div>
-      </div>
-      <div class="row g-4">
-        <div class="col-md-6" data-aos="zoom-in">
-          <div class="card glass h-100">
-            <div class="card-body">
-              <h5 class="mb-3">Vendor graph &amp; contracts</h5>
-              <p class="text-fg-3">Centralised view of every vendor with contract lifecycle, obligations, and spend.</p>
-              <ul class="text-fg-2 small mb-0">
-                <li>Single inventory across legal, finance, and security.</li>
-                <li>Benchmarked negotiation guidance surfaced in context.</li>
-                <li>Link contracts directly to Engagement Rooms and issues.</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-6" data-aos="zoom-in" data-aos-delay="50">
-          <div class="card glass h-100">
-            <div class="card-body">
-              <h5 class="mb-3">Risk, compliance, renewals</h5>
-              <p class="text-fg-3">Command center for renewals, risk scoring, and stakeholder updates.</p>
-              <ul class="text-fg-2 small mb-0">
-                <li>Continuous risk monitoring with renewal countdowns.</li>
-                <li>AI-ready posture that combines issues, files, and milestones.</li>
-                <li>Renewal command center feeding shared status reports.</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
+      </section>
     </section>
 
     <section class="bg-surface py-5" id="rooms">
@@ -408,5 +419,43 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
   <script src="/js/main.js" type="module"></script>
+  <script>
+    (function() {
+      const toggle = document.getElementById('landingSuiteToggle');
+      if (!toggle) return;
+
+      const body = document.body;
+      const vendorBtn = toggle.querySelector('[data-suite="vendor"]');
+      const buyerBtn = toggle.querySelector('[data-suite="buyer"]');
+      const vendorSection = document.getElementById('landingVendorSection');
+      const buyerSection = document.getElementById('landingBuyerSection');
+
+      function setSuite(suite) {
+        if (suite === 'buyer') {
+          body.setAttribute('data-theme', 'buyer');
+          buyerBtn.classList.add('active');
+          vendorBtn.classList.remove('active');
+          if (vendorSection) vendorSection.classList.add('d-none');
+          if (buyerSection) buyerSection.classList.remove('d-none');
+        } else {
+          body.setAttribute('data-theme', 'vendor');
+          vendorBtn.classList.add('active');
+          buyerBtn.classList.remove('active');
+          if (buyerSection) buyerSection.classList.add('d-none');
+          if (vendorSection) vendorSection.classList.remove('d-none');
+        }
+      }
+
+      toggle.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-suite]');
+        if (!btn) return;
+        const suite = btn.getAttribute('data-suite');
+        setSuite(suite);
+      });
+
+      // Default: vendor theme
+      setSuite('vendor');
+    })();
+  </script>
 </body>
 </html>
