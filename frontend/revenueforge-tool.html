@@ -57,6 +57,13 @@
             <span class="sidebar-label">Docs</span>
           </a>
         </div>
+        <div class="sidebar-section-label" id="orgAdminLabel" style="display:none;">Organisation</div>
+        <div class="sidebar-section" id="orgAdminSection" style="display:none;">
+          <a class="sidebar-link" href="/admin-org.html" id="orgAdminLink">
+            <i class="bi bi-building-gear"></i>
+            <span class="sidebar-label">Org &amp; Members</span>
+          </a>
+        </div>
         <div class="sidebar-section-label">Account &amp; Settings</div>
         <div class="sidebar-section">
           <a class="sidebar-link" href="/profile.html">
@@ -424,6 +431,20 @@
       calendarCursor: new Date()
     };
 
+    function toggleOrgAdminNav(authPayload) {
+      const label = document.getElementById('orgAdminLabel');
+      const section = document.getElementById('orgAdminSection');
+      const { effectiveLicense, organizationContext, memberships } = authPayload || {};
+      const hasBusiness = effectiveLicense?.tier === 'business';
+      const isOrgAdmin = (memberships || []).some(m => m.isHome && ['owner', 'admin'].includes(m.role));
+      const contextAdmin = organizationContext && ['owner', 'admin'].includes(organizationContext.role);
+      const canSee = hasBusiness && (isOrgAdmin || contextAdmin);
+      if (label && section) {
+        label.style.display = canSee ? '' : 'none';
+        section.style.display = canSee ? '' : 'none';
+      }
+    }
+
     const currencyFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
     function renderRevenueForgePreview() {
@@ -510,6 +531,11 @@
         const res = await fetch('/api/auth/me', { credentials: 'include' });
         if (res.status === 401) return (window.location.href = '/api/auth/workos/login');
         const json = await res.json();
+        toggleOrgAdminNav({
+          effectiveLicense: json.effectiveLicense,
+          organizationContext: json.organizationContext,
+          memberships: json.memberships
+        });
         rfState.user = json.user;
         if (!json.user.platformAccess?.includes('revenueforge') || json.user.licenseTier !== 'business') {
           renderRevenueForgePreview();
