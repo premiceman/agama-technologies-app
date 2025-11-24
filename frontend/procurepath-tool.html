@@ -64,6 +64,13 @@
             <span class="sidebar-label">Org &amp; Members</span>
           </a>
         </div>
+        <div class="sidebar-section-label" id="agamaAdminLabel" style="display:none;">Agama</div>
+        <div class="sidebar-section" id="agamaAdminSection" style="display:none;">
+          <a class="sidebar-link" href="/agama-admin.html" id="agamaAdminLink">
+            <i class="bi bi-shield-lock"></i>
+            <span class="sidebar-label">Agama Admin Console</span>
+          </a>
+        </div>
         <div class="sidebar-section-label">Account &amp; Settings</div>
         <div class="sidebar-section">
           <a class="sidebar-link" href="/profile.html">
@@ -288,6 +295,17 @@
       }
     }
 
+    function toggleAgamaAdminNav(user) {
+      const label = document.getElementById('agamaAdminLabel');
+      const section = document.getElementById('agamaAdminSection');
+      const email = (user?.email || '').toLowerCase();
+      const canSee = user?.isStaff === true && email.endsWith('@agamatechnologies.com');
+      if (label && section) {
+        label.style.display = canSee ? '' : 'none';
+        section.style.display = canSee ? '' : 'none';
+      }
+    }
+
     function renderProcurePathPreview() {
       const mount = document.getElementById('toolContent');
       if (!mount) return;
@@ -375,6 +393,7 @@
           return;
         }
         const authJson = await authRes.json();
+        toggleAgamaAdminNav(authJson.user);
         toggleOrgAdminNav({
           effectiveLicense: authJson.effectiveLicense,
           organizationContext: authJson.organizationContext,

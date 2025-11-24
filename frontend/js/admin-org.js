@@ -25,6 +25,17 @@ function toggleOrgAdminNav(authPayload) {
   }
 }
 
+function toggleAgamaAdminNav(user) {
+  const label = document.getElementById('agamaAdminLabel');
+  const section = document.getElementById('agamaAdminSection');
+  const email = (user?.email || '').toLowerCase();
+  const canSee = user?.isStaff === true && email.endsWith('@agamatechnologies.com');
+  if (label && section) {
+    label.style.display = canSee ? '' : 'none';
+    section.style.display = canSee ? '' : 'none';
+  }
+}
+
 function formatList(values) {
   if (!Array.isArray(values) || !values.length) return 'Not configured';
   return values.join(', ');
@@ -116,6 +127,7 @@ async function fetchAuthContext() {
     adminState.user = json.user;
     adminState.memberships = json.memberships || [];
     adminState.effectiveLicense = json.effectiveLicense || { tier: json.user?.licenseTier };
+    toggleAgamaAdminNav(adminState.user);
     toggleOrgAdminNav({
       effectiveLicense: adminState.effectiveLicense,
       memberships: adminState.memberships,

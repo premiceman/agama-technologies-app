@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Billing — Agama Workspace</title>
+  <title>Agama Admin Console — Agama Technologies</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <link rel="stylesheet" href="/css/styles.v2.css">
 </head>
-<body class="bg-body text-fg">
+<body class="bg-body">
   <div class="liquid-bg" aria-hidden="true">
     <div class="blob blob-blue"></div>
     <div class="blob blob-teal"></div>
@@ -33,6 +33,10 @@
         </a>
         <div class="sidebar-section-label">Applications</div>
         <div class="sidebar-section">
+          <a class="sidebar-link" href="/rooms.html">
+            <i class="bi bi-people"></i>
+            <span class="sidebar-label">Engagement Rooms</span>
+          </a>
           <a class="sidebar-link" href="/revenueforge-tool.html">
             <i class="bi bi-lightning-charge"></i>
             <span class="sidebar-label">RevenueForge</span>
@@ -46,6 +50,13 @@
             <span class="sidebar-label">ProcurePath</span>
           </a>
         </div>
+        <div class="sidebar-section-label">Docs</div>
+        <div class="sidebar-section">
+          <a class="sidebar-link" href="/docs.html">
+            <i class="bi bi-journal-text"></i>
+            <span class="sidebar-label">Docs</span>
+          </a>
+        </div>
         <div class="sidebar-section-label" id="orgAdminLabel" style="display:none;">Organisation</div>
         <div class="sidebar-section" id="orgAdminSection" style="display:none;">
           <a class="sidebar-link" href="/admin-org.html" id="orgAdminLink">
@@ -55,7 +66,7 @@
         </div>
         <div class="sidebar-section-label" id="agamaAdminLabel" style="display:none;">Agama</div>
         <div class="sidebar-section" id="agamaAdminSection" style="display:none;">
-          <a class="sidebar-link" href="/agama-admin.html" id="agamaAdminLink">
+          <a class="sidebar-link active" href="/agama-admin.html" id="agamaAdminLink">
             <i class="bi bi-shield-lock"></i>
             <span class="sidebar-label">Agama Admin Console</span>
           </a>
@@ -70,7 +81,7 @@
             <i class="bi bi-gear"></i>
             <span class="sidebar-label">Settings</span>
           </a>
-          <a class="sidebar-link active" href="/billing.html">
+          <a class="sidebar-link" href="/billing.html">
             <i class="bi bi-credit-card"></i>
             <span class="sidebar-label">Billing</span>
           </a>
@@ -79,69 +90,74 @@
     </aside>
 
     <div class="app-content">
-      <nav class="navbar navbar-expand-lg bg-glass border-bottom mb-4">
-        <div class="container-fluid">
-          <a class="navbar-brand d-flex align-items-center gap-2" href="/">
-            <span class="brand-dot"></span>
-            Agama <strong>Technologies</strong>
-          </a>
-          <div class="d-flex align-items-center gap-2">
-            <a class="btn btn-outline-light btn-sm" href="/workspace.html">Back to workspace</a>
-            <button class="btn btn-primary btn-sm" id="logout">Logout</button>
+      <div class="container py-5">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+          <div>
+            <span class="eyebrow">Agama</span>
+            <h1 class="h3 mb-0">Agama Admin Console</h1>
+            <div class="text-fg-3 small">Internal staff console protected by an unlock secret.</div>
+          </div>
+          <div class="d-flex gap-2">
+            <a class="btn btn-outline-light" href="/workspace.html">Back to workspace</a>
+            <button class="btn btn-primary" id="logoutButton">Logout</button>
           </div>
         </div>
-      </nav>
 
-      <main class="container py-5" style="max-width: 960px;">
-        <header class="card glass p-4 mb-4">
-          <span class="eyebrow">Account</span>
-          <h1 class="h4 mb-2">Billing</h1>
-          <p class="text-fg-3 mb-0">Subscription details for your Agama workspace.</p>
-        </header>
+        <div class="alert alert-danger d-none" id="adminAccessDenied" role="alert">
+          Access denied. This console is only available to Agama staff with a verified email domain.
+        </div>
 
-        <section class="card glass p-4 mb-3">
-          <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+        <div class="card glass p-4 mb-4" id="adminLockedCard">
+          <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
             <div>
-              <h2 class="h6 mb-1">Plan</h2>
-              <p class="text-fg-3 small mb-0">Business suite</p>
+              <h2 class="h5 mb-1">Unlock console</h2>
+              <p class="text-fg-3 small mb-0">Enter the shared secret key to unlock internal tools for this session.</p>
             </div>
-            <button class="btn btn-outline-light btn-sm" type="button">Update plan</button>
+            <span class="badge-soft">Locked</span>
           </div>
-          <div class="d-flex justify-content-between align-items-center">
+          <form id="unlockForm" class="d-flex flex-column gap-3">
             <div>
-              <p class="mb-0">Next renewal</p>
-              <small class="text-fg-3">Auto-renews annually</small>
+              <label class="form-label" for="adminSecret">Secret key</label>
+              <input type="password" class="form-control" id="adminSecret" name="secret" autocomplete="off" required>
+              <div class="form-text">Secret is stored in AdminConfig. Rotate manually until UI is available.</div>
             </div>
-            <strong>$7,200 / year</strong>
-          </div>
-        </section>
+            <div class="d-flex gap-2 align-items-center">
+              <button type="submit" class="btn btn-primary" id="unlockSubmit">Unlock console</button>
+              <div class="form-text text-danger" id="unlockError"></div>
+            </div>
+          </form>
+        </div>
 
-        <section class="card glass p-4">
-          <h2 class="h6 mb-3">Payment methods</h2>
-          <div class="d-flex flex-column gap-2">
-            <div class="d-flex justify-content-between align-items-center card glass p-3">
-              <div class="d-flex align-items-center gap-2">
-                <i class="bi bi-credit-card-2-front"></i>
-                <div>
-                  <strong>Visa ending in 4242</strong>
-                  <p class="text-fg-3 small mb-0">Expires 06/27</p>
-                </div>
-              </div>
-              <button class="btn btn-outline-light btn-sm" type="button">Replace</button>
+        <div class="card glass p-4 d-none" id="adminContent">
+          <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+            <div>
+              <h2 class="h5 mb-1">Organisations</h2>
+              <p class="text-fg-3 small mb-0">Read-only overview of organisations configured in this workspace.</p>
             </div>
-            <button class="btn btn-outline-light" type="button">Add payment method</button>
+            <span class="badge-soft">Unlocked</span>
           </div>
-        </section>
-      </main>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">Slug</th>
+                  <th scope="col">Tier</th>
+                  <th scope="col">Org type</th>
+                  <th scope="col">Product access</th>
+                  <th scope="col">Seat limit</th>
+                  <th scope="col">Created</th>
+                </tr>
+              </thead>
+              <tbody id="orgTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-    document.getElementById('logout').addEventListener('click', async () => {
-      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-      window.location.href = '/';
-    });
-  </script>
+  <script src="/js/agama-admin.js"></script>
 </body>
 </html>
