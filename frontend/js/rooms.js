@@ -38,6 +38,12 @@ function toggle(el, show) {
   el.hidden = !show;
 }
 
+function resolveOrgName(orgId) {
+  if (!orgId) return 'Unknown';
+  const org = state.organizations.find(o => o.id === orgId || o._id === orgId);
+  return org?.name || orgId;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const roomsList = document.getElementById('roomsList');
   const roomTitle = document.getElementById('roomTitle');
@@ -85,28 +91,58 @@ async function initRoomsPage() {
 }
 
 function renderRooms(rooms) {
-  const list = document.getElementById('roomsList');
-  const empty = document.getElementById('roomsEmpty');
-  if (!list) return;
+  const homeList = document.getElementById('homeRoomsList');
+  const guestList = document.getElementById('guestRoomsList');
+  if (!homeList || !guestList) return;
+
+  const homeRooms = [];
+  const guestRooms = [];
+  rooms.forEach(room => {
+    const isGuestRoom = room?.yourMembership?.isGuest === true;
+    if (isGuestRoom) {
+      guestRooms.push(room);
+    } else {
+      homeRooms.push(room);
+    }
+  });
+
+  renderRoomSection('home', homeRooms);
+  renderRoomSection('guest', guestRooms);
+}
+
+function renderRoomSection(prefix, rooms) {
+  const list = document.getElementById(`${prefix}RoomsList`);
+  const empty = document.getElementById(`${prefix}RoomsEmpty`);
+  const count = document.getElementById(`${prefix}RoomsCount`);
+  if (!list || !empty || !count) return;
+
   list.innerHTML = '';
-  if (!rooms.length) {
-    toggle(empty, true);
-    return;
-  }
-  toggle(empty, false);
+  toggle(empty, !rooms.length);
+  count.textContent = rooms.length;
+  if (!rooms.length) return;
 
   rooms.forEach(room => {
     const col = document.createElement('div');
     col.className = 'col-md-6 col-xl-4';
     const card = document.createElement('div');
     card.className = 'card glass p-3 h-100';
+
+    const role = room.yourMembership?.role || room.membership?.role || 'viewer';
+    const isGuest = room.yourMembership?.isGuest === true;
+    const vendor = resolveOrgName(room.vendorOrg);
+    const buyer = resolveOrgName(room.buyerOrg);
+
     card.innerHTML = `
       <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
         <div>
           <h3 class="h6 mb-1">${room.title || 'Untitled room'}</h3>
-          <div class="text-fg-3 small">Status: ${room.status || 'active'}</div>
+          <div class="text-fg-3 small">Vendor: ${vendor} • Buyer: ${buyer}</div>
+          <div class="text-fg-3 small">Your role: ${role}${isGuest ? ' (Guest)' : ''}</div>
         </div>
-        <span class="badge-soft">${room.membership?.role || 'member'}</span>
+        <div class="d-flex gap-2 align-items-center">
+          ${isGuest ? '<span class="badge-soft">Guest</span>' : ''}
+          <span class="badge-soft">${role}</span>
+        </div>
       </div>
       <div class="d-flex flex-wrap gap-3 align-items-center mb-2">
         <div class="small"><i class="bi bi-list-task"></i> Issues: ${room.summary?.issues?.total || 0}</div>
@@ -231,6 +267,8 @@ async function initRoomDetailPage() {
     state.isGuest = orgResp.user?.licenseTier === 'guest';
     const roomResp = await fetchJson(`/api/rooms/${roomId}`);
     state.room = roomResp.room;
+    state.roomMembership = state.room?.yourMembership || state.room?.membership;
+    state.isRoomGuest = state.roomMembership?.isGuest === true;
     renderRoomHeader();
     configureOrgControls();
     bindAiActions();
@@ -242,17 +280,31 @@ async function initRoomDetailPage() {
 
 function renderRoomHeader() {
   setText('roomTitle', state.room?.title || 'Untitled room');
-  const role = state.room?.membership?.role || 'viewer';
-  setText('roomRole', role === 'room_admin' ? 'Room admin' : role);
+  const membership = state.roomMembership || state.room?.yourMembership || state.room?.membership || {};
+  const role = membership.role || 'viewer';
+  const roleLabel = role === 'room_admin' ? 'Room admin' : role;
+  const isGuest = membership.isGuest === true;
+  const roleText = `Your role: ${roleLabel}${isGuest ? ' (Guest)' : ''}`;
+  setText('roomRole', `${roleLabel}${isGuest ? ' • Guest' : ''}`);
+  setText('roomRoleSummary', roleText);
   const meta = [];
   if (state.room?.vendorOrg) meta.push(`Vendor org: ${state.room.vendorOrg}`);
   if (state.room?.buyerOrg) meta.push(`Buyer org: ${state.room.buyerOrg}`);
+  const membershipOrg = membership.organization;
+  if (membershipOrg) {
+    const orgName = membershipOrg.name || resolveOrgName(membershipOrg.id || membershipOrg._id || membershipOrg);
+    meta.push(`Membership org: ${orgName}`);
+  }
   setText('roomMeta', meta.join(' • '));
+  const guestNotice = document.getElementById('roomGuestNotice');
+  toggle(guestNotice, isGuest);
 }
 
 function configureOrgControls() {
-  const isAdmin = state.room?.membership?.role === 'room_admin';
-  const canEdit = ['editor', 'room_admin'].includes(state.room?.membership?.role);
+  const membership = state.roomMembership || state.room?.yourMembership || state.room?.membership || {};
+  const isGuestMember = membership.isGuest === true;
+  const isAdmin = membership.role === 'room_admin' && !isGuestMember;
+  const canEdit = ['editor', 'room_admin'].includes(membership.role) && !isGuestMember;
 
   document.querySelectorAll('#issueForm input, #issueForm textarea, #issueForm select, #issueForm button').forEach(el => {
     el.disabled = !canEdit;
@@ -274,7 +326,7 @@ function configureOrgControls() {
   const memberRoleReminder = document.getElementById('memberRoleReminder');
   if (memberRoleReminder) memberRoleReminder.textContent = isAdmin ? 'You can manage members' : 'Admin only';
 
-  if (state.isGuest) {
+  if (isGuestMember) {
     const guestHideSelectors = ['#assigneeSearch', '#addAssigneeButton', '#assigneeHelp', '#memberSearch', '#memberOptions'];
     guestHideSelectors.forEach(sel => {
       const el = document.querySelector(sel);
@@ -728,7 +780,8 @@ async function loadMembers() {
 
 async function loadInvites() {
   try {
-    const isAdmin = state.room?.membership?.role === 'room_admin';
+    const membership = state.roomMembership || state.room?.yourMembership || state.room?.membership;
+    const isAdmin = membership?.role === 'room_admin' && membership?.isGuest !== true;
     if (!isAdmin) return;
     const res = await fetchJson(`/api/rooms/${state.roomId}/invites`);
     const list = document.getElementById('inviteList');

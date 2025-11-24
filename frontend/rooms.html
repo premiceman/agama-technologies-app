@@ -107,8 +107,34 @@
               <span class="badge-soft" id="licenseBadge">Loading license...</span>
             </div>
           </div>
-          <div id="roomsList" class="row g-3"></div>
-          <div id="roomsEmpty" class="text-center text-fg-3 small d-none">No rooms found for your account.</div>
+          <div class="row g-3">
+            <div class="col-12">
+              <div class="card glass p-3 h-100">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                  <div>
+                    <h3 class="h6 mb-1">Rooms in your organisation(s)</h3>
+                    <p class="text-fg-3 small mb-0">Owned by your host organisation where you are a direct member.</p>
+                  </div>
+                  <span class="badge-soft" id="homeRoomsCount">0</span>
+                </div>
+                <div id="homeRoomsList" class="row g-3"></div>
+                <div id="homeRoomsEmpty" class="text-center text-fg-3 small d-none">No rooms for your organisation yet.</div>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="card glass p-3 h-100">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                  <div>
+                    <h3 class="h6 mb-1">Rooms where you are a guest</h3>
+                    <p class="text-fg-3 small mb-0">Engagements hosted by another organisation where you collaborate as a guest.</p>
+                  </div>
+                  <span class="badge-soft" id="guestRoomsCount">0</span>
+                </div>
+                <div id="guestRoomsList" class="row g-3"></div>
+                <div id="guestRoomsEmpty" class="text-center text-fg-3 small d-none">No guest rooms right now.</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

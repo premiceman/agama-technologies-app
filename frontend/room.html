@@ -89,6 +89,7 @@
             <span class="eyebrow">Engagement room</span>
             <h1 class="h3 mb-1" id="roomTitle">Loading room...</h1>
             <div class="text-fg-3 small" id="roomMeta">Preparing context...</div>
+            <div class="text-fg-2 small" id="roomRoleSummary">Determining your access...</div>
           </div>
           <div class="d-flex flex-wrap gap-2 align-items-center">
             <div class="d-flex gap-2">
@@ -98,6 +99,18 @@
             <span class="badge-soft" id="roomRole">Role</span>
             <a class="btn btn-outline-light" href="/rooms.html">Back to rooms</a>
             <button class="btn btn-primary" id="logoutButton">Logout</button>
+          </div>
+        </div>
+
+        <div class="card glass p-3 mb-3" id="roomGuestNotice" hidden>
+          <div class="d-flex gap-2 align-items-start">
+            <i class="bi bi-info-circle text-primary"></i>
+            <div>
+              <div class="fw-semibold small">Guest access</div>
+              <div class="text-fg-3 small mb-0">
+                You’re collaborating in this room as a guest. Some actions may be restricted by the host organisation.
+              </div>
+            </div>
           </div>
         </div>
 
