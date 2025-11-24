@@ -148,8 +148,11 @@ async function handleNextStep() {
 
   const billingName = document.getElementById('billingName')?.value?.trim();
   const billingEmail = document.getElementById('billingEmail')?.value?.trim();
+  const licenseSelection = onboardingState.answers.licenseSelection || 'free-personal';
+  onboardingState.answers.licenseSelection = licenseSelection;
   const payload = {
     ...onboardingState.answers,
+    licenseSelection,
     useCases: onboardingState.answers.useCases ? [onboardingState.answers.useCases] : [],
     billingDetails: { billingName, email: billingEmail },
     status: 'completed'
@@ -191,8 +194,8 @@ async function validateCurrentStep() {
 
   if (current === 'license') {
     if (!onboardingState.answers.licenseSelection) {
-      alert('Choose a license to finish onboarding.');
-      return false;
+      onboardingState.answers.licenseSelection = 'free-personal';
+      selectLicenseCard('free-personal');
     }
   }
 
