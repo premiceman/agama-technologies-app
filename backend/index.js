@@ -187,6 +187,113 @@ function resolveWorkOSRedirectUri(req) {
   return `${origin}/api/auth/workos/callback`;
 }
 
+function computeEffectiveLicense(user, organizationContext) {
+  if (!user) return { tier: 'guest', homeOrg: null };
+  if (user.licenseTier === 'guest') return { tier: 'guest', homeOrg: null };
+
+  if (user.licenseTier === 'business' && organizationContext && organizationContext.tier === 'business') {
+    const { id, name, tier, orgType, role } = organizationContext;
+    return { tier: 'business', homeOrg: { id, name, tier, orgType, role } };
+  }
+
+  return { tier: 'personal', homeOrg: null };
+}
+
+function getPlatformEntitlement(user, organizationContext, platformId) {
+  const platform = PLATFORM_DEFINITIONS.find(p => p.id === platformId);
+  const effectiveLicense = computeEffectiveLicense(user, organizationContext);
+  const userPlatforms = Array.isArray(user?.platformAccess) ? user.platformAccess : [];
+
+  if (!platform) {
+    return { allowed: false, reason: 'unknown_platform', effectiveLicense };
+  }
+
+  if (effectiveLicense.tier === 'guest') {
+    return { allowed: false, reason: 'guest_only', effectiveLicense };
+  }
+
+  const hasPlatform = userPlatforms.includes(platformId);
+  const requiresBusiness = platform.requiresBusinessLicense === true;
+  const isBusiness = effectiveLicense.tier === 'business';
+
+  if (!hasPlatform) {
+    return { allowed: false, reason: 'not_purchased', effectiveLicense };
+  }
+
+  if (requiresBusiness && !isBusiness) {
+    return { allowed: false, reason: 'requires_business', effectiveLicense };
+  }
+
+  if (
+    platform.requiredOrgType &&
+    organizationContext &&
+    organizationContext.orgType &&
+    platform.requiredOrgType !== organizationContext.orgType
+  ) {
+    return { allowed: false, reason: 'wrong_org_type', effectiveLicense };
+  }
+
+  return { allowed: true, reason: 'ok', effectiveLicense };
+}
+
+async function buildOrganizationContext(user, orgId, { includeSeatDetails = false } = {}) {
+  if (!user || !orgId) return null;
+  const organization = await Organization.findById(orgId);
+  if (!organization) return null;
+  const membership = await OrganizationMembership.findOne({ organization: orgId, user: user._id, status: 'active' });
+  if (!membership) return null;
+
+  const context = {
+    id: organization._id.toString(),
+    name: organization.name,
+    slug: organization.slug,
+    tier: organization.tier,
+    orgType: organization.orgType || 'both',
+    role: membership.role
+  };
+
+  if (includeSeatDetails) {
+    context.seatLimit = organization.seatLimit;
+    context.seatsUsed = await OrganizationMembership.countActiveSeats(organization._id);
+  }
+
+  return context;
+}
+
+function requirePlatformAccess(platformId) {
+  return async function(req, res, next) {
+    try {
+      if (!req.auth || !req.auth.uid) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const user = req.requestingUser || (await User.findById(req.auth.uid));
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const orgId = req.auth.orgId || user.defaultOrganization;
+      const organizationContext = await buildOrganizationContext(user, orgId);
+      const entitlement = getPlatformEntitlement(user, organizationContext, platformId);
+
+      if (!entitlement.allowed) {
+        return res
+          .status(403)
+          .json({ error: 'PLATFORM_ACCESS_DENIED', platformId, reason: entitlement.reason });
+      }
+
+      req.requestingUser = user;
+      req.organizationContext = organizationContext;
+      req.platformEntitlement = entitlement;
+
+      return next();
+    } catch (err) {
+      console.error('Platform access middleware error', err);
+      return res.status(500).json({ error: 'Unable to verify platform access' });
+    }
+  };
+}
+
 function normalisePlatformAccess(licenseTier, requested) {
   if (!LICENSE_OPTIONS.includes(licenseTier)) {
     return { error: 'Unknown license tier.' };
@@ -214,48 +321,13 @@ function normalisePlatformAccess(licenseTier, requested) {
   return { platformAccess: filtered };
 }
 
-function assertProcurePathAccess(user, organization) {
-  if (organization) {
-    const hasProcurePath = Array.isArray(organization.platformAccess) && organization.platformAccess.includes('procurepath');
-    if (organization.tier !== 'business' || !hasProcurePath) {
-      return { error: 'ProcurePath Control Tower requires a business license with ProcurePath enabled.' };
-    }
-    return { ok: true };
-  }
-
-  const hasProcurePath = Array.isArray(user.platformAccess) && user.platformAccess.includes('procurepath');
-  if (user.licenseTier !== 'business' || !hasProcurePath) {
-    return { error: 'ProcurePath Control Tower requires a business license with ProcurePath enabled.' };
-  }
-  return { ok: true };
-}
-
-function assertRevenueForgeAccess(user, organization) {
-  if (organization) {
-    const hasRevenueForge =
-      Array.isArray(organization.platformAccess) && organization.platformAccess.includes('revenueforge');
-    if (organization.tier !== 'business' || !hasRevenueForge) {
-      return { error: 'RevenueForge AI Studio requires a business license with RevenueForge enabled.' };
-    }
-    return { ok: true };
-  }
-
-  const hasRevenueForge = Array.isArray(user.platformAccess) && user.platformAccess.includes('revenueforge');
-  if (user.licenseTier !== 'business' || !hasRevenueForge) {
-    return { error: 'RevenueForge AI Studio requires a business license with RevenueForge enabled.' };
-  }
-  return { ok: true };
-}
-
 const signupSchema = z.object({
   name: z.string().trim().min(1).max(120),
   email: z.string().email(),
   password: z.string().min(8),
   company: z.string().trim().max(160).optional(),
   role: z.string().trim().max(160).optional(),
-  industry: z.string().trim().max(160).optional(),
-  licenseTier: z.enum(LICENSE_OPTIONS),
-  platformAccess: z.array(z.string()).optional()
+  industry: z.string().trim().max(160).optional()
 });
 
 const loginSchema = z.object({
@@ -912,11 +984,7 @@ app.get('/api/auth/workos/signup', (req, res) => startWorkOSAuthorization(req, r
 
 app.post('/api/auth/signup', validateBody(signupSchema), async (req, res) => {
   try {
-    const { name, email, password, company, role, industry, licenseTier, platformAccess: requested } = req.validatedBody;
-    const normalised = normalisePlatformAccess(licenseTier, requested);
-    if (normalised.error) {
-      return res.status(400).json({ error: normalised.error });
-    }
+    const { name, email, password, company, role, industry } = req.validatedBody;
 
     const existing = await User.findOne({ email: email.toLowerCase().trim() });
     if (existing) {
@@ -930,8 +998,8 @@ app.post('/api/auth/signup', validateBody(signupSchema), async (req, res) => {
       company,
       role,
       industry,
-      licenseTier,
-      platformAccess: normalised.platformAccess
+      licenseTier: 'personal',
+      platformAccess: ['valuesphere']
     });
 
     const token = issueTokenCookie(res, {
@@ -979,6 +1047,7 @@ app.get('/api/auth/workos/callback', async (req, res) => {
     }
 
     const user = await User.findOrCreateFromWorkOSProfile(profile);
+    let shouldSave = false;
 
     let organization = null;
     let membership = null;
@@ -1038,10 +1107,14 @@ app.get('/api/auth/workos/callback', async (req, res) => {
 
       if (!user.defaultOrganization) {
         user.defaultOrganization = organization._id;
+        shouldSave = true;
       }
     }
 
-    if (organization && typeof user.isModified === 'function' && user.isModified('defaultOrganization')) {
+    user.lastLoginAt = new Date();
+    shouldSave = true;
+
+    if (shouldSave && typeof user.save === 'function') {
       await user.save();
     }
 
@@ -1074,6 +1147,10 @@ app.post('/api/auth/login', validateBody(loginSchema), async (req, res) => {
     }
     const valid = await user.verifyPassword(password);
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+
+    user.lastLoginAt = new Date();
+    await user.save();
+
     const token = issueTokenCookie(res, {
       uid: user._id.toString(),
       orgId: user.defaultOrganization ? user.defaultOrganization.toString() : null
@@ -1100,21 +1177,18 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
     if (!user) return res.status(404).json({ error: 'Not found' });
     let organizationContext = null;
     if (user.defaultOrganization) {
-      const organization = await Organization.findById(user.defaultOrganization);
-      const membership = await OrganizationMembership.findForUserAndOrg(user._id, user.defaultOrganization);
-      if (organization) {
-        organizationContext = {
-          id: organization._id.toString(),
-          name: organization.name,
-          slug: organization.slug,
-          tier: organization.tier,
-          seatLimit: organization.seatLimit,
-          seatsUsed: await OrganizationMembership.countActiveSeats(organization._id),
-          role: membership ? membership.role : null
-        };
-      }
+      organizationContext = await buildOrganizationContext(user, user.defaultOrganization, { includeSeatDetails: true });
     }
-    res.json({ ok: true, user: user.public(), platforms: PLATFORM_DEFINITIONS, organizationContext });
+
+    const effectiveLicense = computeEffectiveLicense(user, organizationContext);
+
+    res.json({
+      ok: true,
+      user: user.public(),
+      platforms: PLATFORM_DEFINITIONS,
+      organizationContext,
+      effectiveLicense
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -1128,6 +1202,7 @@ app.get('/api/org/current', requireAuth, async (req, res) => {
 
     const orgId = req.auth.orgId || user.defaultOrganization;
     let organizationPayload = null;
+    let orgContext = null;
 
     if (orgId) {
       const organization = await Organization.findById(orgId);
@@ -1148,10 +1223,19 @@ app.get('/api/org/current', requireAuth, async (req, res) => {
           orgType: organization.orgType || 'both',
           productAccess
         };
+
+        orgContext = {
+          id: organization._id.toString(),
+          name: organization.name,
+          tier: organization.tier,
+          orgType: organization.orgType || 'both',
+          role: membership.role
+        };
       }
     }
 
-    const licenseTier = user.licenseTier === 'guest' ? 'guest' : 'full';
+    const licenseTier = user.licenseTier || 'personal';
+    const effectiveLicense = computeEffectiveLicense(user, orgContext);
 
     res.json({
       ok: true,
@@ -1161,7 +1245,9 @@ app.get('/api/org/current', requireAuth, async (req, res) => {
         email: user.email,
         name: user.name,
         licenseTier
-      }
+      },
+      effectiveLicenseTier: effectiveLicense.tier,
+      homeOrganization: effectiveLicense.homeOrg
     });
   } catch (err) {
     console.error('Org current error', err);
@@ -1660,6 +1746,29 @@ app.post('/api/rooms', requireAuth, validateBody(roomCreateSchema), async (req, 
       return res.status(403).json({ error: 'No active membership for either organization.' });
     }
 
+    const user = await User.findById(req.auth.uid);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const membershipOrg = vendorMembership ? vendorOrg : buyerOrg;
+    const membershipContext = vendorMembership || buyerMembership;
+    const orgContext =
+      membershipOrg && membershipContext
+        ? {
+            id: membershipOrg._id.toString(),
+            name: membershipOrg.name,
+            tier: membershipOrg.tier,
+            orgType: membershipOrg.orgType || 'both',
+            role: membershipContext.role
+          }
+        : null;
+
+    const effectiveLicense = computeEffectiveLicense(user, orgContext);
+    if (effectiveLicense.tier !== 'business') {
+      return res.status(403).json({ error: 'BUSINESS_TIER_REQUIRED_FOR_ROOM_CREATION' });
+    }
+
     if (payload.revenueAccount) {
       const revenueAccount = await RevenueAccount.findById(payload.revenueAccount);
       if (!revenueAccount) return res.status(404).json({ error: 'Revenue account not found' });
@@ -1681,17 +1790,18 @@ app.post('/api/rooms', requireAuth, validateBody(roomCreateSchema), async (req, 
       lastActivityAt: new Date()
     });
 
-    const membershipOrg = vendorMembership ? vendorOrg._id : buyerOrg._id;
-    const user = await User.findById(req.auth.uid);
     await EngagementRoomMembership.create({
       room: room._id,
       user: req.auth.uid,
-      organization: membershipOrg,
+      organization: membershipOrg._id,
       role: 'room_admin',
       isGuest: user && user.licenseTier === 'guest'
     });
 
-    res.status(201).json({ ok: true, room: serializeRoom(room, { role: 'room_admin', organization: membershipOrg }) });
+    res.status(201).json({
+      ok: true,
+      room: serializeRoom(room, { role: 'room_admin', organization: membershipOrg._id })
+    });
   } catch (err) {
     console.error('Create room error', err);
     res.status(500).json({ error: 'Unable to create room' });
@@ -2672,15 +2782,9 @@ app.post(
 );
 
 async function loadProcurePathUser(req, res) {
-  const user = await User.findById(req.auth.uid);
+  const user = req.requestingUser || (await User.findById(req.auth.uid));
   if (!user) {
     res.status(404).json({ error: 'Not found' });
-    return null;
-  }
-
-  const access = assertProcurePathAccess(user, req.organization);
-  if (access.error) {
-    res.status(403).json({ error: access.error });
     return null;
   }
 
@@ -2688,15 +2792,9 @@ async function loadProcurePathUser(req, res) {
 }
 
 async function loadRevenueForgeUser(req, res) {
-  const user = await User.findById(req.auth.uid);
+  const user = req.requestingUser || (await User.findById(req.auth.uid));
   if (!user) {
     res.status(404).json({ error: 'Not found' });
-    return null;
-  }
-
-  const access = assertRevenueForgeAccess(user, req.organization);
-  if (access.error) {
-    res.status(403).json({ error: access.error });
     return null;
   }
 
@@ -2727,7 +2825,7 @@ function calculateRevenueStats(account) {
   };
 }
 
-app.get('/api/procurepath/overview', requireAuth, async (req, res) => {
+app.get('/api/procurepath/overview', requireAuth, requirePlatformAccess('procurepath'), async (req, res) => {
   try {
     const user = await loadProcurePathUser(req, res);
     if (!user) return;
@@ -2757,7 +2855,7 @@ app.get('/api/procurepath/overview', requireAuth, async (req, res) => {
   }
 });
 
-app.get('/api/procurepath/vendors', requireAuth, async (req, res) => {
+app.get('/api/procurepath/vendors', requireAuth, requirePlatformAccess('procurepath'), async (req, res) => {
   try {
     const user = await loadProcurePathUser(req, res);
     if (!user) return;
@@ -2769,42 +2867,55 @@ app.get('/api/procurepath/vendors', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/procurepath/vendors', requireAuth, validateBody(procurementVendorSchema), async (req, res) => {
-  try {
-    const user = await loadProcurePathUser(req, res);
-    if (!user) return;
-    const vendor = await ProcurementVendor.create({ ...req.validatedBody, userId: user._id });
-    res.status(201).json({ ok: true, vendor });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Unable to create vendor' });
-  }
-});
-
-app.put('/api/procurepath/vendors/:id', requireAuth, validateBody(procurementVendorSchema.partial()), async (req, res) => {
-  try {
-    const user = await loadProcurePathUser(req, res);
-    if (!user) return;
-    const vendor = await ProcurementVendor.findOneAndUpdate(
-      { _id: req.params.id, userId: user._id },
-      { $set: req.validatedBody },
-      { new: true }
-    );
-
-    if (!vendor) {
-      return res.status(404).json({ error: 'Vendor not found' });
+  app.post(
+    '/api/procurepath/vendors',
+    requireAuth,
+    requirePlatformAccess('procurepath'),
+    validateBody(procurementVendorSchema),
+    async (req, res) => {
+      try {
+        const user = await loadProcurePathUser(req, res);
+        if (!user) return;
+        const vendor = await ProcurementVendor.create({ ...req.validatedBody, userId: user._id });
+        res.status(201).json({ ok: true, vendor });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Unable to create vendor' });
+      }
     }
+  );
 
-    res.json({ ok: true, vendor });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Unable to update vendor' });
-  }
-});
+  app.put(
+    '/api/procurepath/vendors/:id',
+    requireAuth,
+    requirePlatformAccess('procurepath'),
+    validateBody(procurementVendorSchema.partial()),
+    async (req, res) => {
+      try {
+        const user = await loadProcurePathUser(req, res);
+        if (!user) return;
+        const vendor = await ProcurementVendor.findOneAndUpdate(
+          { _id: req.params.id, userId: user._id },
+          { $set: req.validatedBody },
+          { new: true }
+        );
+
+        if (!vendor) {
+          return res.status(404).json({ error: 'Vendor not found' });
+        }
+
+        res.json({ ok: true, vendor });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Unable to update vendor' });
+      }
+    }
+  );
 
 app.post(
   '/api/procurepath/vendors/:id/objectives',
   requireAuth,
+  requirePlatformAccess('procurepath'),
   validateBody(procurementObjectiveSchema),
   async (req, res) => {
     try {
@@ -2827,6 +2938,7 @@ app.post(
 app.post(
   '/api/procurepath/vendors/:id/touchpoints',
   requireAuth,
+  requirePlatformAccess('procurepath'),
   validateBody(procurementTouchpointSchema),
   async (req, res) => {
     try {
@@ -2846,7 +2958,7 @@ app.post(
   }
 );
 
-app.post('/api/procurepath/ai/playbook', requireAuth, async (req, res) => {
+app.post('/api/procurepath/ai/playbook', requireAuth, requirePlatformAccess('procurepath'), async (req, res) => {
   try {
     const user = await loadProcurePathUser(req, res);
     if (!user) return;
@@ -2920,7 +3032,7 @@ app.post('/api/procurepath/ai/playbook', requireAuth, async (req, res) => {
   }
 });
 
-app.get('/api/revenueforge/accounts', requireAuth, async (req, res) => {
+app.get('/api/revenueforge/accounts', requireAuth, requirePlatformAccess('revenueforge'), async (req, res) => {
   try {
     const user = await loadRevenueForgeUser(req, res);
     if (!user) return;
@@ -2933,7 +3045,12 @@ app.get('/api/revenueforge/accounts', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/revenueforge/accounts', requireAuth, validateBody(revenueAccountSchema), async (req, res) => {
+app.post(
+  '/api/revenueforge/accounts',
+  requireAuth,
+  requirePlatformAccess('revenueforge'),
+  validateBody(revenueAccountSchema),
+  async (req, res) => {
   try {
     const user = await loadRevenueForgeUser(req, res);
     if (!user) return;
@@ -2943,9 +3060,14 @@ app.post('/api/revenueforge/accounts', requireAuth, validateBody(revenueAccountS
     console.error('RevenueForge account create failed', err);
     res.status(500).json({ error: 'Unable to create account' });
   }
-});
+  }
+);
 
-app.get('/api/revenueforge/accounts/:id', requireAuth, async (req, res) => {
+app.get(
+  '/api/revenueforge/accounts/:id',
+  requireAuth,
+  requirePlatformAccess('revenueforge'),
+  async (req, res) => {
   try {
     const user = await loadRevenueForgeUser(req, res);
     if (!user) return;
@@ -2956,11 +3078,13 @@ app.get('/api/revenueforge/accounts/:id', requireAuth, async (req, res) => {
     console.error('RevenueForge account fetch failed', err);
     res.status(500).json({ error: 'Unable to load account' });
   }
-});
+  }
+);
 
 app.post(
   '/api/revenueforge/accounts/:id/opportunities',
   requireAuth,
+  requirePlatformAccess('revenueforge'),
   validateBody(revenueOpportunitySchema),
   async (req, res) => {
     try {
@@ -2982,6 +3106,7 @@ app.post(
 app.put(
   '/api/revenueforge/accounts/:accountId/opportunities/:opportunityId',
   requireAuth,
+  requirePlatformAccess('revenueforge'),
   validateBody(opportunityUpdateSchema),
   async (req, res) => {
     try {
@@ -3008,6 +3133,7 @@ app.put(
 app.post(
   '/api/revenueforge/opportunities/:opportunityId/meetings',
   requireAuth,
+  requirePlatformAccess('revenueforge'),
   validateBody(meetingNoteSchema),
   async (req, res) => {
     try {

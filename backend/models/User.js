@@ -13,7 +13,8 @@ const UserSchema = new Schema(
     industry: { type: String, trim: true },
     licenseTier: { type: String, enum: ['personal', 'business', 'guest'], default: 'personal' },
     platformAccess: { type: [String], default: ['valuesphere'] },
-    defaultOrganization: { type: Schema.Types.ObjectId, ref: 'Organization' }
+    defaultOrganization: { type: Schema.Types.ObjectId, ref: 'Organization', default: null },
+    lastLoginAt: { type: Date }
   },
   { timestamps: true }
 );
@@ -30,6 +31,7 @@ UserSchema.methods.public = function() {
     licenseTier: this.licenseTier,
     platformAccess: Array.isArray(this.platformAccess) ? [...this.platformAccess] : [],
     defaultOrganizationId: this.defaultOrganization ? this.defaultOrganization.toString() : null,
+    lastLoginAt: this.lastLoginAt || null,
     createdAt: this.createdAt
   };
 };
@@ -45,9 +47,7 @@ UserSchema.statics.createSecure = async function({
   password,
   company,
   role,
-  industry,
-  licenseTier,
-  platformAccess
+  industry
 }) {
   const salt = await bcrypt.genSalt(12);
   const hash = await bcrypt.hash(password, salt);
@@ -58,8 +58,9 @@ UserSchema.statics.createSecure = async function({
     company,
     role,
     industry,
-    licenseTier,
-    platformAccess
+    licenseTier: 'personal',
+    platformAccess: ['valuesphere'],
+    defaultOrganization: null
   });
 };
 
