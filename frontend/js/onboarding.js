@@ -12,7 +12,8 @@ const onboardingState = {
     billingDetails: {}
   },
   recommendation: 'free-personal',
-  status: 'pending'
+  status: 'pending',
+  orgManagedLicense: false
 };
 
 function personaLabel(key) {
@@ -146,17 +147,28 @@ async function handleNextStep() {
     return;
   }
 
-  const billingName = document.getElementById('billingName')?.value?.trim();
-  const billingEmail = document.getElementById('billingEmail')?.value?.trim();
-  const licenseSelection = onboardingState.answers.licenseSelection || 'free-personal';
-  onboardingState.answers.licenseSelection = licenseSelection;
-  const payload = {
-    ...onboardingState.answers,
-    licenseSelection,
-    useCases: onboardingState.answers.useCases ? [onboardingState.answers.useCases] : [],
-    billingDetails: { billingName, email: billingEmail },
-    status: 'completed'
-  };
+  let payload;
+
+  if (onboardingState.orgManagedLicense) {
+    const { licenseSelection, billingDetails, ...restAnswers } = onboardingState.answers;
+    payload = {
+      ...restAnswers,
+      useCases: onboardingState.answers.useCases ? [onboardingState.answers.useCases] : [],
+      status: 'completed'
+    };
+  } else {
+    const billingName = document.getElementById('billingName')?.value?.trim();
+    const billingEmail = document.getElementById('billingEmail')?.value?.trim();
+    const licenseSelection = onboardingState.answers.licenseSelection || 'free-personal';
+    onboardingState.answers.licenseSelection = licenseSelection;
+    payload = {
+      ...onboardingState.answers,
+      licenseSelection,
+      useCases: onboardingState.answers.useCases ? [onboardingState.answers.useCases] : [],
+      billingDetails: { billingName, email: billingEmail },
+      status: 'completed'
+    };
+  }
   const saved = await persistProgress(payload);
   if (saved) {
     window.location.href = '/workspace.html';
@@ -193,6 +205,10 @@ async function validateCurrentStep() {
   }
 
   if (current === 'license') {
+    if (onboardingState.orgManagedLicense) {
+      return true;
+    }
+
     if (!onboardingState.answers.licenseSelection) {
       onboardingState.answers.licenseSelection = 'free-personal';
       selectLicenseCard('free-personal');
@@ -269,6 +285,8 @@ function bindUsage() {
 function bindLicenseSelection() {
   document.querySelectorAll('[data-license-select]').forEach(btn => {
     btn.addEventListener('click', async event => {
+      if (onboardingState.orgManagedLicense) return;
+
       const license = btn.getAttribute('data-license-select');
       selectLicenseCard(license);
       onboardingState.answers.licenseSelection = license;
@@ -291,6 +309,63 @@ function bindLicenseSelection() {
       window.open('mailto:sales@agamatechnologies.com?subject=Consulting%20Enterprise%20License', '_blank');
     });
   }
+}
+
+function bindOrgLicenseCheck() {
+  const btn = document.getElementById('checkOrgLicense');
+  if (!btn) return;
+  const feedback = document.getElementById('orgLicenseFeedback');
+
+  btn.addEventListener('click', async () => {
+    if (feedback) feedback.textContent = 'Checking your organisation...';
+
+    try {
+      const res = await fetch('/api/org/current', { credentials: 'include' });
+      if (!res.ok) {
+        if (feedback) feedback.textContent = 'Could not verify organisation. Please try again.';
+        return;
+      }
+      const json = await res.json();
+      const org = json.organization || null;
+
+      if (org) {
+        onboardingState.orgManagedLicense = true;
+
+        document.querySelectorAll('.license-card').forEach(card => {
+          card.classList.add('opacity-50');
+        });
+
+        document.querySelectorAll('.license-card [data-license-select]').forEach(button => {
+          button.classList.add('disabled');
+          button.setAttribute('aria-disabled', 'true');
+          button.disabled = true;
+        });
+
+        if (feedback) {
+          feedback.textContent =
+            'We found your organisation (' + (org.name || 'Your organisation') + '). Your licence is managed by your admin. You can continue without selecting a plan.';
+        }
+      } else {
+        onboardingState.orgManagedLicense = false;
+        document.querySelectorAll('.license-card').forEach(card => {
+          card.classList.remove('opacity-50');
+        });
+        document.querySelectorAll('.license-card [data-license-select]').forEach(button => {
+          button.classList.remove('disabled');
+          button.removeAttribute('aria-disabled');
+          button.disabled = false;
+        });
+
+        if (feedback) {
+          feedback.textContent =
+            'We did not find a business organisation linked to this account. Use the options above to choose a plan or stay on free.';
+        }
+      }
+    } catch (err) {
+      console.error('Org licence check failed', err);
+      if (feedback) feedback.textContent = 'Unable to check organisation right now.';
+    }
+  });
 }
 
 function recommendPlan(persona) {
@@ -364,5 +439,6 @@ document.addEventListener('DOMContentLoaded', () => {
   bindGoals();
   bindUsage();
   bindLicenseSelection();
+  bindOrgLicenseCheck();
   loadOnboarding();
 });
