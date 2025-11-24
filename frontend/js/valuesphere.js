@@ -2,6 +2,17 @@
   const urgencyOptions = ['Immediate', 'In the next 6 months', 'In the next 12 months', 'Roadmap'];
   const maturityOptions = ['Not in place', 'Partially in place', 'Mostly in place', 'Fully in place', 'Out of scope'];
 
+  const vsState = {
+    user: null,
+    effectiveLicense: null,
+    organizationContext: null,
+    isBusinessBuyerWithProcurePath: false,
+    vendors: [],
+    vendorsLoaded: false,
+    selectedVendor: null,
+    currentAssessment: null
+  };
+
   const initialTemplate = {
     id: crypto.randomUUID(),
     name: 'Datadog GTM Value Path',
@@ -105,6 +116,18 @@
   const vsBuyerMode = document.getElementById('vsBuyerMode');
   const vsModeVendorBtn = document.getElementById('vsModeVendorBtn');
   const vsModeBuyerBtn = document.getElementById('vsModeBuyerBtn');
+  const vsBuyerVendorHelper = document.getElementById('vsBuyerVendorHelper');
+  const vsBuyerVendorList = document.getElementById('vsBuyerVendorList');
+  const vsBuyerAssessmentEmpty = document.getElementById('vsBuyerAssessmentEmpty');
+  const vsBuyerAssessmentDetail = document.getElementById('vsBuyerAssessmentDetail');
+  const vsBuyerAssessmentVendorName = document.getElementById('vsBuyerAssessmentVendorName');
+  const vsBuyerAssessmentTitle = document.getElementById('vsBuyerAssessmentTitle');
+  const vsBuyerAssessmentSummary = document.getElementById('vsBuyerAssessmentSummary');
+  const vsBuyerAssessmentTags = document.getElementById('vsBuyerAssessmentTags');
+  const vsBuyerAssessmentMeta = document.getElementById('vsBuyerAssessmentMeta');
+  const vsBuyerSaveAssessmentBtn = document.getElementById('vsBuyerSaveAssessmentBtn');
+  const vsBuyerOpenProcurePath = document.getElementById('vsBuyerOpenProcurePath');
+  const vsBuyerOpenRooms = document.getElementById('vsBuyerOpenRooms');
   let activeAssessment = null;
 
   function computeLocalAssessmentLimit(user) {
@@ -197,6 +220,264 @@
     if (persist) {
       persistValuesphereMode(mode);
     }
+  }
+
+  function hydrateBuyerStateFromContext() {
+    vsState.user = accountContext.user;
+    vsState.effectiveLicense = accountContext.effectiveLicense;
+    vsState.organizationContext = accountContext.organizationContext;
+
+    const tier = vsState.effectiveLicense?.tier || vsState.user?.licenseTier || null;
+    const orgType = (vsState.organizationContext?.orgType || vsState.effectiveLicense?.homeOrg?.orgType || '').toLowerCase();
+    const productAccess = Array.isArray(vsState.organizationContext?.productAccess)
+      ? vsState.organizationContext.productAccess
+      : Array.isArray(vsState.organizationContext?.platformAccess)
+        ? vsState.organizationContext.platformAccess
+        : [];
+
+    vsState.isBusinessBuyerWithProcurePath = tier === 'business'
+      && (orgType === 'buyer' || orgType === 'both')
+      && productAccess.includes('procurepath');
+  }
+
+  function renderBuyerVendorHelper() {
+    if (!vsBuyerVendorHelper) return;
+    if (vsState.isBusinessBuyerWithProcurePath) {
+      vsBuyerVendorHelper.textContent = 'Vendors from ProcurePath will appear here when you’re in a buyer organisation.';
+      return;
+    }
+
+    vsBuyerVendorHelper.textContent = 'Add vendors manually in this mode (future improvement). For now, treat Buyer mode as a sandbox for vendor evaluation.';
+  }
+
+  function renderBuyerAssessmentMeta(assessment, { loading = false, error = null } = {}) {
+    if (!vsBuyerAssessmentMeta) return;
+    if (loading) {
+      vsBuyerAssessmentMeta.textContent = 'Loading assessment...';
+      return;
+    }
+    if (error) {
+      vsBuyerAssessmentMeta.textContent = error;
+      return;
+    }
+    if (assessment?.updatedAt) {
+      const updated = new Date(assessment.updatedAt);
+      vsBuyerAssessmentMeta.textContent = `Last saved ${updated.toLocaleString()}`;
+      return;
+    }
+    vsBuyerAssessmentMeta.textContent = '';
+  }
+
+  function renderBuyerAssessmentForm(vendor, assessment) {
+    if (!vsBuyerAssessmentDetail || !vsBuyerAssessmentEmpty) return;
+    if (!vendor) {
+      vsBuyerAssessmentDetail.classList.add('d-none');
+      vsBuyerAssessmentEmpty.classList.remove('d-none');
+      return;
+    }
+
+    vsBuyerAssessmentEmpty.classList.add('d-none');
+    vsBuyerAssessmentDetail.classList.remove('d-none');
+
+    if (vsBuyerAssessmentVendorName) {
+      vsBuyerAssessmentVendorName.textContent = vendor.name || 'Vendor';
+    }
+
+    if (vsBuyerAssessmentTitle) vsBuyerAssessmentTitle.value = assessment?.title || '';
+    if (vsBuyerAssessmentSummary) vsBuyerAssessmentSummary.value = assessment?.summary || '';
+    if (vsBuyerAssessmentTags) vsBuyerAssessmentTags.value = Array.isArray(assessment?.tags)
+      ? assessment.tags.join(', ')
+      : '';
+
+    renderBuyerAssessmentMeta(assessment);
+
+    if (vsBuyerOpenProcurePath) {
+      vsBuyerOpenProcurePath.href = vendor.id
+        ? `/procurepath-tool.html?vendorId=${encodeURIComponent(vendor.id)}`
+        : '/procurepath-tool.html';
+    }
+
+    if (vsBuyerOpenRooms) {
+      vsBuyerOpenRooms.href = '/rooms.html';
+    }
+  }
+
+  function createVendorListItem(vendor) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'list-group-item list-group-item-action';
+    btn.dataset.vendorId = vendor.id || '';
+
+    const details = [];
+    if (vendor.category) details.push(vendor.category);
+    if (vendor.renewalDate) {
+      details.push(`Renews ${new Date(vendor.renewalDate).toLocaleDateString()}`);
+    }
+
+    btn.innerHTML = `
+      <div class="d-flex justify-content-between align-items-start gap-2">
+        <div>
+          <strong class="d-block">${vendor.name}</strong>
+          <span class="text-fg-3">${details.join(' • ') || 'Vendor portfolio'}</span>
+        </div>
+        <i class="bi bi-chevron-right small"></i>
+      </div>
+    `;
+
+    btn.addEventListener('click', () => selectBuyerVendor(vendor));
+    if (vsState.selectedVendor) {
+      const sameVendor = vsState.selectedVendor.id
+        ? vsState.selectedVendor.id === vendor.id
+        : vsState.selectedVendor.name === vendor.name;
+      btn.classList.toggle('active', sameVendor);
+    }
+    return btn;
+  }
+
+  function handleManualVendorAdd() {
+    const name = (prompt('Enter a vendor to assess') || '').trim();
+    if (!name) return;
+    const vendor = { id: null, name, category: 'Manual', renewalDate: null };
+    vsState.vendors = [vendor, ...vsState.vendors.filter(existing => existing.name !== vendor.name || existing.id)];
+    renderBuyerVendorList();
+    selectBuyerVendor(vendor);
+  }
+
+  function renderBuyerVendorList() {
+    if (!vsBuyerVendorList) return;
+    vsBuyerVendorList.innerHTML = '';
+
+    if (!vsState.isBusinessBuyerWithProcurePath) {
+      const manualBtn = document.createElement('button');
+      manualBtn.type = 'button';
+      manualBtn.className = 'list-group-item list-group-item-action';
+      manualBtn.textContent = 'Add vendor manually';
+      manualBtn.addEventListener('click', handleManualVendorAdd);
+      vsBuyerVendorList.appendChild(manualBtn);
+    }
+
+    if (vsState.vendors.length === 0) return;
+    vsState.vendors.forEach(vendor => {
+      vsBuyerVendorList.appendChild(createVendorListItem(vendor));
+    });
+  }
+
+  async function loadBuyerVendors() {
+    try {
+      const res = await fetch('/api/valuesphere/buyer/vendors', { credentials: 'include' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Unable to load vendors');
+      vsState.vendors = Array.isArray(json.vendors) ? json.vendors : [];
+      vsState.vendorsLoaded = true;
+      renderBuyerVendorList();
+    } catch (err) {
+      console.error('Unable to load buyer vendors', err);
+    }
+  }
+
+  async function loadBuyerAssessmentsForVendor() {
+    if (!vsState.selectedVendor) return;
+    renderBuyerAssessmentMeta(null, { loading: true });
+    try {
+      let url = '/api/valuesphere/buyer/assessments';
+      if (vsState.isBusinessBuyerWithProcurePath && vsState.selectedVendor.id) {
+        url += `?vendorId=${encodeURIComponent(vsState.selectedVendor.id)}`;
+      }
+      const res = await fetch(url, { credentials: 'include' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Unable to load assessments');
+
+      let assessment = null;
+      if (Array.isArray(json.assessments)) {
+        if (vsState.isBusinessBuyerWithProcurePath && vsState.selectedVendor.id) {
+          assessment = json.assessments[0] || null;
+        } else {
+          const selectedName = (vsState.selectedVendor.name || '').toLowerCase();
+          assessment = json.assessments.find(item => (item.vendorName || '').toLowerCase() === selectedName) || null;
+        }
+      }
+
+      vsState.currentAssessment = assessment || null;
+      renderBuyerAssessmentForm(vsState.selectedVendor, vsState.currentAssessment);
+    } catch (err) {
+      console.error('Unable to load buyer assessments', err);
+      renderBuyerAssessmentMeta(null, { error: 'Unable to load assessment' });
+    }
+  }
+
+  function selectBuyerVendor(vendor) {
+    vsState.selectedVendor = vendor;
+    vsState.currentAssessment = null;
+    renderBuyerVendorList();
+    renderBuyerAssessmentForm(vendor, null);
+    loadBuyerAssessmentsForVendor();
+  }
+
+  async function handleBuyerAssessmentSave() {
+    if (!vsState.selectedVendor) {
+      renderBuyerAssessmentMeta(null, { error: 'Select or add a vendor first' });
+      return;
+    }
+
+    const vendorName = (vsState.selectedVendor.name || '').trim();
+    if (!vendorName) {
+      renderBuyerAssessmentMeta(null, { error: 'Vendor name is required' });
+      return;
+    }
+
+    const title = (vsBuyerAssessmentTitle?.value || '').trim();
+    const summary = vsBuyerAssessmentSummary?.value || '';
+    const tags = (vsBuyerAssessmentTags?.value || '').split(',').map(tag => tag.trim()).filter(Boolean);
+
+    try {
+      renderBuyerAssessmentMeta(null, { loading: true });
+      let res;
+      let json;
+      if (vsState.currentAssessment?.id) {
+        res = await fetch(`/api/valuesphere/buyer/assessments/${vsState.currentAssessment.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ title, summary, tags })
+        });
+        json = await res.json();
+      } else {
+        res = await fetch('/api/valuesphere/buyer/assessments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            vendorId: vsState.selectedVendor.id || null,
+            vendorName,
+            title,
+            summary,
+            tags
+          })
+        });
+        json = await res.json();
+      }
+
+      if (!res.ok || !json.assessment) {
+        throw new Error(json.error || 'Unable to save assessment');
+      }
+
+      vsState.currentAssessment = json.assessment;
+      renderBuyerAssessmentForm(vsState.selectedVendor, vsState.currentAssessment);
+    } catch (err) {
+      console.error('Unable to save buyer assessment', err);
+      renderBuyerAssessmentMeta(null, { error: 'Unable to save assessment' });
+    }
+  }
+
+  async function prepareBuyerMode() {
+    if (!vsBuyerMode) return;
+    renderBuyerVendorHelper();
+    if (vsState.isBusinessBuyerWithProcurePath && !vsState.vendorsLoaded) {
+      await loadBuyerVendors();
+    } else {
+      renderBuyerVendorList();
+    }
+    renderBuyerAssessmentForm(vsState.selectedVendor, vsState.currentAssessment);
   }
 
   function isAssessmentLimitReached() {
@@ -880,6 +1161,7 @@
   async function boot() {
     const authed = await ensureAuthenticated();
     if (!authed) return;
+    hydrateBuyerStateFromContext();
     const initialMode = computeInitialMode();
     setMode(initialMode, { persist: false });
     bindAreaEvents();
@@ -890,6 +1172,11 @@
       setActiveAssessment(state.assessments[0]);
     }
     renderAssessmentLimitNotice();
+    if (initialMode === 'buyer') {
+      await prepareBuyerMode();
+    } else {
+      renderBuyerVendorHelper();
+    }
 
     const addAreaBtn = document.getElementById('addArea');
     if (addAreaBtn) addAreaBtn.addEventListener('click', addArea);
@@ -914,7 +1201,11 @@
     if (templateLibraryList) templateLibraryList.addEventListener('click', handleTemplateLibraryClick);
     if (completedAssessmentsList) completedAssessmentsList.addEventListener('click', handleCompletedAssessmentOpen);
     if (vsModeVendorBtn) vsModeVendorBtn.addEventListener('click', () => setMode('vendor'));
-    if (vsModeBuyerBtn) vsModeBuyerBtn.addEventListener('click', () => setMode('buyer'));
+    if (vsModeBuyerBtn) vsModeBuyerBtn.addEventListener('click', async () => {
+      setMode('buyer');
+      await prepareBuyerMode();
+    });
+    if (vsBuyerSaveAssessmentBtn) vsBuyerSaveAssessmentBtn.addEventListener('click', handleBuyerAssessmentSave);
   }
 
   document.addEventListener('DOMContentLoaded', boot);

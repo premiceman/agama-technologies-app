@@ -305,12 +305,53 @@
         </section>
 
         <section id="vsBuyerMode" class="d-none">
-          <div class="card glass p-4">
-            <h2 class="h6 mb-2">Buyer mode</h2>
-            <p class="text-fg-3 small mb-0">
-              Use this mode to evaluate the value you get from your vendors and align them to your roadmap.
-              We’ll integrate deeper with ProcurePath in a later phase.
-            </p>
+          <div class="row g-3">
+            <div class="col-lg-4">
+              <div class="card glass p-3 h-100">
+                <h2 class="h6 mb-2">Vendors</h2>
+                <p class="text-fg-3 small mb-3" id="vsBuyerVendorHelper">
+                  Vendors from ProcurePath will appear here when you’re in a buyer organisation.
+                </p>
+                <div class="list-group small" id="vsBuyerVendorList">
+                  <!-- vendor rows injected here -->
+                </div>
+              </div>
+            </div>
+            <div class="col-lg-8">
+              <div class="card glass p-3 mb-3" id="vsBuyerAssessmentEmpty">
+                <p class="text-fg-3 small mb-0">Select a vendor to start assessing their value.</p>
+              </div>
+              <div class="card glass p-3 d-none" id="vsBuyerAssessmentDetail">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div>
+                    <span class="eyebrow d-block mb-1">Buyer mode</span>
+                    <strong class="h6 mb-0" id="vsBuyerAssessmentVendorName"></strong>
+                  </div>
+                  <div class="d-flex gap-2">
+                    <a class="btn btn-outline-light btn-sm" id="vsBuyerOpenProcurePath" href="#">Open in ProcurePath</a>
+                    <a class="btn btn-outline-light btn-sm" id="vsBuyerOpenRooms" href="/rooms.html">Open Engagement Rooms</a>
+                  </div>
+                </div>
+                <!-- simple assessment form -->
+                <div class="mb-3">
+                  <label class="form-label small" for="vsBuyerAssessmentTitle">Assessment title</label>
+                  <input class="form-control form-control-sm" id="vsBuyerAssessmentTitle" type="text" placeholder="e.g. 2025 roadmap fit">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label small" for="vsBuyerAssessmentSummary">Summary</label>
+                  <textarea class="form-control form-control-sm" id="vsBuyerAssessmentSummary" rows="3" placeholder="How does this vendor support our outcomes?"></textarea>
+                </div>
+                <!-- tags can be a simple text input for now -->
+                <div class="mb-3">
+                  <label class="form-label small" for="vsBuyerAssessmentTags">Tags (comma-separated)</label>
+                  <input class="form-control form-control-sm" id="vsBuyerAssessmentTags" type="text" placeholder="keep,grow,watch,consolidate">
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                  <div class="small text-fg-3" id="vsBuyerAssessmentMeta"></div>
+                  <button class="btn btn-primary btn-sm" id="vsBuyerSaveAssessmentBtn" type="button">Save assessment</button>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
       </main>
