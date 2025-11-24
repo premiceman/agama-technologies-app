@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
 const COOKIE = process.env.JWT_COOKIE_NAME || 'at_session';
 const DAYS = parseInt(process.env.JWT_EXPIRES_DAYS || '7', 10);
@@ -25,14 +26,22 @@ function clearTokenCookie(res) {
   res.cookie(COOKIE, '', { httpOnly: true, secure: SECURE_COOKIE, sameSite: 'lax', maxAge: 1, path: '/' });
 }
 
-function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
   const token = req.cookies[COOKIE] || (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   try {
     const decoded = jwt.verify(token, SECRET);
+    const user = await User.findById(decoded.uid);
+    if (!user || user.status !== 'active') {
+      clearTokenCookie(res);
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
     req.auth = decoded;
+    req.requestingUser = user;
     return next();
-  } catch {
+  } catch (err) {
+    console.error('Auth middleware error', err);
     return res.status(401).json({ error: 'Unauthorized' });
   }
 }
