@@ -1,5 +1,7 @@
 const state = {
   orgContext: null,
+  user: null,
+  effectiveLicenseTier: null,
   isGuest: false,
   organizations: [],
   roomId: null,
@@ -30,6 +32,58 @@ async function fetchJson(url, options = {}) {
 function setText(id, text) {
   const el = document.getElementById(id);
   if (el) el.textContent = text;
+}
+
+function licenseLabel(tier) {
+  switch (tier) {
+    case 'business':
+      return 'Business license';
+    case 'guest':
+      return 'Guest license';
+    default:
+      return 'Personal license';
+  }
+}
+
+function roomsEntitlement() {
+  const tier = state.effectiveLicenseTier || state.orgContext?.tier || state.user?.licenseTier || 'personal';
+  if (state.isGuest) return { allowed: true };
+  if (tier === 'business') return { allowed: true };
+  return {
+    allowed: false,
+    reason:
+      'Engagement Rooms are part of Agama Business workspaces. Talk to us to switch it on and unify every buyer conversation.'
+  };
+}
+
+function buildSalesEmailLink() {
+  const subject = encodeURIComponent('Enable Engagement Rooms for my workspace');
+  const body = encodeURIComponent(
+    `Hi Agama Sales,%0D%0A%0D%0APlease enable Engagement Rooms for our workspace so we can centralise email, Slack/Teams, Monday, and Google Docs in one place.%0D%0AAccount email: ${
+      state.user?.email || 'Not provided'
+    }%0D%0AName: ${state.user?.name || 'Not provided'}%0D%0AOrganisation: ${
+      state.orgContext?.name || 'Not set'
+    }%0D%0ALicense tier: ${state.effectiveLicenseTier || state.user?.licenseTier || 'personal'}%0D%0AUse case: Consolidate multi-channel buyer conversations and documents into a single Engagement Room.%0D%0A`
+  );
+  return `mailto:sales@agamatechnologies.com?subject=${subject}&body=${body}`;
+}
+
+function renderRoomsLanding(entitlement) {
+  const landing = document.getElementById('roomsLanding');
+  const experience = document.getElementById('roomsExperience');
+  toggle(experience, false);
+  toggle(landing, true);
+
+  const licenseTier = state.effectiveLicenseTier || state.user?.licenseTier || (state.isGuest ? 'guest' : 'personal');
+  setText('roomsLandingBadge', licenseLabel(licenseTier));
+  const contextPieces = [];
+  if (state.orgContext?.name) contextPieces.push(state.orgContext.name);
+  if (licenseTier) contextPieces.push(licenseLabel(licenseTier));
+  setText('roomsLandingContext', contextPieces.join(' • '));
+  if (entitlement?.reason) setText('roomsLandingMessage', entitlement.reason);
+
+  const cta = document.getElementById('roomsSalesCta');
+  if (cta) cta.href = buildSalesEmailLink();
 }
 
 function toggle(el, show) {
@@ -74,10 +128,20 @@ async function initRoomsPage() {
   try {
     const orgResp = await fetchJson('/api/org/current');
     state.orgContext = orgResp.organization;
+    state.user = orgResp.user;
+    state.effectiveLicenseTier = orgResp.effectiveLicenseTier || orgResp.effectiveLicense?.tier;
     state.isGuest = orgResp.user?.licenseTier === 'guest';
+
+    const entitlement = roomsEntitlement();
+    if (!entitlement.allowed) {
+      renderRoomsLanding(entitlement);
+      return;
+    }
+
     const orgsResp = await fetchJson('/api/orgs');
     state.organizations = orgsResp.organizations || [];
-    setText('licenseBadge', state.isGuest ? 'Guest license' : 'Full member');
+    const licenseTier = state.effectiveLicenseTier || orgResp.user?.licenseTier || 'personal';
+    setText('licenseBadge', licenseLabel(licenseTier));
     setText(
       'roomsOrgContext',
       state.orgContext ? `${state.orgContext.name} • ${state.orgContext.orgType || 'multi-org'}` : 'No organization selected'
