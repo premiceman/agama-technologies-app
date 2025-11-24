@@ -631,7 +631,10 @@ async function findActiveOrgMembership(userId, orgId) {
 
 async function loadRoomWithMembership(roomId, userId) {
   if (!isValidObjectId(roomId)) return { room: null, membership: null };
-  const membership = await EngagementRoomMembership.findOne({ room: roomId, user: userId });
+  const membership = await EngagementRoomMembership.findOne({ room: roomId, user: userId }).populate(
+    'organization',
+    'name orgType tier'
+  );
   if (!membership) return { room: null, membership: null };
   const room = await EngagementRoom.findById(roomId);
   return { room, membership };
@@ -639,6 +642,16 @@ async function loadRoomWithMembership(roomId, userId) {
 
 function serializeRoom(room, membership) {
   if (!room) return null;
+  const membershipOrg = membership?.organization;
+  const orgDetails = membershipOrg
+    ? {
+        id: membershipOrg._id ? membershipOrg._id.toString() : membershipOrg.toString(),
+        name: membershipOrg.name || null,
+        orgType: membershipOrg.orgType || null,
+        tier: membershipOrg.tier || null
+      }
+    : null;
+
   return {
     id: room._id.toString(),
     title: room.title,
@@ -651,7 +664,18 @@ function serializeRoom(room, membership) {
     membership: membership
       ? {
           role: membership.role,
-          organization: membership.organization ? membership.organization.toString() : null
+          organization: membership.organization
+            ? membership.organization._id
+              ? membership.organization._id.toString()
+              : membership.organization.toString()
+            : null
+        }
+      : null,
+    yourMembership: membership
+      ? {
+          role: membership.role,
+          isGuest: Boolean(membership.isGuest),
+          organization: orgDetails
         }
       : null
   };
@@ -2182,7 +2206,9 @@ app.post(
 
 app.get('/api/rooms', requireAuth, async (req, res) => {
   try {
-    const memberships = await EngagementRoomMembership.find({ user: req.auth.uid }).populate('room');
+    const memberships = await EngagementRoomMembership.find({ user: req.auth.uid })
+      .populate('room')
+      .populate('organization', 'name orgType tier');
 
     const validMemberships = memberships.filter(m => m.room);
     const roomIds = validMemberships.map(m => m.room._id);
@@ -2285,7 +2311,11 @@ app.post('/api/rooms', requireAuth, validateBody(roomCreateSchema), async (req, 
 
     res.status(201).json({
       ok: true,
-      room: serializeRoom(room, { role: 'room_admin', organization: membershipOrg._id })
+      room: serializeRoom(room, {
+        role: 'room_admin',
+        organization: membershipOrg,
+        isGuest: user && user.licenseTier === 'guest'
+      })
     });
   } catch (err) {
     console.error('Create room error', err);
@@ -2900,8 +2930,8 @@ app.post(
         return res.status(404).json({ error: 'Room not found' });
       }
 
-      if (!hasRoomRole(membership, 'room_admin')) {
-        return res.status(403).json({ error: 'Only room admins can manage members.' });
+      if (!hasRoomRole(membership, 'room_admin') || membership.isGuest) {
+        return res.status(403).json({ error: 'Only non-guest room admins can manage members.' });
       }
 
       const payload = req.validatedBody;
@@ -2948,8 +2978,8 @@ app.delete('/api/rooms/:roomId/members/:userId', requireAuth, async (req, res) =
       return res.status(404).json({ error: 'Room not found' });
     }
 
-    if (!hasRoomRole(membership, 'room_admin')) {
-      return res.status(403).json({ error: 'Only room admins can remove members.' });
+    if (!hasRoomRole(membership, 'room_admin') || membership.isGuest) {
+      return res.status(403).json({ error: 'Only non-guest room admins can remove members.' });
     }
 
     const targetMembership = await EngagementRoomMembership.findOne({ room: room._id, user: req.params.userId });
@@ -2983,8 +3013,8 @@ app.get('/api/rooms/:roomId/invites', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Room not found' });
     }
 
-    if (!hasRoomRole(membership, 'room_admin')) {
-      return res.status(403).json({ error: 'Only room admins can view invites.' });
+    if (!hasRoomRole(membership, 'room_admin') || membership.isGuest) {
+      return res.status(403).json({ error: 'Only non-guest room admins can view invites.' });
     }
 
     const invites = await EngagementRoomInvite.find({ room: room._id }).sort({ createdAt: -1 });
@@ -3006,8 +3036,8 @@ app.post(
         return res.status(404).json({ error: 'Room not found' });
       }
 
-      if (!hasRoomRole(membership, 'room_admin')) {
-        return res.status(403).json({ error: 'Only room admins can create invites.' });
+      if (!hasRoomRole(membership, 'room_admin') || membership.isGuest) {
+        return res.status(403).json({ error: 'Only non-guest room admins can create invites.' });
       }
 
       const payload = req.validatedBody;
