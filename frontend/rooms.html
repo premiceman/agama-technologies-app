@@ -90,7 +90,7 @@
     </aside>
 
     <div class="app-content">
-      <div class="container py-5">
+      <div class="container py-5" id="roomsExperience">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
           <div>
             <span class="eyebrow">Engagement rooms</span>
@@ -140,6 +140,96 @@
                 <div id="guestRoomsList" class="row g-3"></div>
                 <div id="guestRoomsEmpty" class="text-center text-fg-3 small d-none">No guest rooms right now.</div>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="container py-5 d-none" id="roomsLanding">
+        <div class="card glass p-4 mb-4">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div>
+              <span class="eyebrow">Engagement Rooms</span>
+              <h1 class="h3 mb-2">Centralise every deal touchpoint</h1>
+              <p class="text-fg-3 mb-0" id="roomsLandingMessage">
+                Bring email, Slack, Teams, Monday boards, and Google Docs into one shared workspace for buyers and vendors.
+              </p>
+            </div>
+            <div class="text-end">
+              <span class="badge-soft" id="roomsLandingBadge">Requires Business workspace</span>
+              <div class="text-fg-3 small" id="roomsLandingContext"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+          <div class="col-md-4">
+            <div class="card glass h-100 p-3">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <div class="icon-circle icon-circle-sm bg-primary-subtle text-primary"><i class="bi bi-diagram-3"></i></div>
+                <h2 class="h6 mb-0">Unified comms diagram</h2>
+              </div>
+              <p class="text-fg-3 small">Visualise how every channel feeds the engagement room.</p>
+              <div class="d-flex flex-column gap-2">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="badge-soft">Email</span>
+                  <div class="flex-grow-1 border-top opacity-75" style="border-top-style: dashed;"></div>
+                  <span class="badge-soft">Room timeline</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="badge-soft">Slack &amp; Teams</span>
+                  <div class="flex-grow-1 border-top opacity-75" style="border-top-style: dashed;"></div>
+                  <span class="badge-soft">Issue tracker</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="badge-soft">Docs &amp; boards</span>
+                  <div class="flex-grow-1 border-top opacity-75" style="border-top-style: dashed;"></div>
+                  <span class="badge-soft">Deliverables</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card glass h-100 p-3">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <div class="icon-circle icon-circle-sm bg-success-subtle text-success"><i class="bi bi-bar-chart"></i></div>
+                <h2 class="h6 mb-0">Value snapshots</h2>
+              </div>
+              <p class="text-fg-3 small">Showcase adoption and ROI with live stats.</p>
+              <ul class="list-unstyled mb-0 small text-fg-3">
+                <li class="mb-2"><i class="bi bi-check2-circle text-success"></i> 60% faster stakeholder alignment</li>
+                <li class="mb-2"><i class="bi bi-check2-circle text-success"></i> 2x higher deliverable completion rates</li>
+                <li class="mb-2"><i class="bi bi-check2-circle text-success"></i> Zero hunting across inboxes and boards</li>
+              </ul>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card glass h-100 p-3">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <div class="icon-circle icon-circle-sm bg-info-subtle text-info"><i class="bi bi-stack"></i></div>
+                <h2 class="h6 mb-0">What centralises here</h2>
+              </div>
+              <p class="text-fg-3 small">Everything that usually lives in a thousand tabs.</p>
+              <ul class="list-unstyled mb-0 small text-fg-3">
+                <li class="mb-2"><i class="bi bi-envelope"></i> Email threads auto-linked to issues</li>
+                <li class="mb-2"><i class="bi bi-slack"></i> Slack &amp; Teams conversations summarised</li>
+                <li class="mb-2"><i class="bi bi-kanban"></i> Monday boards mapped into deliverables</li>
+                <li><i class="bi bi-file-earmark-text"></i> Google Docs versions tracked alongside approvals</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card glass p-4 mb-4">
+          <div class="row g-4 align-items-center">
+            <div class="col-md-8">
+              <h2 class="h5 mb-1">Ready to unlock Engagement Rooms?</h2>
+              <p class="text-fg-3 mb-0" id="roomsLandingCtaCopy">
+                Contact Agama Sales to switch on this workspace and invite your buyers into a single shared record.
+              </p>
+            </div>
+            <div class="col-md-4 text-md-end">
+              <a class="btn btn-primary" id="roomsSalesCta" href="mailto:sales@agamatechnologies.com">Email Agama Sales</a>
             </div>
           </div>
         </div>
