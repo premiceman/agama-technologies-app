@@ -255,6 +255,38 @@ a:hover{text-decoration:none;color:var(--brand-2);}
   transform: translateX(2px);
 }
 
+.docs-toc .sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .5rem .65rem;
+  color: var(--fg-2);
+  border-radius: .65rem;
+  border: 1px solid transparent;
+  letter-spacing: .2px;
+  white-space: normal;
+}
+
+.docs-toc .sidebar-label {
+  display: inline;
+  opacity: 1;
+  transform: none;
+}
+
+.docs-toc .sidebar-link:hover,
+.docs-toc .sidebar-link:focus-visible {
+  background: rgba(255,255,255,.06);
+  color: var(--fg-strong);
+  transform: none;
+}
+
+.docs-toc .sidebar-link.active {
+  background: rgba(0,229,193,.1);
+  color: var(--fg-strong);
+  border: 1px solid rgba(0,229,193,.28);
+  box-shadow: 0 10px 24px rgba(5,199,170,.2);
+}
+
 .sidebar-link.active {
   background: rgba(0,229,193,.1);
   color: var(--fg-strong);
