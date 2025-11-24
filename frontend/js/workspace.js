@@ -12,6 +12,20 @@ function setText(id, text) {
   if (el) el.textContent = text;
 }
 
+function toggleOrgAdminNav(authPayload) {
+  const label = document.getElementById('orgAdminLabel');
+  const section = document.getElementById('orgAdminSection');
+  const { effectiveLicense, organizationContext, memberships } = authPayload || {};
+  const hasBusiness = effectiveLicense?.tier === 'business';
+  const isOrgAdmin = (memberships || []).some(m => m.isHome && ['owner', 'admin'].includes(m.role));
+  const contextAdmin = organizationContext && ['owner', 'admin'].includes(organizationContext.role);
+  const canSee = hasBusiness && (isOrgAdmin || contextAdmin);
+  if (label && section) {
+    label.style.display = canSee ? '' : 'none';
+    section.style.display = canSee ? '' : 'none';
+  }
+}
+
 function formatDate(value) {
   if (!value) return 'n/a';
   const date = new Date(value);
@@ -213,6 +227,11 @@ async function fetchWorkspace() {
     dashboardState.organizationContext = json.organizationContext || null;
     dashboardState.memberships = json.memberships || [];
     dashboardState.effectiveLicense = json.effectiveLicense || { tier: json.user?.licenseTier };
+    toggleOrgAdminNav({
+      effectiveLicense: dashboardState.effectiveLicense,
+      organizationContext: dashboardState.organizationContext,
+      memberships: dashboardState.memberships
+    });
     renderAccountCard();
     renderSuites();
     populateProfileForm();

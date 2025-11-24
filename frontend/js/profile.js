@@ -16,6 +16,20 @@ function setText(id, text) {
   if (el) el.textContent = text;
 }
 
+function toggleOrgAdminNav(authPayload) {
+  const label = document.getElementById('orgAdminLabel');
+  const section = document.getElementById('orgAdminSection');
+  const { effectiveLicense, organizationContext, memberships } = authPayload || {};
+  const hasBusiness = effectiveLicense?.tier === 'business';
+  const isOrgAdmin = (memberships || []).some(m => m.isHome && ['owner', 'admin'].includes(m.role));
+  const contextAdmin = organizationContext && ['owner', 'admin'].includes(organizationContext.role);
+  const canSee = hasBusiness && (isOrgAdmin || contextAdmin);
+  if (label && section) {
+    label.style.display = canSee ? '' : 'none';
+    section.style.display = canSee ? '' : 'none';
+  }
+}
+
 function licenseLabel(tier) {
   switch (tier) {
     case 'business':
@@ -57,6 +71,11 @@ async function loadProfile() {
     profileState.effectiveLicense = json.effectiveLicense || { tier: json.user?.licenseTier };
     profileState.memberships = json.memberships || [];
     profileState.organizationContext = json.organizationContext || null;
+    toggleOrgAdminNav({
+      effectiveLicense: profileState.effectiveLicense,
+      organizationContext: profileState.organizationContext,
+      memberships: profileState.memberships
+    });
     renderProfile();
     renderSuites();
   } catch (err) {

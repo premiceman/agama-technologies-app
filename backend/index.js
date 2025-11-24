@@ -314,6 +314,45 @@ async function requireStaff(req, res, next) {
   }
 }
 
+async function requireOrgAdmin(req, res, next) {
+  try {
+    if (!req.auth || !req.auth.uid) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const user = req.requestingUser || (await User.findById(req.auth.uid));
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const orgId = req.auth.orgId || user.defaultOrganization;
+    if (!orgId) {
+      return res.status(400).json({ error: 'ORG_NOT_SELECTED' });
+    }
+
+    const organization = await Organization.findById(orgId);
+    if (!organization) {
+      return res.status(404).json({ error: 'Organization not found' });
+    }
+
+    const membership = await OrganizationMembership.findOne({
+      organization: orgId,
+      user: user._id,
+      status: 'active'
+    });
+
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ error: 'ORG_ADMIN_ONLY' });
+    }
+
+    req.requestingUser = user;
+    req.organization = organization;
+    req.orgMembership = membership;
+    return next();
+  } catch (err) {
+    console.error('requireOrgAdmin error', err);
+    return res.status(500).json({ error: 'Unable to verify organization admin access' });
+  }
+}
+
 function normalisePlatformAccess(licenseTier, requested) {
   if (!LICENSE_OPTIONS.includes(licenseTier)) {
     return { error: 'Unknown license tier.' };
@@ -457,6 +496,22 @@ const issueCreateSchema = z.object({
   notes: z.string().trim().optional(),
   priority: z.enum(['low', 'medium', 'high']).optional()
 });
+
+function serializeMembership(membership) {
+  const user = membership.user || {};
+  const userId = typeof membership.user === 'string' ? membership.user : user._id;
+  return {
+    id: membership._id.toString(),
+    userId: userId ? userId.toString() : null,
+    name: user.name || null,
+    email: user.email || membership.invitedEmail || null,
+    role: membership.role,
+    status: membership.status,
+    licenseTier: user.licenseTier || null,
+    lastLoginAt: user.lastLoginAt || null,
+    createdAt: membership.createdAt
+  };
+}
 
 const issueUpdateSchema = z.object({
   title: z.string().trim().min(1).optional(),
@@ -1443,6 +1498,170 @@ app.get('/api/org/users/search', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('User search error', err);
     res.status(500).json({ error: 'Unable to search users' });
+  }
+});
+
+app.get('/api/org/admin/overview', requireAuth, requireOrgAdmin, async (req, res) => {
+  try {
+    const organization = req.organization;
+    const productAccess = Array.isArray(organization.productAccess)
+      ? [...organization.productAccess]
+      : Array.isArray(organization.platformAccess)
+        ? [...organization.platformAccess]
+        : [];
+
+    const seatsUsed = await OrganizationMembership.countActiveSeats(organization._id);
+    const members = await OrganizationMembership.find({
+      organization: organization._id,
+      status: { $ne: 'removed' }
+    }).populate({ path: 'user', select: 'name email licenseTier lastLoginAt' });
+
+    res.json({
+      ok: true,
+      organization: {
+        id: organization._id.toString(),
+        name: organization.name,
+        slug: organization.slug,
+        orgType: organization.orgType || 'both',
+        tier: organization.tier,
+        productAccess,
+        seatLimit: organization.seatLimit,
+        seatsUsed,
+        createdAt: organization.createdAt
+      },
+      members: members.map(serializeMembership)
+    });
+  } catch (err) {
+    console.error('Org admin overview error', err);
+    res.status(500).json({ error: 'Unable to load organization overview' });
+  }
+});
+
+app.post('/api/org/admin/members', requireAuth, requireOrgAdmin, validateBody(membershipCreateSchema), async (req, res) => {
+  try {
+    const { email, role } = req.validatedBody;
+    const normalizedEmail = email.toLowerCase().trim();
+
+    let user = await User.findOne({ email: normalizedEmail });
+    if (!user) {
+      user = await User.create({
+        email: normalizedEmail,
+        licenseTier: 'guest',
+        platformAccess: []
+      });
+    }
+
+    let membership = await OrganizationMembership.findOne({ organization: req.organization._id, user: user._id });
+    if (membership && membership.status !== 'removed') {
+      return res.status(400).json({ error: 'User is already a member of this organization.' });
+    }
+
+    if (membership && membership.status === 'removed') {
+      membership.role = role;
+      membership.status = 'invited';
+      membership.invitedEmail = normalizedEmail;
+      await membership.save();
+    } else {
+      membership = await OrganizationMembership.create({
+        organization: req.organization._id,
+        user: user._id,
+        role,
+        status: 'invited',
+        invitedEmail: normalizedEmail
+      });
+    }
+
+    await membership.populate({ path: 'user', select: 'name email licenseTier lastLoginAt' });
+    res.status(201).json({ ok: true, member: serializeMembership(membership) });
+  } catch (err) {
+    console.error('Org admin invite error', err);
+    res.status(500).json({ error: 'Unable to invite member' });
+  }
+});
+
+app.patch(
+  '/api/org/admin/members/:membershipId',
+  requireAuth,
+  requireOrgAdmin,
+  validateBody(membershipUpdateSchema),
+  async (req, res) => {
+    try {
+      const membership = await OrganizationMembership.findById(req.params.membershipId).populate({
+        path: 'user',
+        select: 'name email licenseTier lastLoginAt'
+      });
+      if (!membership) {
+        return res.status(404).json({ error: 'Membership not found' });
+      }
+      if (membership.organization.toString() !== req.organization._id.toString()) {
+        return res.status(403).json({ error: 'ORG_ADMIN_ONLY' });
+      }
+
+      const ownerCount = await OrganizationMembership.countDocuments({
+        organization: req.organization._id,
+        role: 'owner',
+        status: { $ne: 'removed' }
+      });
+
+      const nextRole = req.validatedBody.role;
+      const nextStatus = req.validatedBody.status;
+
+      if (membership.role === 'owner' && ownerCount <= 1) {
+        if (nextRole && nextRole !== 'owner') {
+          return res.status(400).json({ error: 'Cannot remove the last owner.' });
+        }
+        if (nextStatus && nextStatus === 'removed') {
+          return res.status(400).json({ error: 'Cannot remove the last owner.' });
+        }
+      }
+
+      const isSelf = membership.user && membership.user._id && membership.user._id.toString() === req.requestingUser._id.toString();
+      if (isSelf && membership.role === 'owner' && ownerCount <= 1 && nextRole && nextRole !== 'owner') {
+        return res.status(400).json({ error: 'You must keep at least one owner on the organization.' });
+      }
+
+      if (nextRole) {
+        membership.role = nextRole;
+      }
+      if (nextStatus) {
+        membership.status = nextStatus;
+      }
+
+      await membership.save();
+      res.json({ ok: true, member: serializeMembership(membership) });
+    } catch (err) {
+      console.error('Org admin update member error', err);
+      res.status(500).json({ error: 'Unable to update member' });
+    }
+  }
+);
+
+app.delete('/api/org/admin/members/:membershipId', requireAuth, requireOrgAdmin, async (req, res) => {
+  try {
+    const membership = await OrganizationMembership.findById(req.params.membershipId);
+    if (!membership) {
+      return res.status(404).json({ error: 'Membership not found' });
+    }
+    if (membership.organization.toString() !== req.organization._id.toString()) {
+      return res.status(403).json({ error: 'ORG_ADMIN_ONLY' });
+    }
+
+    const ownerCount = await OrganizationMembership.countDocuments({
+      organization: req.organization._id,
+      role: 'owner',
+      status: { $ne: 'removed' }
+    });
+
+    if (membership.role === 'owner' && ownerCount <= 1) {
+      return res.status(400).json({ error: 'Cannot remove the last owner.' });
+    }
+
+    membership.status = 'removed';
+    await membership.save();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Org admin delete member error', err);
+    res.status(500).json({ error: 'Unable to remove member' });
   }
 });
 
