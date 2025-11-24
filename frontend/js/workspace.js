@@ -54,6 +54,21 @@ function licenseLabel(tier) {
   }
 }
 
+function personaLabel(persona) {
+  switch (persona) {
+    case 'vendor':
+      return 'Vendor';
+    case 'buyer':
+      return 'Buyer';
+    case 'both':
+      return 'Vendor & buyer';
+    case 'explorer':
+      return 'Exploring';
+    default:
+      return 'Not set';
+  }
+}
+
 function entitlementForPlatform(platform) {
   const { user, organizationContext, effectiveLicense } = dashboardState;
   const tier = effectiveLicense?.tier || user?.licenseTier || 'personal';
@@ -134,13 +149,50 @@ function renderAccountCard() {
     org.textContent = `${organizationContext.name} • ${roleLabel}`;
     meta.appendChild(org);
   }
+
+  const personaBadge = document.createElement('span');
+  personaBadge.className = 'badge-soft';
+  personaBadge.textContent = `Persona: ${personaLabel(user.persona)}`;
+  meta.appendChild(personaBadge);
+}
+
+function platformPersonaHint(platformId, persona) {
+  if (persona === 'vendor' || persona === 'both') {
+    if (platformId === 'valuesphere') return 'Start with Navigator assessments to quantify value for prospects.';
+    if (platformId === 'revenueforge') return 'Wire your GTM motions to follow through on those assessments.';
+  }
+  if (persona === 'buyer') {
+    if (platformId === 'procurepath') return 'Track contracts and vendors before inviting them into rooms.';
+  }
+  if (persona === 'explorer') {
+    if (platformId === 'valuesphere') return 'Try a sandboxed ValueSphere assessment with sample data.';
+  }
+  return '';
+}
+
+function platformPersonaCta(platformId, persona) {
+  if (persona === 'vendor' || persona === 'both') {
+    if (platformId === 'valuesphere') return 'Start a value assessment';
+    if (platformId === 'revenueforge') return 'Set up your GTM flows';
+  }
+  if (persona === 'buyer') {
+    if (platformId === 'procurepath') return 'View your vendors & contracts';
+  }
+  if (persona === 'explorer' && platformId === 'valuesphere') {
+    return 'Explore ValueSphere';
+  }
+  return 'Open';
+}
+
+function getPlatformById(id) {
+  return dashboardState.platforms.find(platform => platform.id === id);
 }
 
 function renderSuites() {
   const list = document.getElementById('suiteList');
   const count = document.getElementById('suiteCount');
   list.innerHTML = '';
-  const { platforms } = dashboardState;
+  const { platforms, user } = dashboardState;
   count.textContent = `${platforms.length} suites`;
 
   platforms.forEach(platform => {
@@ -149,10 +201,12 @@ function renderSuites() {
     col.className = 'col-md-6';
     const active = entitlement.allowed;
     const target = platform.id === 'valuesphere' ? 'valuesphere-tool' : `${platform.id}-tool`;
+    const actionLabel = platformPersonaCta(platform.id, user?.persona);
     const action = active
-      ? `<a class="btn btn-primary btn-sm" href="/${target}.html">Open</a>`
+      ? `<a class="btn btn-primary btn-sm" href="/${target}.html">${actionLabel}</a>`
       : '';
     const reason = active ? 'Active' : entitlement.reason || 'Locked';
+    const hint = platformPersonaHint(platform.id, user?.persona);
     col.innerHTML = `
       <div class="card glass h-100 p-3 d-flex flex-column gap-2">
         <div class="d-flex justify-content-between align-items-start gap-2">
@@ -162,7 +216,7 @@ function renderSuites() {
           </div>
           <span class="badge-soft">${active ? 'Active' : 'Locked'}</span>
         </div>
-        <p class="text-fg-2 small flex-grow-1 mb-0">${platform.summary}</p>
+        <p class="text-fg-2 small flex-grow-1 mb-0">${platform.summary}${hint ? ` ${hint}` : ''}</p>
         <div class="d-flex justify-content-between align-items-center gap-2 mt-2">
           <span class="text-fg-3 small">${reason}</span>
           ${action}
@@ -170,6 +224,103 @@ function renderSuites() {
       </div>
     `;
     list.appendChild(col);
+  });
+}
+
+function renderNextSteps() {
+  const persona = dashboardState.user?.persona || 'unknown';
+  const list = document.getElementById('nextStepsList');
+  const personaBadge = document.getElementById('nextStepsPersona');
+  const empty = document.getElementById('nextStepsEmpty');
+  if (personaBadge) personaBadge.textContent = personaLabel(persona);
+  if (!list || !empty) return;
+  list.innerHTML = '';
+
+  const steps = [];
+
+  function addPlatformStep(platformId, title, description, cta, icon = 'bi-grid') {
+    const platform = getPlatformById(platformId);
+    if (!platform) return;
+    const entitlement = entitlementForPlatform(platform);
+    if (!entitlement.allowed) return;
+    const target = platformId === 'valuesphere' ? 'valuesphere-tool' : `${platformId}-tool`;
+    steps.push({ title, description, cta, href: `/${target}.html`, icon });
+  }
+
+  function addRoomsStep(title, description, cta) {
+    steps.push({ title, description, cta, href: '/rooms.html', icon: 'bi-people' });
+  }
+
+  if (persona === 'vendor' || persona === 'both') {
+    addPlatformStep(
+      'valuesphere',
+      'Kick off in ValueSphere',
+      'Run a value assessment for your customer and capture the quantified impact.',
+      'Start a value assessment',
+      'bi-kanban'
+    );
+    addPlatformStep(
+      'revenueforge',
+      'Operationalise your GTM',
+      'Stand up your GTM plays after the assessment to keep momentum.',
+      'Set up your GTM flows',
+      'bi-lightning-charge'
+    );
+    addRoomsStep(
+      'Collaborate in an Engagement Room',
+      'Share your assessment outcomes and GTM plan with buyers in one place.',
+      'Open Engagement Rooms'
+    );
+  } else if (persona === 'buyer') {
+    addPlatformStep(
+      'procurepath',
+      'Review vendors & contracts',
+      'Check supplier health and renewal dates before you collaborate.',
+      'View vendors & contracts',
+      'bi-diagram-3'
+    );
+    addRoomsStep(
+      'Invite vendors into a room',
+      'Collaborate on renewals and decision workflows with your suppliers.',
+      'Open Engagement Rooms'
+    );
+  } else if (persona === 'explorer') {
+    addPlatformStep(
+      'valuesphere',
+      'Explore ValueSphere safely',
+      'Use sample data to trial assessments without changing your production work.',
+      'Explore ValueSphere',
+      'bi-binoculars'
+    );
+    steps.push({
+      title: 'Browse the docs',
+      description: 'See how Agama fits vendors and buyers before you commit.',
+      cta: 'Open docs',
+      href: '/docs.html',
+      icon: 'bi-journal-text'
+    });
+  }
+
+  if (steps.length === 0) {
+    empty.style.display = '';
+    return;
+  }
+
+  empty.style.display = 'none';
+  steps.forEach(step => {
+    const row = document.createElement('div');
+    row.className = 'glass p-3 d-flex flex-wrap justify-content-between align-items-start gap-3';
+    row.innerHTML = `
+      <div class="d-flex align-items-start gap-2">
+        <i class="bi ${step.icon} text-brand"></i>
+        <div>
+          <div class="fw-semibold">${step.title}</div>
+          <p class="text-fg-3 small mb-0">${step.description}</p>
+        </div>
+      </div>
+      <a class="btn btn-primary btn-sm" href="${step.href}">${step.cta}</a>
+    `;
+    list.appendChild(row);
   });
 }
 
@@ -225,6 +376,58 @@ function renderRoomRow(room, isGuest = false) {
   return wrapper;
 }
 
+function renderPersonaWizard() {
+  const wizard = document.getElementById('personaWizard');
+  const persona = dashboardState.user?.persona || 'unknown';
+  if (!wizard) return;
+  if (persona === 'unknown') {
+    wizard.classList.remove('d-none');
+  } else {
+    wizard.classList.add('d-none');
+  }
+}
+
+async function updatePersonaSelection(persona) {
+  const feedback = document.getElementById('personaFeedback');
+  const buttons = document.querySelectorAll('[data-persona-choice]');
+  buttons.forEach(btn => (btn.disabled = true));
+  if (feedback) feedback.textContent = 'Saving your preferences...';
+  try {
+    const res = await fetch('/api/auth/persona', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ persona })
+    });
+    const json = await res.json();
+    if (res.ok && json.ok) {
+      dashboardState.user = json.user;
+      renderAccountCard();
+      renderSuites();
+      renderNextSteps();
+      renderGreeting();
+      renderPersonaWizard();
+      if (feedback) feedback.textContent = 'Thanks! Your workspace is now tailored.';
+    } else if (feedback) {
+      feedback.textContent = json.error || 'Unable to save persona.';
+    }
+  } catch (err) {
+    if (feedback) feedback.textContent = 'Network error. Please try again.';
+  } finally {
+    buttons.forEach(btn => (btn.disabled = false));
+  }
+}
+
+function bindPersonaWizard() {
+  const buttons = document.querySelectorAll('[data-persona-choice]');
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const choice = btn.getAttribute('data-persona-choice');
+      if (choice) updatePersonaSelection(choice);
+    });
+  });
+}
+
 async function fetchWorkspace() {
   try {
     const res = await fetch('/api/auth/me', { credentials: 'include' });
@@ -246,6 +449,8 @@ async function fetchWorkspace() {
     });
     renderAccountCard();
     renderSuites();
+    renderNextSteps();
+    renderPersonaWizard();
     populateProfileForm();
     const roomsRes = await fetch('/api/rooms', { credentials: 'include' });
     if (roomsRes.ok) {
@@ -348,6 +553,7 @@ function bindLogout() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  bindPersonaWizard();
   bindProfileForm();
   bindDangerZone();
   bindLogout();

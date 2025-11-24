@@ -15,6 +15,7 @@ const UserSchema = new Schema(
     industry: { type: String, trim: true },
     licenseTier: { type: String, enum: ['personal', 'business', 'guest'], default: 'personal' },
     platformAccess: { type: [String], default: ['valuesphere'] },
+    persona: { type: String, enum: ['vendor', 'buyer', 'both', 'explorer', 'unknown'], default: 'unknown' },
     defaultOrganization: { type: Schema.Types.ObjectId, ref: 'Organization', default: null },
     lastLoginAt: { type: Date }
   },
@@ -31,6 +32,7 @@ UserSchema.methods.public = function() {
     role: this.role,
     industry: this.industry,
     licenseTier: this.licenseTier,
+    persona: this.persona || 'unknown',
     emailVerified: this.emailVerified,
     status: this.status,
     platformAccess: Array.isArray(this.platformAccess) ? [...this.platformAccess] : [],
