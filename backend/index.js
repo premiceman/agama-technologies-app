@@ -259,6 +259,37 @@ async function recordAuditEvent({
   }
 }
 
+function serializeAuditEvent(event) {
+  const toUserPayload = user =>
+    user
+      ? {
+          id: user._id ? user._id.toString() : String(user),
+          name: user.name || '',
+          email: user.email || ''
+        }
+      : null;
+  const toOrgPayload = org =>
+    org
+      ? {
+          id: org._id ? org._id.toString() : String(org),
+          name: org.name || '',
+          slug: org.slug || ''
+        }
+      : null;
+
+  return {
+    id: event._id ? event._id.toString() : undefined,
+    type: event.type,
+    createdAt: event.createdAt,
+    actorUser: toUserPayload(event.actorUser),
+    actorOrganization: toOrgPayload(event.actorOrganization),
+    targetUser: toUserPayload(event.targetUser),
+    targetOrganization: toOrgPayload(event.targetOrganization),
+    targetRoom: event.targetRoom ? (event.targetRoom._id ? event.targetRoom._id.toString() : String(event.targetRoom)) : null,
+    metadata: event.metadata || {}
+  };
+}
+
 function getPlatformEntitlement(user, organizationContext, platformId) {
   const platform = PLATFORM_DEFINITIONS.find(p => p.id === platformId);
   const effectiveLicense = computeEffectiveLicense(user, organizationContext);
@@ -1495,6 +1526,15 @@ app.post('/api/agama-admin/unlock', requireAuth, requireAgamaStaff, validateBody
       path: '/'
     });
 
+    await recordAuditEvent({
+      type: 'staff.console.unlocked',
+      actorUser: req.requestingUser?._id || req.auth.uid,
+      metadata: {
+        ip: req.ip,
+        userAgent: req.get('user-agent') || undefined
+      }
+    });
+
     return res.json({ ok: true });
   } catch (err) {
     console.error('Admin console unlock failed', err);
@@ -1549,6 +1589,52 @@ app.get(
     }
   }
 );
+
+app.get('/api/agama-admin/audit', requireAuth, requireAgamaStaff, requireAdminConsoleUnlocked, async (req, res) => {
+  try {
+    const { orgId, userId } = req.query;
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const query = { createdAt: { $gte: ninetyDaysAgo } };
+
+    if (orgId) {
+      query.$or = [{ actorOrganization: orgId }, { targetOrganization: orgId }];
+    }
+
+    if (userId) {
+      let userFilter = null;
+      if (mongoose.Types.ObjectId.isValid(userId)) {
+        userFilter = userId;
+      } else {
+        const user = await User.findOne({ email: userId.toLowerCase() }).select('_id');
+        if (user) {
+          userFilter = user._id;
+        }
+      }
+
+      if (!userFilter) {
+        return res.json({ ok: true, events: [] });
+      }
+
+      query.$or = query.$or
+        ? [...query.$or, { actorUser: userFilter }, { targetUser: userFilter }]
+        : [{ actorUser: userFilter }, { targetUser: userFilter }];
+    }
+
+    const events = await AuditEvent.find(query)
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .populate({ path: 'actorUser', select: 'name email' })
+      .populate({ path: 'targetUser', select: 'name email' })
+      .populate({ path: 'actorOrganization', select: 'name slug' })
+      .populate({ path: 'targetOrganization', select: 'name slug' })
+      .populate({ path: 'targetRoom', select: 'title' });
+
+    res.json({ ok: true, events: events.map(serializeAuditEvent) });
+  } catch (err) {
+    console.error('Agama staff audit fetch failed', err);
+    res.status(500).json({ error: 'Unable to load audit events' });
+  }
+});
 
 app.get('/api/org/current', requireAuth, async (req, res) => {
   try {
@@ -1903,6 +1989,31 @@ app.delete('/api/org/admin/members/:membershipId', requireAuth, requireOrgAdmin,
   } catch (err) {
     console.error('Org admin delete member error', err);
     res.status(500).json({ error: 'Unable to remove member' });
+  }
+});
+
+app.get('/api/org/admin/audit', requireAuth, requireOrgAdmin, async (req, res) => {
+  try {
+    const orgId = req.organization._id;
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const query = {
+      createdAt: { $gte: ninetyDaysAgo },
+      $or: [{ actorOrganization: orgId }, { targetOrganization: orgId }]
+    };
+
+    const events = await AuditEvent.find(query)
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .populate({ path: 'actorUser', select: 'name email' })
+      .populate({ path: 'targetUser', select: 'name email' })
+      .populate({ path: 'actorOrganization', select: 'name slug' })
+      .populate({ path: 'targetOrganization', select: 'name slug' })
+      .populate({ path: 'targetRoom', select: 'title' });
+
+    res.json({ ok: true, events: events.map(serializeAuditEvent) });
+  } catch (err) {
+    console.error('Org admin audit fetch failed', err);
+    res.status(500).json({ error: 'Unable to load audit history' });
   }
 });
 
