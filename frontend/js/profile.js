@@ -122,6 +122,7 @@ function renderProfile() {
 
   renderMemberships();
   renderBusinessRequestCta();
+  renderDangerZone();
 }
 
 function renderBusinessRequestCta() {
@@ -198,6 +199,62 @@ function renderSuites() {
   });
 }
 
+function renderDangerZone() {
+  const { effectiveLicense } = profileState;
+  const summary = document.getElementById('dangerZoneSummary');
+  const actionsContainer = document.getElementById('dangerZoneActions');
+  if (!summary || !actionsContainer) return;
+
+  actionsContainer.innerHTML = '';
+  const isBusiness = effectiveLicense?.tier === 'business';
+
+  if (isBusiness) {
+    summary.textContent = 'Managed by your organisation. Contact your admin to remove accounts or data.';
+    const alert = document.createElement('div');
+    alert.className = 'alert alert-warning border-danger-subtle text-bg-dark-subtle mb-0';
+    alert.innerHTML = `
+      <div class="d-flex align-items-start gap-2">
+        <i class="bi bi-shield-lock text-warning mt-1"></i>
+        <div>
+          <div class="fw-semibold">Contact your organisation admin</div>
+          <div class="small text-fg-3">Business workspaces are centrally managed. Ask your admin to remove your seat and data via the admin console.</div>
+        </div>
+      </div>
+    `;
+    actionsContainer.appendChild(alert);
+    return;
+  }
+
+  summary.textContent = 'Permanently remove your workspace data. These actions cannot be undone.';
+  const dataReset = document.createElement('div');
+  dataReset.className = 'border rounded-3 p-3 mb-3';
+  dataReset.innerHTML = `
+    <div class="d-flex flex-wrap justify-content-between gap-2 align-items-start">
+      <div>
+        <div class="fw-semibold">Delete all data</div>
+        <div class="small text-fg-3">Removes your memberships and resets your profile so you can restart onboarding.</div>
+      </div>
+      <button class="btn btn-outline-danger btn-sm" id="deleteDataBtn" type="button">Delete data</button>
+    </div>
+  `;
+
+  const deleteAccount = document.createElement('div');
+  deleteAccount.className = 'border rounded-3 p-3';
+  deleteAccount.innerHTML = `
+    <div class="d-flex flex-wrap justify-content-between gap-2 align-items-start">
+      <div>
+        <div class="fw-semibold">Delete account and all data</div>
+        <div class="small text-fg-3">Removes your account and data from Agama, WorkOS, and MongoDB.</div>
+      </div>
+      <button class="btn btn-danger btn-sm" id="deleteAccountBtn" type="button">Delete account</button>
+    </div>
+  `;
+
+  actionsContainer.appendChild(dataReset);
+  actionsContainer.appendChild(deleteAccount);
+  bindDangerZoneActions();
+}
+
 function bindSaveProfile() {
   const saveBtn = document.getElementById('saveProfile');
   if (!saveBtn) return;
@@ -231,6 +288,51 @@ function bindSaveProfile() {
       saveBtn.disabled = false;
     }
   });
+}
+
+function bindDangerZoneActions() {
+  const deleteDataBtn = document.getElementById('deleteDataBtn');
+  const deleteAccountBtn = document.getElementById('deleteAccountBtn');
+
+  if (deleteDataBtn) {
+    deleteDataBtn.addEventListener('click', async () => {
+      const confirmed = window.confirm('Delete all of your workspace data and restart onboarding?');
+      if (!confirmed) return;
+      deleteDataBtn.disabled = true;
+      try {
+        const res = await fetch('/api/auth/me/data', { method: 'DELETE', credentials: 'include' });
+        if (res.ok) {
+          window.location.href = '/workspace.html?onboarding=restart';
+        } else {
+          alert('Unable to delete your data. Please try again.');
+        }
+      } catch (err) {
+        alert('Network error while deleting your data.');
+      } finally {
+        deleteDataBtn.disabled = false;
+      }
+    });
+  }
+
+  if (deleteAccountBtn) {
+    deleteAccountBtn.addEventListener('click', async () => {
+      const confirmed = window.confirm('Delete your account and all data? This cannot be undone.');
+      if (!confirmed) return;
+      deleteAccountBtn.disabled = true;
+      try {
+        const res = await fetch('/api/auth/me', { method: 'DELETE', credentials: 'include' });
+        if (res.ok) {
+          window.location.href = '/';
+        } else {
+          alert('Unable to delete your account. Please try again.');
+        }
+      } catch (err) {
+        alert('Network error while deleting your account.');
+      } finally {
+        deleteAccountBtn.disabled = false;
+      }
+    });
+  }
 }
 
 function bindLogout() {

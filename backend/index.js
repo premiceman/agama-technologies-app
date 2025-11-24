@@ -49,6 +49,29 @@ if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
+async function purgeUserOwnedData(user) {
+  const userId = user._id;
+  const email = (user.email || '').toLowerCase();
+  await Promise.all([
+    OrganizationMembership.deleteMany({ user: userId }),
+    EngagementRoomMembership.deleteMany({ user: userId }),
+    EngagementRoomInvite.deleteMany({ invitedBy: userId }),
+    email ? EngagementRoomInvite.deleteMany({ email }) : Promise.resolve(),
+    EngagementRoomMessage.deleteMany({ author: userId }),
+    EngagementRoomFile.deleteMany({ createdBy: userId }),
+    EngagementRoomFileVersion.deleteMany({ uploadedBy: userId }),
+    EngagementRoomFileComment.deleteMany({ author: userId }),
+    EngagementRoomDeliverable.deleteMany({ owner: userId }),
+    EngagementRoomDeliverable.deleteMany({ createdBy: userId }),
+    EngagementRoomIssue.deleteMany({ createdBy: userId }),
+    EngagementRoomIssueComment.deleteMany({ author: userId }),
+    AuditEvent.deleteMany({ actorUser: userId }),
+    AuditEvent.deleteMany({ targetUser: userId }),
+    RevenueAccount.deleteMany({ userId }),
+    ProcurementVendor.deleteMany({ userId })
+  ]);
+}
+
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false
@@ -2071,9 +2094,44 @@ app.put('/api/auth/me', requireAuth, validateBody(profileUpdateSchema), async (r
   }
 });
 
+app.delete('/api/auth/me/data', requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.auth.uid);
+    if (!user) return res.status(404).json({ error: 'Profile not found' });
+
+    await purgeUserOwnedData(user);
+
+    user.name = null;
+    user.company = null;
+    user.role = null;
+    user.industry = null;
+    user.persona = 'unknown';
+    user.platformAccess = ['valuesphere'];
+    user.licenseTier = 'personal';
+    user.defaultOrganization = null;
+    await user.save();
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Profile data delete error', err);
+    res.status(500).json({ error: 'Unable to delete profile data' });
+  }
+});
+
 app.delete('/api/auth/me', requireAuth, async (req, res) => {
   try {
-    await User.deleteOne({ _id: req.auth.uid });
+    const user = await User.findById(req.auth.uid);
+    if (user) {
+      await purgeUserOwnedData(user);
+      if (user.workosUserId && workosClient) {
+        try {
+          await workosClient.userManagement.deleteUser(user.workosUserId);
+        } catch (workosErr) {
+          console.error('WorkOS user delete error', workosErr);
+        }
+      }
+      await User.deleteOne({ _id: req.auth.uid });
+    }
     clearTokenCookie(res);
     res.json({ ok: true });
   } catch (err) {
