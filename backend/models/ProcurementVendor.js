@@ -32,6 +32,7 @@ const TouchpointSchema = new mongoose.Schema(
 
 const ProcurementVendorSchema = new mongoose.Schema(
   {
+    organization: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true, required: true },
     name: { type: String, required: true, trim: true },
     category: { type: String, trim: true },
