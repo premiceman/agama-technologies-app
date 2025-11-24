@@ -30,6 +30,7 @@ const EngagementRoomMessage = require('./models/EngagementRoomMessage');
 const EngagementRoomFile = require('./models/EngagementRoomFile');
 const EngagementRoomFileVersion = require('./models/EngagementRoomFileVersion');
 const EngagementRoomFileComment = require('./models/EngagementRoomFileComment');
+const AuditEvent = require('./models/AuditEvent');
 const { requireOrgRole } = require('./middleware/orgAuth');
 
 const app = express();
@@ -197,6 +198,32 @@ function computeEffectiveLicense(user, organizationContext) {
   }
 
   return { tier: 'personal', homeOrg: null };
+}
+
+async function recordAuditEvent({
+  type,
+  actorUser,
+  actorOrganization = null,
+  targetUser = null,
+  targetOrganization = null,
+  targetRoom = null,
+  metadata = {}
+}) {
+  try {
+    if (!type || !actorUser) return null;
+    return await AuditEvent.create({
+      type,
+      actorUser,
+      actorOrganization,
+      targetUser,
+      targetOrganization,
+      targetRoom,
+      metadata
+    });
+  } catch (err) {
+    console.error('Audit log failed', err);
+    return null;
+  }
 }
 
 function getPlatformEntitlement(user, organizationContext, platformId) {
@@ -1196,70 +1223,76 @@ app.get('/api/auth/workos/callback', async (req, res) => {
     }
 
     const user = await User.findOrCreateFromWorkOSProfile(profile);
+    if (user.status !== 'active') {
+      if (wantsJson) return res.status(403).json({ error: 'Account is deactivated.' });
+      return res.redirect(`${redirectUrl}?error=account_deactivated`);
+    }
     let shouldSave = false;
 
     let organization = null;
     let membership = null;
+    let membershipCreated = false;
+    let membershipStatusChanged = false;
 
     if (workosOrgId) {
       organization = await Organization.findOne({ workosOrganizationId: workosOrgId });
 
-      if (!organization) {
-        const defaultName =
-          authentication.user?.organization?.name || (profile.email ? profile.email.split('@')[1] : 'Workspace');
-        const baseSlug = String(defaultName || 'workspace')
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/(^-|-$)+/g, '')
-          .slice(0, 60) ||
-          `org-${Date.now()}`;
-        let slug = baseSlug;
-        let slugSuffix = 1;
-        while (await Organization.findOne({ slug })) {
-          slug = `${baseSlug}-${slugSuffix++}`;
+      if (organization) {
+        membership = await OrganizationMembership.findOne({ organization: organization._id, user: user._id });
+        if (!membership) {
+          membership = new OrganizationMembership({ organization: organization._id, user: user._id, role: 'member' });
+          membershipCreated = true;
         }
 
-        organization = await Organization.create({
-          name: defaultName || 'Workspace',
-          slug,
-          workosOrganizationId: workosOrgId,
-          tier: 'business',
-          platformAccess: ['valuesphere', 'procurepath', 'revenueforge'],
-          seatLimit: 10,
-          createdBy: user._id
-        });
-      }
-
-      membership = await OrganizationMembership.findOne({ organization: organization._id, user: user._id });
-      if (!membership) {
-        const existingCount = await OrganizationMembership.countDocuments({ organization: organization._id });
-        const role = existingCount === 0 ? 'owner' : 'member';
-        membership = new OrganizationMembership({ organization: organization._id, user: user._id, role });
-      }
-
-      const seatsUsed = await OrganizationMembership.countActiveSeats(organization._id);
-      if (membership.status !== 'active') {
-        if (seatsUsed >= organization.seatLimit) {
-          membership.status = 'suspended';
-          await membership.save();
-          if (wantsJson) {
-            return res
-              .status(403)
-              .json({ error: 'Seat limit exceeded for this organization. Contact your workspace admin.' });
+        const previousStatus = membership.status;
+        const seatsUsed = await OrganizationMembership.countActiveSeats(organization._id);
+        if (membership.status !== 'active') {
+          if (seatsUsed >= organization.seatLimit) {
+            membership.status = 'suspended';
+            await membership.save();
+            if (wantsJson) {
+              return res
+                .status(403)
+                .json({ error: 'Seat limit exceeded for this organization. Contact your workspace admin.' });
+            }
+            return res.redirect(`${redirectUrl}?error=seat_limit_exceeded`);
           }
-          return res.redirect(`${redirectUrl}?error=seat_limit_exceeded`);
+          membership.status = 'active';
         }
-        membership.status = 'active';
-      }
 
-      await membership.save();
+        await membership.save();
+        membershipStatusChanged = previousStatus !== membership.status;
 
-      if (!user.defaultOrganization) {
-        user.defaultOrganization = organization._id;
-        shouldSave = true;
+        if (organization.tier === 'business' && user.licenseTier !== 'business') {
+          user.licenseTier = 'business';
+          shouldSave = true;
+        }
+
+        if (!user.defaultOrganization) {
+          user.defaultOrganization = organization._id;
+          shouldSave = true;
+        }
+
+        if (membershipCreated || membershipStatusChanged) {
+          await recordAuditEvent({
+            type: 'org.member.added',
+            actorUser: user._id,
+            actorOrganization: organization._id,
+            targetUser: user._id,
+            targetOrganization: organization._id,
+            metadata: {
+              source: 'workos',
+              membershipStatus: membership.status
+            }
+          });
+        }
       }
     }
 
+    if (!user.emailVerified) {
+      user.emailVerified = true;
+      shouldSave = true;
+    }
     user.lastLoginAt = new Date();
     shouldSave = true;
 
@@ -1291,12 +1324,18 @@ app.post('/api/auth/login', validateBody(loginSchema), async (req, res) => {
     const { email, password } = req.validatedBody;
     const user = await User.findOne({ email: email.toLowerCase().trim() });
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+    if (user.status !== 'active') {
+      return res.status(403).json({ error: 'Account is deactivated.' });
+    }
     if (!user.passwordHash) {
       return res.status(400).json({ error: 'Password login is disabled for this account. Use WorkOS to sign in.' });
     }
     const valid = await user.verifyPassword(password);
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 
+    if (!user.emailVerified) {
+      user.emailVerified = true;
+    }
     user.lastLoginAt = new Date();
     await user.save();
 
@@ -1308,6 +1347,21 @@ app.post('/api/auth/login', validateBody(loginSchema), async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/auth/deactivate', requireAuth, async (req, res) => {
+  try {
+    const user = req.requestingUser || (await User.findById(req.auth.uid));
+    if (!user) return res.status(404).json({ error: 'Not found' });
+
+    user.status = 'deactivated';
+    await user.save();
+    clearTokenCookie(res);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('User deactivate error', err);
+    res.status(500).json({ error: 'Unable to deactivate account' });
   }
 });
 
@@ -1596,6 +1650,14 @@ app.post('/api/org/admin/members', requireAuth, requireOrgAdmin, validateBody(me
     }
 
     await membership.populate({ path: 'user', select: 'name email licenseTier lastLoginAt' });
+    await recordAuditEvent({
+      type: 'org.member.added',
+      actorUser: req.requestingUser?._id || req.auth.uid,
+      actorOrganization: req.organization._id,
+      targetUser: membership.user?._id || membership.user,
+      targetOrganization: req.organization._id,
+      metadata: { role: membership.role, status: membership.status }
+    });
     res.status(201).json({ ok: true, member: serializeMembership(membership) });
   } catch (err) {
     console.error('Org admin invite error', err);
@@ -1629,6 +1691,8 @@ app.patch(
 
       const nextRole = req.validatedBody.role;
       const nextStatus = req.validatedBody.status;
+      const previousRole = membership.role;
+      const previousStatus = membership.status;
 
       if (membership.role === 'owner' && ownerCount <= 1) {
         if (nextRole && nextRole !== 'owner') {
@@ -1652,6 +1716,19 @@ app.patch(
       }
 
       await membership.save();
+      await recordAuditEvent({
+        type: 'org.member.updated',
+        actorUser: req.requestingUser?._id || req.auth.uid,
+        actorOrganization: req.organization._id,
+        targetUser: membership.user?._id || membership.user,
+        targetOrganization: req.organization._id,
+        metadata: {
+          previousRole,
+          previousStatus,
+          role: membership.role,
+          status: membership.status
+        }
+      });
       res.json({ ok: true, member: serializeMembership(membership) });
     } catch (err) {
       console.error('Org admin update member error', err);
@@ -1680,8 +1757,17 @@ app.delete('/api/org/admin/members/:membershipId', requireAuth, requireOrgAdmin,
       return res.status(400).json({ error: 'Cannot remove the last owner.' });
     }
 
+    const previousStatus = membership.status;
     membership.status = 'removed';
     await membership.save();
+    await recordAuditEvent({
+      type: 'org.member.removed',
+      actorUser: req.requestingUser?._id || req.auth.uid,
+      actorOrganization: req.organization._id,
+      targetUser: membership.user,
+      targetOrganization: req.organization._id,
+      metadata: { previousStatus }
+    });
     res.json({ ok: true });
   } catch (err) {
     console.error('Org admin delete member error', err);
@@ -2307,6 +2393,19 @@ app.post('/api/rooms', requireAuth, validateBody(roomCreateSchema), async (req, 
       organization: membershipOrg._id,
       role: 'room_admin',
       isGuest: user && user.licenseTier === 'guest'
+    });
+
+    await recordAuditEvent({
+      type: 'room.created',
+      actorUser: req.auth.uid,
+      actorOrganization: membershipOrg._id,
+      targetRoom: room._id,
+      targetOrganization: membershipOrg._id,
+      metadata: {
+        title: room.title,
+        vendorOrg: vendorOrg._id,
+        buyerOrg: buyerOrg._id
+      }
     });
 
     res.status(201).json({
