@@ -75,6 +75,7 @@
   }
 
   const state = loadState();
+  const accountContext = { user: null, usageLimits: {} };
 
   const areaList = document.getElementById('areaList');
   const templateForm = document.getElementById('templateForm');
@@ -101,6 +102,49 @@
   const dashboardAccountCount = document.getElementById('dashboardAccountCount');
   const dashboardAssessmentCount = document.getElementById('dashboardAssessmentCount');
   let activeAssessment = null;
+
+  function computeLocalAssessmentLimit(user) {
+    if (!user) return null;
+    return user.licenseTier === 'personal' ? user.valueAssessmentLimit || 3 : null;
+  }
+
+  async function ensureAuthenticated() {
+    try {
+      const res = await fetch('/api/auth/me', { credentials: 'include' });
+      if (res.status === 401) {
+        window.location.href = '/api/auth/workos/login';
+        return false;
+      }
+      const json = await res.json();
+      if (json.user?.onboardingStatus !== 'completed') {
+        window.location.href = '/onboarding.html';
+        return false;
+      }
+      accountContext.user = json.user;
+      accountContext.usageLimits = json.usageLimits || { valueAssessments: computeLocalAssessmentLimit(json.user) };
+      return true;
+    } catch (err) {
+      console.error('Unable to load account context', err);
+      return false;
+    }
+  }
+
+  function isAssessmentLimitReached() {
+    const limit = accountContext.usageLimits?.valueAssessments;
+    if (!limit) return false;
+    return state.assessments.length >= limit;
+  }
+
+  function renderAssessmentLimitNotice() {
+    const limit = accountContext.usageLimits?.valueAssessments;
+    if (!limit || !assessmentForm) return;
+    if (document.getElementById('assessmentLimitNotice')) return;
+    const notice = document.createElement('div');
+    notice.id = 'assessmentLimitNotice';
+    notice.className = 'alert alert-warning bg-transparent border border-warning text-warning small';
+    notice.innerHTML = `Free personal licenses include ${limit} assessments. Upgrade to Consulting Enterprise for unlimited Navigator assessments.`;
+    assessmentForm.parentNode.insertBefore(notice, assessmentForm);
+  }
 
   function renderArea(area, index) {
     const areaCard = document.createElement('div');
@@ -492,6 +536,10 @@
 
   function handleAssessmentSubmit(event) {
     event.preventDefault();
+    if (isAssessmentLimitReached()) {
+      alert('Free personal licenses include up to 3 assessments. Select Consulting Enterprise during onboarding to keep creating more.');
+      return;
+    }
     const accountId = assessmentAccount.value;
     const templateId = assessmentTemplate.value;
     const templatePayload = buildAssessmentPayload(templateId);
@@ -759,34 +807,41 @@
     dashboardAssessmentCount.textContent = state.assessments.length;
   }
 
-  bindAreaEvents();
-  render();
-  if (templateForm || areaList) {
-    initDefaults();
-  } else if (state.assessments[0]) {
-    setActiveAssessment(state.assessments[0]);
+  async function boot() {
+    const authed = await ensureAuthenticated();
+    if (!authed) return;
+    bindAreaEvents();
+    render();
+    if (templateForm || areaList) {
+      initDefaults();
+    } else if (state.assessments[0]) {
+      setActiveAssessment(state.assessments[0]);
+    }
+    renderAssessmentLimitNotice();
+
+    const addAreaBtn = document.getElementById('addArea');
+    if (addAreaBtn) addAreaBtn.addEventListener('click', addArea);
+    if (templateForm) {
+      templateForm.addEventListener('submit', handleTemplateSubmit);
+      templateForm.addEventListener('reset', handleResetTemplate);
+    }
+    if (templateStages) templateStages.addEventListener('change', refreshQuestionTargets);
+    if (accountForm) accountForm.addEventListener('submit', handleAccountSubmit);
+    if (assessmentForm) assessmentForm.addEventListener('submit', handleAssessmentSubmit);
+    if (globalStages) globalStages.addEventListener('change', handleGlobalStagesChange);
+    if (addObjectiveBtn) addObjectiveBtn.addEventListener('click', addObjective);
+    if (objectivesList) {
+      objectivesList.addEventListener('change', handleObjectiveToggle);
+      objectivesList.addEventListener('click', handleObjectiveRemove);
+    }
+    if (generateAiSummaryBtn) generateAiSummaryBtn.addEventListener('click', handleGenerateAiSummary);
+    if (assessmentDetail) {
+      assessmentDetail.addEventListener('input', handleAssessmentChange);
+      assessmentDetail.addEventListener('change', handleAssessmentChange);
+    }
+    if (templateLibraryList) templateLibraryList.addEventListener('click', handleTemplateLibraryClick);
+    if (completedAssessmentsList) completedAssessmentsList.addEventListener('click', handleCompletedAssessmentOpen);
   }
 
-  const addAreaBtn = document.getElementById('addArea');
-  if (addAreaBtn) addAreaBtn.addEventListener('click', addArea);
-  if (templateForm) {
-    templateForm.addEventListener('submit', handleTemplateSubmit);
-    templateForm.addEventListener('reset', handleResetTemplate);
-  }
-  if (templateStages) templateStages.addEventListener('change', refreshQuestionTargets);
-  if (accountForm) accountForm.addEventListener('submit', handleAccountSubmit);
-  if (assessmentForm) assessmentForm.addEventListener('submit', handleAssessmentSubmit);
-  if (globalStages) globalStages.addEventListener('change', handleGlobalStagesChange);
-  if (addObjectiveBtn) addObjectiveBtn.addEventListener('click', addObjective);
-  if (objectivesList) {
-    objectivesList.addEventListener('change', handleObjectiveToggle);
-    objectivesList.addEventListener('click', handleObjectiveRemove);
-  }
-  if (generateAiSummaryBtn) generateAiSummaryBtn.addEventListener('click', handleGenerateAiSummary);
-  if (assessmentDetail) {
-    assessmentDetail.addEventListener('input', handleAssessmentChange);
-    assessmentDetail.addEventListener('change', handleAssessmentChange);
-  }
-  if (templateLibraryList) templateLibraryList.addEventListener('click', handleTemplateLibraryClick);
-  if (completedAssessmentsList) completedAssessmentsList.addEventListener('click', handleCompletedAssessmentOpen);
+  document.addEventListener('DOMContentLoaded', boot);
 })();

@@ -345,8 +345,31 @@ function bindLogout() {
   }
 }
 
+function bindOnboardingRestart() {
+  const restartBtn = document.getElementById('restartOnboarding');
+  if (!restartBtn) return;
+  restartBtn.addEventListener('click', async () => {
+    restartBtn.disabled = true;
+    restartBtn.textContent = 'Redirecting…';
+    try {
+      const res = await fetch('/api/onboarding/restart', { method: 'POST', credentials: 'include' });
+      if (res.ok) {
+        window.location.href = '/onboarding.html?force=1';
+      } else {
+        alert('Unable to restart onboarding.');
+      }
+    } catch (err) {
+      alert('Unable to restart onboarding.');
+    } finally {
+      restartBtn.disabled = false;
+      restartBtn.textContent = 'Restart onboarding';
+    }
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   bindSaveProfile();
   bindLogout();
+  bindOnboardingRestart();
   loadProfile();
 });

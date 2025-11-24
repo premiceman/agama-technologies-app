@@ -14,8 +14,17 @@ const UserSchema = new Schema(
     role: { type: String, trim: true },
     industry: { type: String, trim: true },
     licenseTier: { type: String, enum: ['personal', 'business', 'guest'], default: 'personal' },
+    licensePlan: {
+      type: String,
+      enum: ['free-personal', 'vendor-enterprise', 'procurement-enterprise', 'consulting-enterprise'],
+      default: 'free-personal'
+    },
+    onboardingStatus: { type: String, enum: ['pending', 'in-progress', 'completed'], default: 'pending' },
+    onboardingResponses: { type: Schema.Types.Mixed, default: {} },
+    valueAssessmentLimit: { type: Number, default: 3 },
+    billingProfile: { type: Schema.Types.Mixed, default: {} },
     platformAccess: { type: [String], default: ['valuesphere'] },
-    persona: { type: String, enum: ['vendor', 'buyer', 'both', 'explorer', 'unknown'], default: 'unknown' },
+    persona: { type: String, enum: ['vendor', 'buyer', 'consultant', 'both', 'explorer', 'unknown'], default: 'unknown' },
     defaultOrganization: { type: Schema.Types.ObjectId, ref: 'Organization', default: null },
     lastLoginAt: { type: Date }
   },
@@ -35,6 +44,11 @@ UserSchema.methods.public = function() {
     persona: this.persona || 'unknown',
     emailVerified: this.emailVerified,
     status: this.status,
+    licensePlan: this.licensePlan || 'free-personal',
+    onboardingStatus: this.onboardingStatus || 'pending',
+    onboardingResponses: this.onboardingResponses || {},
+    valueAssessmentLimit: this.valueAssessmentLimit,
+    billingProfile: this.billingProfile || {},
     platformAccess: Array.isArray(this.platformAccess) ? [...this.platformAccess] : [],
     defaultOrganizationId: this.defaultOrganization ? this.defaultOrganization.toString() : null,
     lastLoginAt: this.lastLoginAt || null,
@@ -53,7 +67,11 @@ UserSchema.statics.createSecure = async function({
   password,
   company,
   role,
-  industry
+  industry,
+  licenseTier = 'personal',
+  platformAccess = ['valuesphere'],
+  licensePlan = licenseTier === 'business' ? 'consulting-enterprise' : 'free-personal',
+  valueAssessmentLimit
 }) {
   const salt = await bcrypt.genSalt(12);
   const hash = await bcrypt.hash(password, salt);
@@ -64,8 +82,10 @@ UserSchema.statics.createSecure = async function({
     company,
     role,
     industry,
-    licenseTier: 'personal',
-    platformAccess: ['valuesphere'],
+    licenseTier,
+    licensePlan,
+    platformAccess,
+    valueAssessmentLimit: licenseTier === 'personal' ? valueAssessmentLimit ?? 3 : null,
     defaultOrganization: null
   });
 };
@@ -91,7 +111,9 @@ UserSchema.statics.findOrCreateFromWorkOSProfile = async function(profile) {
       name: fullName,
       passwordHash: null,
       licenseTier: 'personal',
-      platformAccess: ['valuesphere']
+      licensePlan: 'free-personal',
+      platformAccess: ['valuesphere'],
+      valueAssessmentLimit: 3
     });
     return user;
   }
@@ -120,6 +142,16 @@ UserSchema.statics.findOrCreateFromWorkOSProfile = async function(profile) {
 
   if (!user.licenseTier) {
     user.licenseTier = 'personal';
+    changed = true;
+  }
+
+  if (!user.licensePlan) {
+    user.licensePlan = user.licenseTier === 'business' ? 'consulting-enterprise' : 'free-personal';
+    changed = true;
+  }
+
+  if (user.valueAssessmentLimit === undefined && user.licenseTier === 'personal') {
+    user.valueAssessmentLimit = 3;
     changed = true;
   }
 
