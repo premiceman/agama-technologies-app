@@ -18,6 +18,7 @@ const { validateBody } = require('./middleware/validation');
 const User = require('./models/User');
 const AdminConfig = require('./models/AdminConfig');
 const ProcurementVendor = require('./models/ProcurementVendor');
+const BuyerValueAssessment = require('./models/BuyerValueAssessment');
 const RevenueAccount = require('./models/RevenueAccount');
 const Organization = require('./models/Organization');
 const OrganizationMembership = require('./models/OrganizationMembership');
@@ -3957,6 +3958,225 @@ function calculateRevenueStats(account) {
     noteCount: totalNotes
   };
 }
+
+async function loadBuyerContext(req, res) {
+  const user = req.requestingUser || (req.auth?.uid ? await User.findById(req.auth.uid) : null);
+  if (!user) {
+    res.status(404).json({ error: 'User not found' });
+    return null;
+  }
+
+  const orgId = req.auth?.orgId || user.defaultOrganization;
+  let organization = null;
+  let orgContext = null;
+
+  if (orgId) {
+    const org = await Organization.findById(orgId);
+    if (org) {
+      const membership = await OrganizationMembership.findOne({
+        organization: org._id,
+        user: user._id,
+        status: 'active'
+      });
+
+      if (membership) {
+        organization = org;
+        orgContext = {
+          id: org._id.toString(),
+          name: org.name,
+          tier: org.tier,
+          orgType: org.orgType || 'both',
+          role: membership.role
+        };
+      }
+    }
+  }
+
+  const effectiveLicense = computeEffectiveLicense(user, orgContext);
+  const entitlement = getPlatformEntitlement(user, orgContext, 'valuesphere');
+  const canUseBuyerMode = user.licenseTier !== 'guest' && entitlement.allowed;
+  const productAccess = Array.isArray(organization?.productAccess)
+    ? organization.productAccess
+    : Array.isArray(organization?.platformAccess)
+      ? organization.platformAccess
+      : [];
+
+  const isBusinessBuyerWithProcurePath =
+    effectiveLicense.tier === 'business' &&
+    organization &&
+    organization.tier === 'business' &&
+    (organization.orgType === 'buyer' || organization.orgType === 'both') &&
+    productAccess.includes('procurepath');
+
+  return { user, organization, effectiveLicense, canUseBuyerMode, isBusinessBuyerWithProcurePath };
+}
+
+function serializeBuyerAssessment(assessment) {
+  return {
+    id: assessment._id.toString(),
+    vendorName: assessment.vendorName,
+    title: assessment.title || '',
+    dimensions: Array.isArray(assessment.dimensions) ? assessment.dimensions : [],
+    summary: assessment.summary || '',
+    tags: Array.isArray(assessment.tags) ? assessment.tags : [],
+    createdAt: assessment.createdAt,
+    updatedAt: assessment.updatedAt
+  };
+}
+
+app.get('/api/valuesphere/buyer/vendors', requireAuth, requirePlatformAccess('valuesphere'), async (req, res) => {
+  try {
+    const context = await loadBuyerContext(req, res);
+    if (!context) return;
+
+    if (context.isBusinessBuyerWithProcurePath && context.organization) {
+      const vendors = await ProcurementVendor.find({ organization: context.organization._id })
+        .sort({ updatedAt: -1 })
+        .lean();
+
+      const payload = vendors.map(vendor => ({
+        id: vendor._id.toString(),
+        name: vendor.name,
+        category: vendor.category || null,
+        spend: typeof vendor.annualSpend === 'number' ? vendor.annualSpend : null,
+        renewalDate: vendor.renewalDate ? vendor.renewalDate.toISOString() : null,
+        riskLevel: vendor.riskLevel || null
+      }));
+
+      return res.json({ ok: true, vendors: payload });
+    }
+
+    return res.json({ ok: true, vendors: [] });
+  } catch (err) {
+    console.error('Buyer vendor list error', err);
+    return res.status(500).json({ error: 'Unable to load vendors' });
+  }
+});
+
+app.get('/api/valuesphere/buyer/assessments', requireAuth, requirePlatformAccess('valuesphere'), async (req, res) => {
+  try {
+    const context = await loadBuyerContext(req, res);
+    if (!context) return;
+
+    const { vendorId } = req.query;
+    let query = {};
+
+    if (context.isBusinessBuyerWithProcurePath && context.organization) {
+      query.organization = context.organization._id;
+      if (vendorId) {
+        if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+          return res.status(400).json({ error: 'Invalid vendorId' });
+        }
+        query.procurementVendor = vendorId;
+      }
+    } else {
+      query = { organization: null, createdBy: context.user._id };
+    }
+
+    const assessments = await BuyerValueAssessment.find(query).sort({ updatedAt: -1 });
+    return res.json({ ok: true, assessments: assessments.map(serializeBuyerAssessment) });
+  } catch (err) {
+    console.error('Buyer assessments fetch error', err);
+    return res.status(500).json({ error: 'Unable to load buyer assessments' });
+  }
+});
+
+app.post('/api/valuesphere/buyer/assessments', requireAuth, requirePlatformAccess('valuesphere'), async (req, res) => {
+  try {
+    const context = await loadBuyerContext(req, res);
+    if (!context) return;
+
+    const { vendorId, vendorName, title, dimensions, summary, tags } = req.body || {};
+
+    if (!vendorName || typeof vendorName !== 'string') {
+      return res.status(400).json({ error: 'vendorName is required' });
+    }
+
+    let procurementVendorId = null;
+
+    if (context.isBusinessBuyerWithProcurePath) {
+      if (!context.organization) {
+        return res.status(400).json({ error: 'Organization context required' });
+      }
+
+      if (vendorId) {
+        if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+          return res.status(400).json({ error: 'Invalid vendorId' });
+        }
+
+        const procurementVendor = await ProcurementVendor.findOne({
+          _id: vendorId,
+          organization: context.organization._id
+        });
+
+        if (!procurementVendor) {
+          return res.status(404).json({ error: 'Vendor not found' });
+        }
+
+        procurementVendorId = procurementVendor._id;
+      }
+    }
+
+    const assessment = await BuyerValueAssessment.create({
+      organization: context.isBusinessBuyerWithProcurePath && context.organization ? context.organization._id : null,
+      procurementVendor: procurementVendorId,
+      vendorName,
+      title,
+      dimensions: Array.isArray(dimensions) ? dimensions : [],
+      summary,
+      tags: Array.isArray(tags) ? tags : [],
+      createdBy: context.user._id
+    });
+
+    return res.status(201).json({ ok: true, assessment: serializeBuyerAssessment(assessment) });
+  } catch (err) {
+    console.error('Buyer assessment create error', err);
+    return res.status(500).json({ error: 'Unable to create buyer assessment' });
+  }
+});
+
+app.patch('/api/valuesphere/buyer/assessments/:id', requireAuth, requirePlatformAccess('valuesphere'), async (req, res) => {
+  try {
+    const context = await loadBuyerContext(req, res);
+    if (!context) return;
+
+    const assessment = await BuyerValueAssessment.findById(req.params.id);
+    if (!assessment) {
+      return res.status(404).json({ error: 'Assessment not found' });
+    }
+
+    const belongsToOrg = !!assessment.organization;
+    if (belongsToOrg) {
+      const membership = await OrganizationMembership.findOne({
+        organization: assessment.organization,
+        user: context.user._id,
+        status: 'active'
+      });
+
+      if (!membership) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    } else if (assessment.createdBy.toString() !== context.user._id.toString()) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    ['title', 'dimensions', 'summary', 'tags'].forEach(field => {
+      if (req.body[field] !== undefined) {
+        assessment[field] = field === 'tags' || field === 'dimensions'
+          ? Array.isArray(req.body[field])
+            ? req.body[field]
+            : assessment[field]
+          : req.body[field];
+      }
+    });
+
+    await assessment.save();
+    return res.json({ ok: true, assessment: serializeBuyerAssessment(assessment) });
+  } catch (err) {
+    console.error('Buyer assessment update error', err);
+    return res.status(500).json({ error: 'Unable to update buyer assessment' });
+  }
+});
 
 app.get('/api/procurepath/overview', requireAuth, requirePlatformAccess('procurepath'), async (req, res) => {
   try {
