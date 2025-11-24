@@ -1,6 +1,9 @@
 const adminState = {
   user: null,
-  unlocked: false
+  unlocked: false,
+  organizations: [],
+  selectedOrgId: null,
+  saving: false
 };
 
 function toggleOrgAdminNav(authPayload) {
@@ -75,6 +78,59 @@ function formatDate(value) {
   return date.toLocaleString();
 }
 
+function setOrgEditFormDisabled(disabled) {
+  const form = document.getElementById('orgEditForm');
+  if (!form) return;
+  const inputs = form.querySelectorAll('input, select, button');
+  inputs.forEach(input => {
+    input.disabled = disabled || adminState.saving;
+  });
+}
+
+function updateOrgEditHeader(org) {
+  const nameLabel = document.getElementById('selectedOrgName');
+  const badge = document.getElementById('editOrgBadge');
+  if (!org) {
+    if (nameLabel) nameLabel.textContent = 'Select an organisation to edit its entitlements.';
+    if (badge) badge.textContent = 'Not selected';
+    setOrgEditFormDisabled(true);
+    return;
+  }
+
+  if (nameLabel) nameLabel.textContent = `${org.name || 'Organisation'} (${org.slug || 'slug'})`;
+  if (badge) badge.textContent = org.tier ? org.tier : 'Selected';
+  setOrgEditFormDisabled(false);
+}
+
+function updateOrgEditForm(org) {
+  const tierSelect = document.getElementById('orgTier');
+  const typeSelect = document.getElementById('orgType');
+  const seatInput = document.getElementById('seatLimit');
+  const errorEl = document.getElementById('editOrgError');
+  const form = document.getElementById('orgEditForm');
+  if (errorEl) errorEl.textContent = '';
+  if (!form) return;
+
+  const products = Array.isArray(org?.productAccess) ? org.productAccess : [];
+  const productCheckboxes = form.querySelectorAll('input[name="productAccess"]');
+
+  if (tierSelect) tierSelect.value = org?.tier || 'personal';
+  if (typeSelect) typeSelect.value = org?.orgType || 'both';
+  if (seatInput) seatInput.value = org?.seatLimit ?? '';
+  productCheckboxes.forEach(box => {
+    box.checked = products.includes(box.value);
+  });
+
+  updateOrgEditHeader(org);
+}
+
+function selectOrganization(orgId) {
+  const existing = adminState.organizations.find(org => org.id === orgId);
+  adminState.selectedOrgId = existing ? orgId : null;
+  updateOrgEditForm(existing || null);
+  renderOrganizations(adminState.organizations);
+}
+
 function renderOrganizations(list) {
   const tbody = document.getElementById('orgTableBody');
   if (!tbody) return;
@@ -87,21 +143,34 @@ function renderOrganizations(list) {
     cell.textContent = 'No organisations found.';
     row.appendChild(cell);
     tbody.appendChild(row);
+    updateOrgEditForm(null);
     return;
   }
 
   list.forEach(org => {
     const row = document.createElement('tr');
     const products = Array.isArray(org.productAccess) ? org.productAccess.join(', ') : '';
+    const seatsLabel = `${org.seatsUsed ?? 0} / ${org.seatLimit ?? '—'}`;
+    row.classList.toggle('table-active', adminState.selectedOrgId === org.id);
     row.innerHTML = `
       <td>${org.name || '-'}</td>
-      <td>${org.slug || '-'}</td>
       <td>${org.tier || '-'}</td>
       <td>${org.orgType || '-'}</td>
       <td>${products || '-'}</td>
-      <td>${org.seatLimit ?? '-'}</td>
+      <td>${seatsLabel}</td>
       <td>${formatDate(org.createdAt)}</td>
+      <td class="text-end">
+        <button class="btn btn-outline-light btn-sm" data-org-id="${org.id}" type="button">Edit</button>
+      </td>
     `;
+    row.addEventListener('click', () => selectOrganization(org.id));
+    const editBtn = row.querySelector('button[data-org-id]');
+    if (editBtn) {
+      editBtn.addEventListener('click', event => {
+        event.stopPropagation();
+        selectOrganization(org.id);
+      });
+    }
     tbody.appendChild(row);
   });
 }
@@ -143,10 +212,81 @@ async function loadOrganizations() {
       throw new Error('Unable to load organizations');
     }
     const json = await res.json();
-    renderOrganizations(json.organizations || []);
+    adminState.organizations = json.organizations || [];
+    if (adminState.organizations.length > 0) {
+      const stillSelected = adminState.organizations.some(org => org.id === adminState.selectedOrgId);
+      adminState.selectedOrgId = stillSelected ? adminState.selectedOrgId : adminState.organizations[0].id;
+    } else {
+      adminState.selectedOrgId = null;
+    }
+    renderOrganizations(adminState.organizations);
+    if (adminState.selectedOrgId) {
+      const selected = adminState.organizations.find(org => org.id === adminState.selectedOrgId);
+      updateOrgEditForm(selected || null);
+    }
   } catch (err) {
     console.error(err);
     showAccessDenied('Unable to load organizations.');
+  }
+}
+
+function collectProductAccess() {
+  const form = document.getElementById('orgEditForm');
+  if (!form) return [];
+  const checked = form.querySelectorAll('input[name="productAccess"]:checked');
+  return Array.from(checked).map(el => el.value);
+}
+
+async function saveOrganization(event) {
+  event.preventDefault();
+  const orgId = adminState.selectedOrgId;
+  const errorEl = document.getElementById('editOrgError');
+  if (errorEl) errorEl.textContent = '';
+  if (!orgId) {
+    if (errorEl) errorEl.textContent = 'Select an organisation before saving.';
+    return;
+  }
+
+  const tierSelect = document.getElementById('orgTier');
+  const typeSelect = document.getElementById('orgType');
+  const seatInput = document.getElementById('seatLimit');
+  const productAccess = collectProductAccess();
+  const seatLimit = seatInput ? parseInt(seatInput.value, 10) : undefined;
+
+  const payload = {
+    tier: tierSelect?.value,
+    orgType: typeSelect?.value,
+    productAccess
+  };
+
+  if (!Number.isNaN(seatLimit)) {
+    payload.seatLimit = seatLimit;
+  }
+
+  adminState.saving = true;
+  setOrgEditFormDisabled(false);
+
+  try {
+    const res = await fetch(`/api/admin/organizations/${orgId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const errorJson = await res.json().catch(() => ({}));
+      const message = errorJson?.error || 'Unable to save organisation changes.';
+      throw new Error(message);
+    }
+
+    await loadOrganizations();
+  } catch (err) {
+    console.error(err);
+    if (errorEl) errorEl.textContent = err.message || 'Unable to save organisation changes.';
+  } finally {
+    adminState.saving = false;
+    setOrgEditFormDisabled(false);
   }
 }
 
@@ -225,6 +365,13 @@ function initHandlers() {
       window.location.href = '/login.html';
     });
   }
+
+  const orgEditForm = document.getElementById('orgEditForm');
+  if (orgEditForm) {
+    orgEditForm.addEventListener('submit', saveOrganization);
+  }
+
+  updateOrgEditForm(null);
 }
 
 document.addEventListener('DOMContentLoaded', () => {

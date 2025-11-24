@@ -1502,20 +1502,26 @@ app.get(
   async (req, res) => {
     try {
       const organizations = await Organization.find({}).sort({ createdAt: -1 });
-      const payload = organizations.map(org => ({
-        id: org._id.toString(),
-        name: org.name,
-        slug: org.slug,
-        tier: org.tier,
-        orgType: org.orgType || 'both',
-        productAccess: Array.isArray(org.productAccess)
-          ? org.productAccess
-          : Array.isArray(org.platformAccess)
-            ? org.platformAccess
-            : [],
-        seatLimit: org.seatLimit,
-        createdAt: org.createdAt
-      }));
+      const payload = await Promise.all(
+        organizations.map(async org => {
+          const seatsUsed = await OrganizationMembership.countActiveSeats(org._id);
+          return {
+            id: org._id.toString(),
+            name: org.name,
+            slug: org.slug,
+            tier: org.tier,
+            orgType: org.orgType || 'both',
+            productAccess: Array.isArray(org.productAccess)
+              ? org.productAccess
+              : Array.isArray(org.platformAccess)
+                ? org.platformAccess
+                : [],
+            seatLimit: org.seatLimit,
+            seatsUsed,
+            createdAt: org.createdAt
+          };
+        })
+      );
 
       return res.json({ ok: true, organizations: payload });
     } catch (err) {
