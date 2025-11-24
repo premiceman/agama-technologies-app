@@ -64,6 +64,13 @@
             <span class="sidebar-label">Org &amp; Members</span>
           </a>
         </div>
+        <div class="sidebar-section-label" id="agamaAdminLabel" style="display:none;">Agama</div>
+        <div class="sidebar-section" id="agamaAdminSection" style="display:none;">
+          <a class="sidebar-link" href="/agama-admin.html" id="agamaAdminLink">
+            <i class="bi bi-shield-lock"></i>
+            <span class="sidebar-label">Agama Admin Console</span>
+          </a>
+        </div>
         <div class="sidebar-section-label">Account &amp; Settings</div>
         <div class="sidebar-section">
           <a class="sidebar-link" href="/profile.html">
@@ -445,6 +452,17 @@
       }
     }
 
+    function toggleAgamaAdminNav(user) {
+      const label = document.getElementById('agamaAdminLabel');
+      const section = document.getElementById('agamaAdminSection');
+      const email = (user?.email || '').toLowerCase();
+      const canSee = user?.isStaff === true && email.endsWith('@agamatechnologies.com');
+      if (label && section) {
+        label.style.display = canSee ? '' : 'none';
+        section.style.display = canSee ? '' : 'none';
+      }
+    }
+
     const currencyFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
     function renderRevenueForgePreview() {
@@ -531,6 +549,7 @@
         const res = await fetch('/api/auth/me', { credentials: 'include' });
         if (res.status === 401) return (window.location.href = '/api/auth/workos/login');
         const json = await res.json();
+        toggleAgamaAdminNav(json.user);
         toggleOrgAdminNav({
           effectiveLicense: json.effectiveLicense,
           organizationContext: json.organizationContext,

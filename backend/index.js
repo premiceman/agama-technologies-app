@@ -16,6 +16,7 @@ const { WorkOS } = require('@workos-inc/node');
 const { requireAuth, issueTokenCookie, clearTokenCookie } = require('./middleware/auth');
 const { validateBody } = require('./middleware/validation');
 const User = require('./models/User');
+const AdminConfig = require('./models/AdminConfig');
 const ProcurementVendor = require('./models/ProcurementVendor');
 const RevenueAccount = require('./models/RevenueAccount');
 const Organization = require('./models/Organization');
@@ -198,6 +199,38 @@ function computeEffectiveLicense(user, organizationContext) {
   }
 
   return { tier: 'personal', homeOrg: null };
+}
+
+const AGAMA_ADMIN_UNLOCK_COOKIE = 'agama_admin_unlocked';
+const AGAMA_ADMIN_UNLOCK_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours per session
+
+function isAgamaStaff(user) {
+  if (!user) return false;
+  const email = (user.email || '').toLowerCase();
+  return user.isStaff === true && email.endsWith('@agamatechnologies.com');
+}
+
+async function requireAgamaStaff(req, res, next) {
+  try {
+    const user = req.requestingUser || (req.auth?.uid ? await User.findById(req.auth.uid) : null);
+    if (!isAgamaStaff(user)) {
+      return res.status(403).json({ error: 'AGAMA_STAFF_ONLY' });
+    }
+    req.requestingUser = user;
+    return next();
+  } catch (err) {
+    console.error('Agama staff check failed', err);
+    return res.status(500).json({ error: 'Unable to verify staff access' });
+  }
+}
+
+// Simple session-level flag: a short-lived, httpOnly cookie marks the admin console as unlocked.
+function requireAdminConsoleUnlocked(req, res, next) {
+  const unlocked = req.cookies?.[AGAMA_ADMIN_UNLOCK_COOKIE] === 'true';
+  if (!unlocked) {
+    return res.status(403).json({ error: 'ADMIN_CONSOLE_LOCKED' });
+  }
+  return next();
 }
 
 async function recordAuditEvent({
@@ -441,6 +474,10 @@ const signupSchema = z.object({
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8)
+});
+
+const adminUnlockSchema = z.object({
+  secret: z.string().min(1)
 });
 
 const profileUpdateSchema = z.object({
@@ -1418,6 +1455,75 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+app.post('/api/agama-admin/unlock', requireAuth, requireAgamaStaff, validateBody(adminUnlockSchema), async (req, res) => {
+  try {
+    // Config seeded manually until UI + rotation exist.
+    const config = await AdminConfig.findById('agama-admin-console');
+    if (!config) {
+      return res.status(500).json({ error: 'ADMIN_CONFIG_MISSING' });
+    }
+
+    if (req.validatedBody.secret !== config.secretKey) {
+      return res.status(403).json({ error: 'INVALID_SECRET' });
+    }
+
+    res.cookie(AGAMA_ADMIN_UNLOCK_COOKIE, 'true', {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: AGAMA_ADMIN_UNLOCK_TTL_MS,
+      path: '/'
+    });
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Admin console unlock failed', err);
+    return res.status(500).json({ error: 'Unable to unlock admin console' });
+  }
+});
+
+app.get('/api/agama-admin/status', requireAuth, requireAgamaStaff, async (req, res) => {
+  try {
+    const user = req.requestingUser || (req.auth?.uid ? await User.findById(req.auth.uid) : null);
+    const unlocked = req.cookies?.[AGAMA_ADMIN_UNLOCK_COOKIE] === 'true';
+    return res.json({ ok: true, isStaff: isAgamaStaff(user), unlocked });
+  } catch (err) {
+    console.error('Admin console status failed', err);
+    return res.status(500).json({ error: 'Unable to fetch admin status' });
+  }
+});
+
+app.get(
+  '/api/agama-admin/organizations',
+  requireAuth,
+  requireAgamaStaff,
+  requireAdminConsoleUnlocked,
+  async (req, res) => {
+    try {
+      const organizations = await Organization.find({}).sort({ createdAt: -1 });
+      const payload = organizations.map(org => ({
+        id: org._id.toString(),
+        name: org.name,
+        slug: org.slug,
+        tier: org.tier,
+        orgType: org.orgType || 'both',
+        productAccess: Array.isArray(org.productAccess)
+          ? org.productAccess
+          : Array.isArray(org.platformAccess)
+            ? org.platformAccess
+            : [],
+        seatLimit: org.seatLimit,
+        createdAt: org.createdAt
+      }));
+
+      return res.json({ ok: true, organizations: payload });
+    } catch (err) {
+      console.error('Admin list organizations failed', err);
+      return res.status(500).json({ error: 'Unable to list organizations' });
+    }
+  }
+);
 
 app.get('/api/org/current', requireAuth, async (req, res) => {
   try {

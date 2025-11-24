@@ -30,6 +30,17 @@ function toggleOrgAdminNav(authPayload) {
   }
 }
 
+function toggleAgamaAdminNav(user) {
+  const label = document.getElementById('agamaAdminLabel');
+  const section = document.getElementById('agamaAdminSection');
+  const email = (user?.email || '').toLowerCase();
+  const canSee = user?.isStaff === true && email.endsWith('@agamatechnologies.com');
+  if (label && section) {
+    label.style.display = canSee ? '' : 'none';
+    section.style.display = canSee ? '' : 'none';
+  }
+}
+
 function licenseLabel(tier) {
   switch (tier) {
     case 'business':
@@ -71,6 +82,7 @@ async function loadProfile() {
     profileState.effectiveLicense = json.effectiveLicense || { tier: json.user?.licenseTier };
     profileState.memberships = json.memberships || [];
     profileState.organizationContext = json.organizationContext || null;
+    toggleAgamaAdminNav(profileState.user);
     toggleOrgAdminNav({
       effectiveLicense: profileState.effectiveLicense,
       organizationContext: profileState.organizationContext,

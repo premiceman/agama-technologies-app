@@ -26,6 +26,17 @@ function toggleOrgAdminNav(authPayload) {
   }
 }
 
+function toggleAgamaAdminNav(user) {
+  const label = document.getElementById('agamaAdminLabel');
+  const section = document.getElementById('agamaAdminSection');
+  const email = (user?.email || '').toLowerCase();
+  const canSee = user?.isStaff === true && email.endsWith('@agamatechnologies.com');
+  if (label && section) {
+    label.style.display = canSee ? '' : 'none';
+    section.style.display = canSee ? '' : 'none';
+  }
+}
+
 function formatDate(value) {
   if (!value) return 'n/a';
   const date = new Date(value);
@@ -227,6 +238,7 @@ async function fetchWorkspace() {
     dashboardState.organizationContext = json.organizationContext || null;
     dashboardState.memberships = json.memberships || [];
     dashboardState.effectiveLicense = json.effectiveLicense || { tier: json.user?.licenseTier };
+    toggleAgamaAdminNav(dashboardState.user);
     toggleOrgAdminNav({
       effectiveLicense: dashboardState.effectiveLicense,
       organizationContext: dashboardState.organizationContext,
