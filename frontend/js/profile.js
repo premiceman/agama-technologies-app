@@ -121,6 +121,27 @@ function renderProfile() {
   }
 
   renderMemberships();
+  renderBusinessRequestCta();
+}
+
+function renderBusinessRequestCta() {
+  const card = document.getElementById('businessRequestCard');
+  const button = document.getElementById('profileRequestBusinessBtn');
+  const hint = document.getElementById('profileRequestHint');
+  if (!card) return;
+
+  if (profileState.effectiveLicense?.tier === 'personal') {
+    card.style.display = '';
+    const subject = encodeURIComponent('Request Business Workspace');
+    const body = encodeURIComponent(
+      `Hi Agama team,%0D%0A%0D%0AI would like to request a Business workspace for my organisation.%0D%0AAccount email: ${profileState.user?.email || ''}%0D%0ACurrent organisation context: ${profileState.organizationContext?.name || 'N/A'}%0D%0A`
+    );
+    const href = `mailto:sales@agamatechnologies.com?subject=${subject}&body=${body}`;
+    if (button) button.href = href;
+    if (hint) hint.textContent = 'Agama will coordinate provisioning for Business workspaces.';
+  } else {
+    card.style.display = 'none';
+  }
 }
 
 function renderMemberships() {

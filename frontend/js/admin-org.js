@@ -5,6 +5,7 @@ const adminState = {
   organization: null,
   members: [],
   auditEvents: [],
+  showActiveOnly: false,
   auditLoaded: false
 };
 
@@ -66,7 +67,9 @@ function renderMembers() {
   const count = document.getElementById('memberCount');
   if (!tbody) return;
   tbody.innerHTML = '';
-  const members = adminState.members || [];
+  const members = (adminState.members || []).filter(member =>
+    adminState.showActiveOnly ? member.status === 'active' : true
+  );
   if (count) count.textContent = `${members.length} members`;
   if (!members.length) {
     const row = document.createElement('tr');
@@ -90,15 +93,31 @@ function renderMembers() {
 
     const statusBadge = document.createElement('span');
     statusBadge.className = 'badge-soft';
-    statusBadge.textContent = member.status;
+    statusBadge.textContent = member.status === 'invited' ? 'Pending invite' : member.status;
+
+    let inviteBadge = null;
+    if (member.status === 'invited') {
+      inviteBadge = document.createElement('div');
+      inviteBadge.className = 'small text-brand d-flex align-items-center gap-1';
+      inviteBadge.innerHTML = '<i class="bi bi-hourglass-split"></i> Pending invite';
+    }
 
     const actionGroup = document.createElement('div');
     actionGroup.className = 'd-flex justify-content-end gap-2';
+    if (member.status === 'invited') {
+      const resendBtn = document.createElement('button');
+      resendBtn.className = 'btn btn-outline-light btn-sm';
+      resendBtn.textContent = 'Resend invite';
+      resendBtn.addEventListener('click', () => resendInvite(member.id));
+      actionGroup.appendChild(resendBtn);
+    }
+
     const deactivateBtn = document.createElement('button');
     deactivateBtn.className = 'btn btn-outline-danger btn-sm';
-    deactivateBtn.textContent = 'Deactivate';
+    deactivateBtn.textContent = member.status === 'invited' ? 'Cancel invite' : 'Deactivate';
     deactivateBtn.addEventListener('click', () => {
-      if (!confirm('Deactivate this member?')) return;
+      const message = member.status === 'invited' ? 'Cancel this invite?' : 'Deactivate this member?';
+      if (!confirm(message)) return;
       removeMember(member.id);
     });
     actionGroup.appendChild(deactivateBtn);
@@ -113,6 +132,7 @@ function renderMembers() {
     `;
     row.children[2].appendChild(roleSelect);
     row.children[3].appendChild(statusBadge);
+    if (inviteBadge) row.children[3].appendChild(inviteBadge);
     row.children[5].appendChild(actionGroup);
     tbody.appendChild(row);
   });
@@ -302,11 +322,37 @@ async function removeMember(id) {
   }
 }
 
+async function resendInvite(id) {
+  const feedback = document.getElementById('memberFeedback');
+  if (feedback) feedback.textContent = '';
+  try {
+    const res = await fetch(`/api/org/admin/members/${id}/resend-invite`, {
+      method: 'POST',
+      credentials: 'include'
+    });
+    const json = await res.json();
+    if (!res.ok || !json.ok) throw new Error(json.error || 'Unable to resend invite');
+    if (feedback) feedback.textContent = 'Invite resent. Agama will manage onboarding or SSO access.';
+  } catch (err) {
+    if (feedback) feedback.textContent = err.message;
+  }
+}
+
 function bindInviteForm() {
   const form = document.getElementById('inviteForm');
   if (form) {
     form.addEventListener('submit', inviteMember);
   }
+}
+
+function bindMemberFilters() {
+  const toggle = document.getElementById('memberFilterToggle');
+  if (!toggle) return;
+  toggle.addEventListener('click', () => {
+    adminState.showActiveOnly = !adminState.showActiveOnly;
+    toggle.textContent = adminState.showActiveOnly ? 'Show all' : 'Show only active';
+    renderMembers();
+  });
 }
 
 function bindAuditControls() {
@@ -330,5 +376,6 @@ document.addEventListener('DOMContentLoaded', () => {
   bindInviteForm();
   bindLogout();
   bindAuditControls();
+  bindMemberFilters();
   fetchAuthContext();
 });
