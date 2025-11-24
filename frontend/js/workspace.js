@@ -459,6 +459,10 @@ async function fetchWorkspace() {
     dashboardState.organizationContext = json.organizationContext || null;
     dashboardState.memberships = json.memberships || [];
     dashboardState.effectiveLicense = json.effectiveLicense || { tier: json.user?.licenseTier };
+    if ((dashboardState.user?.onboardingStatus || 'pending') !== 'completed') {
+      window.location.href = '/onboarding.html';
+      return;
+    }
     toggleAgamaAdminNav(dashboardState.user);
     toggleOrgAdminNav({
       effectiveLicense: dashboardState.effectiveLicense,

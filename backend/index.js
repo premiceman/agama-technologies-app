@@ -171,6 +171,14 @@ const PLATFORM_DEFINITIONS = [
 const PLATFORM_IDS = new Set(PLATFORM_DEFINITIONS.map(platform => platform.id));
 const PERSONAL_ALLOWED_PLATFORMS = new Set(['valuesphere']);
 const LICENSE_OPTIONS = ['personal', 'business', 'guest'];
+const LICENSE_PLANS = ['free-personal', 'vendor-enterprise', 'procurement-enterprise', 'consulting-enterprise'];
+const FREE_ASSESSMENT_LIMIT = 3;
+
+function computeAssessmentLimit(user) {
+  if (!user) return null;
+  if (user.licenseTier === 'personal') return user.valueAssessmentLimit || FREE_ASSESSMENT_LIMIT;
+  return null;
+}
 
 function storeWorkOSState(res) {
   const value = crypto.randomBytes(24).toString('hex');
@@ -222,6 +230,31 @@ function computeEffectiveLicense(user, organizationContext) {
   }
 
   return { tier: 'personal', homeOrg: null };
+}
+
+function recommendLicensePlan(persona, goals = []) {
+  if (persona === 'consultant') return 'consulting-enterprise';
+  if (persona === 'vendor' || persona === 'both') return 'vendor-enterprise';
+  if (persona === 'buyer') return 'procurement-enterprise';
+  if (Array.isArray(goals) && goals.some(goal => /consult/i.test(goal))) return 'consulting-enterprise';
+  return 'free-personal';
+}
+
+function applyLicenseSelection(user, selection) {
+  const chosen = LICENSE_PLANS.includes(selection) ? selection : 'free-personal';
+  user.licensePlan = chosen;
+  if (chosen === 'free-personal') {
+    user.licenseTier = 'personal';
+    user.valueAssessmentLimit = FREE_ASSESSMENT_LIMIT;
+    user.platformAccess = ['valuesphere'];
+    return;
+  }
+
+  user.licenseTier = 'business';
+  user.valueAssessmentLimit = null;
+  const desiredPlatforms = user.platformAccess && user.platformAccess.length ? user.platformAccess : Array.from(PLATFORM_IDS);
+  const normalised = normalisePlatformAccess(user.licenseTier, desiredPlatforms);
+  user.platformAccess = normalised.error ? Array.from(PLATFORM_IDS) : normalised.platformAccess;
 }
 
 const AGAMA_ADMIN_UNLOCK_COOKIE = 'agama_admin_unlocked';
@@ -522,7 +555,9 @@ const signupSchema = z.object({
   password: z.string().min(8),
   company: z.string().trim().max(160).optional(),
   role: z.string().trim().max(160).optional(),
-  industry: z.string().trim().max(160).optional()
+  industry: z.string().trim().max(160).optional(),
+  licenseTier: z.enum(LICENSE_OPTIONS).default('personal'),
+  platformAccess: z.array(z.string()).optional()
 });
 
 const loginSchema = z.object({
@@ -535,7 +570,27 @@ const adminUnlockSchema = z.object({
 });
 
 const personaUpdateSchema = z.object({
-  persona: z.enum(['vendor', 'buyer', 'both', 'explorer', 'unknown'])
+  persona: z.enum(['vendor', 'buyer', 'consultant', 'both', 'explorer', 'unknown'])
+});
+
+const onboardingSchema = z.object({
+  persona: z.enum(['vendor', 'buyer', 'consultant', 'both', 'explorer', 'unknown']).optional(),
+  usage: z.array(z.enum(['assessments', 'procurement', 'gtm'])).optional(),
+  goals: z.array(z.string().trim().max(200)).optional(),
+  intent: z.string().trim().max(400).optional(),
+  useCases: z.array(z.string().trim().max(200)).optional(),
+  organizationType: z.enum(['vendor', 'buyer', 'both', 'consultant']).optional(),
+  recommendation: z.enum(LICENSE_PLANS).optional(),
+  licenseSelection: z.enum(LICENSE_PLANS).optional(),
+  billingDetails: z
+    .object({
+      billingName: z.string().trim().max(200).optional(),
+      company: z.string().trim().max(200).optional(),
+      email: z.string().email().optional(),
+      notes: z.string().trim().max(400).optional()
+    })
+    .optional(),
+  status: z.enum(['pending', 'in-progress', 'completed']).optional()
 });
 
 const profileUpdateSchema = z.object({
@@ -1257,7 +1312,12 @@ app.get('/api/auth/workos/signup', (req, res) => startWorkOSAuthorization(req, r
 
 app.post('/api/auth/signup', validateBody(signupSchema), async (req, res) => {
   try {
-    const { name, email, password, company, role, industry } = req.validatedBody;
+    const { name, email, password, company, role, industry, licenseTier, platformAccess } = req.validatedBody;
+
+    const normalised = normalisePlatformAccess(licenseTier, platformAccess || ['valuesphere']);
+    if (normalised.error) {
+      return res.status(400).json({ error: normalised.error });
+    }
 
     const existing = await User.findOne({ email: email.toLowerCase().trim() });
     if (existing) {
@@ -1271,8 +1331,10 @@ app.post('/api/auth/signup', validateBody(signupSchema), async (req, res) => {
       company,
       role,
       industry,
-      licenseTier: 'personal',
-      platformAccess: ['valuesphere']
+      licenseTier,
+      platformAccess: normalised.platformAccess,
+      licensePlan: licenseTier === 'business' ? 'consulting-enterprise' : 'free-personal',
+      valueAssessmentLimit: licenseTier === 'personal' ? FREE_ASSESSMENT_LIMIT : null
     });
 
     const token = issueTokenCookie(res, {
@@ -1481,6 +1543,7 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
     }
 
     const effectiveLicense = computeEffectiveLicense(user, organizationContext);
+    const usageLimits = { valueAssessments: computeAssessmentLimit(user) };
 
     const memberships = await OrganizationMembership.find({
       user: user._id,
@@ -1508,7 +1571,8 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
       platforms: PLATFORM_DEFINITIONS,
       organizationContext,
       memberships: membershipsPayload,
-      effectiveLicense
+      effectiveLicense,
+      usageLimits
     });
   } catch (err) {
     console.error(err);
@@ -1528,6 +1592,112 @@ app.patch('/api/auth/persona', requireAuth, validateBody(personaUpdateSchema), a
   } catch (err) {
     console.error('Persona update error', err);
     return res.status(500).json({ error: 'Unable to update persona' });
+  }
+});
+
+app.get('/api/onboarding', requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.auth.uid);
+    if (!user) return res.status(404).json({ error: 'Not found' });
+
+    const recommendation = recommendLicensePlan(user.persona, user.onboardingResponses?.goals);
+    const usageLimits = { valueAssessments: computeAssessmentLimit(user) };
+
+    return res.json({
+      ok: true,
+      user: user.public(),
+      onboarding: {
+        status: user.onboardingStatus || 'pending',
+        responses: user.onboardingResponses || {},
+        recommendation
+      },
+      licensePlan: user.licensePlan || 'free-personal',
+      usageLimits
+    });
+  } catch (err) {
+    console.error('Onboarding fetch error', err);
+    return res.status(500).json({ error: 'Unable to load onboarding' });
+  }
+});
+
+app.post('/api/onboarding', requireAuth, validateBody(onboardingSchema), async (req, res) => {
+  try {
+    const user = await User.findById(req.auth.uid);
+    if (!user) return res.status(404).json({ error: 'Not found' });
+
+    const payload = req.validatedBody;
+    const nextResponses = { ...(user.onboardingResponses || {}) };
+    ['persona', 'usage', 'goals', 'intent', 'useCases', 'organizationType', 'recommendation', 'licenseSelection', 'billingDetails'].forEach(
+      key => {
+        if (payload[key] !== undefined) {
+          nextResponses[key] = payload[key];
+        }
+      }
+    );
+
+    if (payload.persona) {
+      user.persona = payload.persona;
+    }
+
+    user.onboardingResponses = nextResponses;
+    user.onboardingStatus = payload.status || user.onboardingStatus || 'in-progress';
+
+    const selection = payload.licenseSelection || nextResponses.licenseSelection;
+    if (selection) {
+      applyLicenseSelection(user, selection);
+      user.onboardingStatus = 'completed';
+    }
+
+    const recommendation = payload.recommendation || recommendLicensePlan(user.persona, nextResponses.goals);
+    user.onboardingResponses.recommendation = recommendation;
+    if (payload.billingDetails) {
+      user.billingProfile = { ...(user.billingProfile || {}), ...payload.billingDetails };
+    }
+
+    await user.save();
+
+    const usageLimits = { valueAssessments: computeAssessmentLimit(user) };
+    return res.json({
+      ok: true,
+      user: user.public(),
+      onboarding: {
+        status: user.onboardingStatus,
+        responses: user.onboardingResponses,
+        recommendation
+      },
+      usageLimits
+    });
+  } catch (err) {
+    console.error('Onboarding update error', err);
+    return res.status(500).json({ error: 'Unable to save onboarding' });
+  }
+});
+
+app.post('/api/onboarding/restart', requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.auth.uid);
+    if (!user) return res.status(404).json({ error: 'Not found' });
+
+    user.onboardingStatus = 'pending';
+    user.onboardingResponses = {};
+    user.persona = 'unknown';
+    user.billingProfile = {};
+    applyLicenseSelection(user, 'free-personal');
+
+    await user.save();
+
+    const recommendation = recommendLicensePlan(user.persona);
+    const usageLimits = { valueAssessments: computeAssessmentLimit(user) };
+
+    return res.json({
+      ok: true,
+      user: user.public(),
+      onboarding: { status: user.onboardingStatus, responses: user.onboardingResponses, recommendation },
+      usageLimits
+    });
+  } catch (err) {
+    console.error('Onboarding restart error', err);
+    return res.status(500).json({ error: 'Unable to restart onboarding' });
   }
 });
 
@@ -2106,8 +2276,13 @@ app.delete('/api/auth/me/data', requireAuth, async (req, res) => {
     user.role = null;
     user.industry = null;
     user.persona = 'unknown';
+    user.onboardingStatus = 'pending';
+    user.onboardingResponses = {};
     user.platformAccess = ['valuesphere'];
     user.licenseTier = 'personal';
+    user.licensePlan = 'free-personal';
+    user.valueAssessmentLimit = FREE_ASSESSMENT_LIMIT;
+    user.billingProfile = {};
     user.defaultOrganization = null;
     await user.save();
 
