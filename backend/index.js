@@ -570,11 +570,15 @@ const adminUnlockSchema = z.object({
 });
 
 const personaUpdateSchema = z.object({
-  persona: z.enum(['vendor', 'buyer', 'consultant', 'both', 'explorer', 'unknown'])
+  persona: z.enum(['vendor', 'buyer', 'both', 'explorer', 'unknown'])
+});
+
+const valuesphereModeUpdateSchema = z.object({
+  mode: z.enum(['vendor', 'buyer'])
 });
 
 const onboardingSchema = z.object({
-  persona: z.enum(['vendor', 'buyer', 'consultant', 'both', 'explorer', 'unknown']).optional(),
+  persona: z.enum(['vendor', 'buyer', 'both', 'explorer', 'unknown']).optional(),
   usage: z.array(z.enum(['assessments', 'procurement', 'gtm'])).optional(),
   goals: z.array(z.string().trim().max(200)).optional(),
   intent: z.string().trim().max(400).optional(),
@@ -1592,6 +1596,21 @@ app.patch('/api/auth/persona', requireAuth, validateBody(personaUpdateSchema), a
   } catch (err) {
     console.error('Persona update error', err);
     return res.status(500).json({ error: 'Unable to update persona' });
+  }
+});
+
+app.patch('/api/auth/valuesphere-mode', requireAuth, validateBody(valuesphereModeUpdateSchema), async (req, res) => {
+  try {
+    const user = await User.findById(req.auth.uid);
+    if (!user) return res.status(404).json({ error: 'Not found' });
+
+    user.valuesphereMode = req.validatedBody.mode;
+    await user.save();
+
+    return res.json({ ok: true, user: user.public() });
+  } catch (err) {
+    console.error('ValueSphere mode update error', err);
+    return res.status(500).json({ error: 'Unable to update ValueSphere mode' });
   }
 });
 

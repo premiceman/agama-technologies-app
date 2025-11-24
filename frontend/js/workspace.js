@@ -406,10 +406,8 @@ function renderPersonaWizard() {
 }
 
 async function updatePersonaSelection(persona) {
-  const feedback = document.getElementById('personaFeedback');
-  const buttons = document.querySelectorAll('[data-persona-choice]');
+  const buttons = document.querySelectorAll('[data-persona]');
   buttons.forEach(btn => (btn.disabled = true));
-  if (feedback) feedback.textContent = 'Saving your preferences...';
   try {
     const res = await fetch('/api/auth/persona', {
       method: 'PATCH',
@@ -425,22 +423,19 @@ async function updatePersonaSelection(persona) {
       renderNextSteps();
       renderGreeting();
       renderPersonaWizard();
-      if (feedback) feedback.textContent = 'Thanks! Your workspace is now tailored.';
-    } else if (feedback) {
-      feedback.textContent = json.error || 'Unable to save persona.';
     }
   } catch (err) {
-    if (feedback) feedback.textContent = 'Network error. Please try again.';
+    console.error('Unable to update persona', err);
   } finally {
     buttons.forEach(btn => (btn.disabled = false));
   }
 }
 
 function bindPersonaWizard() {
-  const buttons = document.querySelectorAll('[data-persona-choice]');
+  const buttons = document.querySelectorAll('[data-persona]');
   buttons.forEach(btn => {
     btn.addEventListener('click', () => {
-      const choice = btn.getAttribute('data-persona-choice');
+      const choice = btn.getAttribute('data-persona');
       if (choice) updatePersonaSelection(choice);
     });
   });
