@@ -103,43 +103,16 @@
           </div>
         </div>
 
-        <div class="card glass p-4 mb-4 d-none" id="personaWizard">
-          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
-            <div>
-              <span class="eyebrow d-block">Onboarding</span>
-              <h2 class="h5 mb-2">Which best describes you?</h2>
-              <p class="text-fg-3 small mb-0">We tailor your dashboard and next steps for vendors and buyers.</p>
-            </div>
-            <span class="badge-soft">1 min setup</span>
+        <section class="card glass p-4 mb-3 d-none" id="personaWizard">
+          <h2 class="h6 mb-2">Help us tailor your workspace</h2>
+          <p class="text-fg-3 small mb-3">Which best describes you?</p>
+          <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-outline-light btn-sm" data-persona="vendor">We sell technology</button>
+            <button class="btn btn-outline-light btn-sm" data-persona="buyer">We buy technology</button>
+            <button class="btn btn-outline-light btn-sm" data-persona="both">Both</button>
+            <button class="btn btn-outline-light btn-sm" data-persona="explorer">I’m just exploring</button>
           </div>
-          <div class="row g-2 mt-3" id="personaChoices">
-            <div class="col-md-3 col-sm-6">
-              <button class="btn btn-outline-light w-100 text-start" data-persona-choice="vendor">
-                <div class="fw-semibold">Vendor</div>
-                <div class="small text-fg-3">We sell technology or services</div>
-              </button>
-            </div>
-            <div class="col-md-3 col-sm-6">
-              <button class="btn btn-outline-light w-100 text-start" data-persona-choice="buyer">
-                <div class="fw-semibold">Buyer</div>
-                <div class="small text-fg-3">We buy technology or services</div>
-              </button>
-            </div>
-            <div class="col-md-3 col-sm-6">
-              <button class="btn btn-outline-light w-100 text-start" data-persona-choice="both">
-                <div class="fw-semibold">Both</div>
-                <div class="small text-fg-3">We do both sides</div>
-              </button>
-            </div>
-            <div class="col-md-3 col-sm-6">
-              <button class="btn btn-outline-light w-100 text-start" data-persona-choice="explorer">
-                <div class="fw-semibold">Exploring</div>
-                <div class="small text-fg-3">Just checking things out</div>
-              </button>
-            </div>
-          </div>
-          <div class="form-text mt-2" id="personaFeedback"></div>
-        </div>
+        </section>
 
         <div class="row g-4">
           <div class="col-lg-8 d-flex flex-column gap-4">

@@ -75,7 +75,7 @@
   }
 
   const state = loadState();
-  const accountContext = { user: null, usageLimits: {} };
+  const accountContext = { user: null, usageLimits: {}, effectiveLicense: null, organizationContext: null };
 
   const areaList = document.getElementById('areaList');
   const templateForm = document.getElementById('templateForm');
@@ -101,6 +101,10 @@
   const dashboardTemplateCount = document.getElementById('dashboardTemplateCount');
   const dashboardAccountCount = document.getElementById('dashboardAccountCount');
   const dashboardAssessmentCount = document.getElementById('dashboardAssessmentCount');
+  const vsVendorMode = document.getElementById('vsVendorMode');
+  const vsBuyerMode = document.getElementById('vsBuyerMode');
+  const vsModeVendorBtn = document.getElementById('vsModeVendorBtn');
+  const vsModeBuyerBtn = document.getElementById('vsModeBuyerBtn');
   let activeAssessment = null;
 
   function computeLocalAssessmentLimit(user) {
@@ -122,10 +126,76 @@
       }
       accountContext.user = json.user;
       accountContext.usageLimits = json.usageLimits || { valueAssessments: computeLocalAssessmentLimit(json.user) };
+      accountContext.effectiveLicense = json.effectiveLicense || null;
+      accountContext.organizationContext = json.organizationContext || null;
       return true;
     } catch (err) {
       console.error('Unable to load account context', err);
       return false;
+    }
+  }
+
+  function computeInitialMode() {
+    const userMode = accountContext.user?.valuesphereMode;
+    if (userMode === 'vendor' || userMode === 'buyer') return userMode;
+
+    const effectiveTier = accountContext.effectiveLicense?.tier;
+    if (effectiveTier === 'personal') return 'vendor';
+
+    const orgType = (accountContext.effectiveLicense?.homeOrg?.orgType || accountContext.organizationContext?.orgType || '')
+      .toLowerCase();
+    const productAccess = Array.isArray(accountContext.organizationContext?.productAccess)
+      ? accountContext.organizationContext.productAccess
+      : Array.isArray(accountContext.organizationContext?.platformAccess)
+        ? accountContext.organizationContext.platformAccess
+        : [];
+
+    if ((orgType === 'buyer' || orgType === 'both') && productAccess.includes('procurepath')) {
+      return 'buyer';
+    }
+
+    return 'vendor';
+  }
+
+  async function persistValuesphereMode(mode) {
+    try {
+      const res = await fetch('/api/auth/valuesphere-mode', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ mode })
+      });
+      const json = await res.json();
+      if (res.ok && json.ok && json.user) {
+        accountContext.user = json.user;
+      }
+    } catch (err) {
+      console.error('Unable to persist ValueSphere mode', err);
+    }
+  }
+
+  function setMode(mode, { persist = true } = {}) {
+    if (mode !== 'vendor' && mode !== 'buyer') return;
+    if (vsVendorMode) vsVendorMode.classList.toggle('d-none', mode !== 'vendor');
+    if (vsBuyerMode) vsBuyerMode.classList.toggle('d-none', mode !== 'buyer');
+
+    if (vsModeVendorBtn) {
+      vsModeVendorBtn.classList.toggle('btn-primary', mode === 'vendor');
+      vsModeVendorBtn.classList.toggle('btn-outline-light', mode !== 'vendor');
+      vsModeVendorBtn.classList.toggle('active', mode === 'vendor');
+    }
+    if (vsModeBuyerBtn) {
+      vsModeBuyerBtn.classList.toggle('btn-primary', mode === 'buyer');
+      vsModeBuyerBtn.classList.toggle('btn-outline-light', mode !== 'buyer');
+      vsModeBuyerBtn.classList.toggle('active', mode === 'buyer');
+    }
+
+    if (accountContext.user) {
+      accountContext.user.valuesphereMode = mode;
+    }
+
+    if (persist) {
+      persistValuesphereMode(mode);
     }
   }
 
@@ -810,6 +880,8 @@
   async function boot() {
     const authed = await ensureAuthenticated();
     if (!authed) return;
+    const initialMode = computeInitialMode();
+    setMode(initialMode, { persist: false });
     bindAreaEvents();
     render();
     if (templateForm || areaList) {
@@ -841,6 +913,8 @@
     }
     if (templateLibraryList) templateLibraryList.addEventListener('click', handleTemplateLibraryClick);
     if (completedAssessmentsList) completedAssessmentsList.addEventListener('click', handleCompletedAssessmentOpen);
+    if (vsModeVendorBtn) vsModeVendorBtn.addEventListener('click', () => setMode('vendor'));
+    if (vsModeBuyerBtn) vsModeBuyerBtn.addEventListener('click', () => setMode('buyer'));
   }
 
   document.addEventListener('DOMContentLoaded', boot);

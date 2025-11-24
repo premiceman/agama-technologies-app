@@ -133,159 +133,184 @@
       </nav>
 
       <main class="container py-4" style="max-width: 1240px;">
-        <header class="card glass p-4 mb-4">
-          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <section class="card glass p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
-              <span class="eyebrow d-block">ValueSphere Navigator</span>
-              <h1 class="h4 mb-2">Enterprise-grade assessments and value paths</h1>
-              <p class="text-fg-3 mb-0">Model maturity templates, capture account signals, and generate AI-ready assessments for consulting teams and their customers.</p>
+              <span class="eyebrow d-block mb-1">ValueSphere</span>
+              <strong class="h6 mb-0">Mode</strong>
             </div>
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-              <div class="badge-soft">Consulting &amp; GTM ready</div>
-              <div class="badge-soft">AI-assisted</div>
-            </div>
-          </div>
-          <div class="mt-3 d-flex flex-wrap gap-3">
-            <div class="glass p-3 flex-grow-1">
-              <div class="d-flex align-items-center gap-3">
-                <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-kanban"></i></div>
-                <div>
-                  <strong>Template studio</strong>
-                  <p class="mb-0 small text-fg-3">Design BVC assessments with configurable maturity stages.</p>
-                </div>
-              </div>
-            </div>
-            <div class="glass p-3 flex-grow-1">
-              <div class="d-flex align-items-center gap-3">
-                <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-building-add"></i></div>
-                <div>
-                  <strong>Accounts &amp; timelines</strong>
-                  <p class="mb-0 small text-fg-3">Assign templates to accounts and track timestamped assessments.</p>
-                </div>
-              </div>
-            </div>
-            <div class="glass p-3 flex-grow-1">
-              <div class="d-flex align-items-center gap-3">
-                <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-graph-up"></i></div>
-                <div>
-                  <strong>Analytics &amp; objectives</strong>
-                  <p class="mb-0 small text-fg-3">Monitor urgency, maturity and objective completion across cycles.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <section class="row g-3 mb-4">
-          <div class="col-md-4">
-            <div class="glass p-3 h-100">
-              <div class="d-flex justify-content-between align-items-start">
-                <div>
-                  <span class="eyebrow d-block">Templates</span>
-                  <h2 class="h5 mb-1">Reusable playbooks</h2>
-                  <p class="small text-fg-3 mb-2">Create and reuse BVC templates for assessments.</p>
-                  <a class="btn btn-primary btn-sm" href="/valuesphere-template-new.html">Launch studio</a>
-                </div>
-                <div class="display-6" id="dashboardTemplateCount">0</div>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-4">
-            <div class="glass p-3 h-100">
-              <div class="d-flex justify-content-between align-items-start">
-                <div>
-                  <span class="eyebrow d-block">Accounts</span>
-                  <h2 class="h5 mb-1">In-flight engagements</h2>
-                  <p class="small text-fg-3 mb-2">Capture account teams, TCV, and link assessments.</p>
-                  <a class="btn btn-outline-light btn-sm" href="/valuesphere-accounts.html">Manage accounts</a>
-                </div>
-                <div class="display-6" id="dashboardAccountCount">0</div>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-4">
-            <div class="glass p-3 h-100">
-              <div class="d-flex justify-content-between align-items-start">
-                <div>
-                  <span class="eyebrow d-block">Assessments</span>
-                  <h2 class="h5 mb-1">Cycles &amp; outcomes</h2>
-                  <p class="small text-fg-3 mb-2">Timestamped assessments with owners and collaborators.</p>
-                  <a class="btn btn-outline-light btn-sm" href="/valuesphere-completed.html">View history</a>
-                </div>
-                <div class="display-6" id="dashboardAssessmentCount">0</div>
-              </div>
+            <div class="btn-group btn-group-sm" role="group" aria-label="ValueSphere mode">
+              <button type="button" class="btn btn-outline-light" id="vsModeVendorBtn">Vendor mode</button>
+              <button type="button" class="btn btn-outline-light" id="vsModeBuyerBtn">Buyer mode</button>
             </div>
           </div>
         </section>
 
-        <section class="card glass p-4">
-          <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
-            <div>
-              <h2 class="h5 mb-1">Navigator quick links</h2>
-              <p class="small text-fg-3 mb-0">Jump into the areas you need to work on next.</p>
+        <section id="vsVendorMode">
+          <header class="card glass p-4 mb-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+              <div>
+                <span class="eyebrow d-block">ValueSphere Navigator</span>
+                <h1 class="h4 mb-2">Enterprise-grade assessments and value paths</h1>
+                <p class="text-fg-3 mb-0">Model maturity templates, capture account signals, and generate AI-ready assessments for consulting teams and their customers.</p>
+              </div>
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <div class="badge-soft">Consulting &amp; GTM ready</div>
+                <div class="badge-soft">AI-assisted</div>
+              </div>
             </div>
-          </div>
-          <div class="row g-3">
-            <div class="col-md-6">
-              <div class="glass p-3 h-100">
+            <div class="mt-3 d-flex flex-wrap gap-3">
+              <div class="glass p-3 flex-grow-1">
                 <div class="d-flex align-items-center gap-3">
-                  <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-pencil"></i></div>
-                  <div class="flex-grow-1">
-                    <strong>Create a new template</strong>
-                    <p class="small text-fg-3 mb-2">Model questions, maturity stages, and reusable areas.</p>
-                    <a class="btn btn-outline-light btn-sm" href="/valuesphere-template-new.html">Open template studio</a>
+                  <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-kanban"></i></div>
+                  <div>
+                    <strong>Template studio</strong>
+                    <p class="mb-0 small text-fg-3">Design BVC assessments with configurable maturity stages.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="glass p-3 flex-grow-1">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-building-add"></i></div>
+                  <div>
+                    <strong>Accounts &amp; timelines</strong>
+                    <p class="mb-0 small text-fg-3">Assign templates to accounts and track timestamped assessments.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="glass p-3 flex-grow-1">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-graph-up"></i></div>
+                  <div>
+                    <strong>Analytics &amp; objectives</strong>
+                    <p class="mb-0 small text-fg-3">Monitor urgency, maturity and objective completion across cycles.</p>
                   </div>
                 </div>
               </div>
             </div>
-            <div class="col-md-6">
+          </header>
+
+          <section class="row g-3 mb-4">
+            <div class="col-md-4">
               <div class="glass p-3 h-100">
-                <div class="d-flex align-items-center gap-3">
-                  <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-journals"></i></div>
-                  <div class="flex-grow-1">
-                    <strong>Browse template library</strong>
-                    <p class="small text-fg-3 mb-2">Reuse past engagements or company-wide playbooks.</p>
-                    <a class="btn btn-outline-light btn-sm" href="/valuesphere-template-library.html">View library</a>
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <span class="eyebrow d-block">Templates</span>
+                    <h2 class="h5 mb-1">Reusable playbooks</h2>
+                    <p class="small text-fg-3 mb-2">Create and reuse BVC templates for assessments.</p>
+                    <a class="btn btn-primary btn-sm" href="/valuesphere-template-new.html">Launch studio</a>
+                  </div>
+                  <div class="display-6" id="dashboardTemplateCount">0</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="glass p-3 h-100">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <span class="eyebrow d-block">Accounts</span>
+                    <h2 class="h5 mb-1">In-flight engagements</h2>
+                    <p class="small text-fg-3 mb-2">Capture account teams, TCV, and link assessments.</p>
+                    <a class="btn btn-outline-light btn-sm" href="/valuesphere-accounts.html">Manage accounts</a>
+                  </div>
+                  <div class="display-6" id="dashboardAccountCount">0</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="glass p-3 h-100">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <span class="eyebrow d-block">Assessments</span>
+                    <h2 class="h5 mb-1">Cycles &amp; outcomes</h2>
+                    <p class="small text-fg-3 mb-2">Timestamped assessments with owners and collaborators.</p>
+                    <a class="btn btn-outline-light btn-sm" href="/valuesphere-completed.html">View history</a>
+                  </div>
+                  <div class="display-6" id="dashboardAssessmentCount">0</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="card glass p-4">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+              <div>
+                <h2 class="h5 mb-1">Navigator quick links</h2>
+                <p class="small text-fg-3 mb-0">Jump into the areas you need to work on next.</p>
+              </div>
+            </div>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="glass p-3 h-100">
+                  <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-pencil"></i></div>
+                    <div class="flex-grow-1">
+                      <strong>Create a new template</strong>
+                      <p class="small text-fg-3 mb-2">Model questions, maturity stages, and reusable areas.</p>
+                      <a class="btn btn-outline-light btn-sm" href="/valuesphere-template-new.html">Open template studio</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="glass p-3 h-100">
+                  <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-journals"></i></div>
+                    <div class="flex-grow-1">
+                      <strong>Browse template library</strong>
+                      <p class="small text-fg-3 mb-2">Reuse past engagements or company-wide playbooks.</p>
+                      <a class="btn btn-outline-light btn-sm" href="/valuesphere-template-library.html">View library</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="glass p-3 h-100">
+                  <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-people"></i></div>
+                    <div class="flex-grow-1">
+                      <strong>Record an assessment</strong>
+                      <p class="small text-fg-3 mb-2">Pick an account, assign a template, and capture collaborators.</p>
+                      <a class="btn btn-outline-light btn-sm" href="/valuesphere-accounts.html">Start from accounts</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="glass p-3 h-100">
+                  <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-clipboard-check"></i></div>
+                    <div class="flex-grow-1">
+                      <strong>Review completed cycles</strong>
+                      <p class="small text-fg-3 mb-2">See who contributed, when it happened, and reopen details.</p>
+                      <a class="btn btn-outline-light btn-sm" href="/valuesphere-completed.html">Open assessments</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="glass p-3 h-100">
+                  <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-people"></i></div>
+                    <div class="flex-grow-1">
+                      <strong>Collaborate in a room</strong>
+                      <p class="small text-fg-3 mb-2">Share assessments and findings with customers via Engagement Rooms.</p>
+                      <a class="btn btn-outline-light btn-sm" href="/rooms.html">Open Engagement Rooms</a>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-            <div class="col-md-6">
-              <div class="glass p-3 h-100">
-                <div class="d-flex align-items-center gap-3">
-                  <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-people"></i></div>
-                  <div class="flex-grow-1">
-                    <strong>Record an assessment</strong>
-                    <p class="small text-fg-3 mb-2">Pick an account, assign a template, and capture collaborators.</p>
-                    <a class="btn btn-outline-light btn-sm" href="/valuesphere-accounts.html">Start from accounts</a>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-6">
-              <div class="glass p-3 h-100">
-                <div class="d-flex align-items-center gap-3">
-                  <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-clipboard-check"></i></div>
-                  <div class="flex-grow-1">
-                    <strong>Review completed cycles</strong>
-                    <p class="small text-fg-3 mb-2">See who contributed, when it happened, and reopen details.</p>
-                    <a class="btn btn-outline-light btn-sm" href="/valuesphere-completed.html">Open assessments</a>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-6">
-              <div class="glass p-3 h-100">
-                <div class="d-flex align-items-center gap-3">
-                  <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-people"></i></div>
-                  <div class="flex-grow-1">
-                    <strong>Collaborate in a room</strong>
-                    <p class="small text-fg-3 mb-2">Share assessments and findings with customers via Engagement Rooms.</p>
-                    <a class="btn btn-outline-light btn-sm" href="/rooms.html">Open Engagement Rooms</a>
-                  </div>
-                </div>
-              </div>
-            </div>
+          </section>
+        </section>
+
+        <section id="vsBuyerMode" class="d-none">
+          <div class="card glass p-4">
+            <h2 class="h6 mb-2">Buyer mode</h2>
+            <p class="text-fg-3 small mb-0">
+              Use this mode to evaluate the value you get from your vendors and align them to your roadmap.
+              We’ll integrate deeper with ProcurePath in a later phase.
+            </p>
           </div>
         </section>
       </main>
