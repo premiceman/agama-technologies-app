@@ -201,6 +201,32 @@
                 </div>
               </form>
             </div>
+
+            <div class="card glass p-4 mt-3">
+              <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+                <div>
+                  <h3 class="h6 mb-1">Activity / Audit log</h3>
+                  <p class="text-fg-3 small mb-0">Recent membership and workspace changes in your organisation.</p>
+                </div>
+                <div class="d-flex gap-2">
+                  <button class="btn btn-outline-light btn-sm" type="button" id="refreshAudit">Refresh</button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle" aria-label="Audit log">
+                  <thead>
+                    <tr>
+                      <th scope="col">Date</th>
+                      <th scope="col">Actor</th>
+                      <th scope="col">Event</th>
+                      <th scope="col">Summary</th>
+                    </tr>
+                  </thead>
+                  <tbody id="auditRows"></tbody>
+                </table>
+              </div>
+              <div class="text-fg-3 small" id="auditEmpty" style="display:none;">No recent audit events for this organisation.</div>
+            </div>
           </div>
         </section>
       </main>

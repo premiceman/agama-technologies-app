@@ -3,7 +3,12 @@ const adminState = {
   unlocked: false,
   organizations: [],
   selectedOrgId: null,
-  saving: false
+  saving: false,
+  auditEvents: [],
+  auditFilters: {
+    orgId: '',
+    userId: ''
+  }
 };
 
 function toggleOrgAdminNav(authPayload) {
@@ -76,6 +81,48 @@ function formatDate(value) {
   if (!value) return '';
   const date = new Date(value);
   return date.toLocaleString();
+}
+
+function formatActor(actor) {
+  if (!actor) return 'Unknown';
+  return actor.name || actor.email || 'Unknown';
+}
+
+function eventLabel(type) {
+  const labels = {
+    'org.member.added': 'Member invited',
+    'org.member.updated': 'Member updated',
+    'org.member.removed': 'Member removed',
+    'room.created': 'Room created',
+    'staff.console.unlocked': 'Staff console unlocked'
+  };
+  return labels[type] || type;
+}
+
+function buildSummary(event) {
+  const actor = formatActor(event.actorUser);
+  const target = formatActor(event.targetUser);
+  const role = event.metadata?.role;
+  const status = event.metadata?.status || event.metadata?.membershipStatus;
+  switch (event.type) {
+    case 'org.member.added':
+      return `${actor} invited ${target || 'a member'}${role ? ` as ${role}` : ''}.`;
+    case 'org.member.updated': {
+      const changes = [];
+      if (role && role !== event.metadata?.previousRole) changes.push(`role to ${role}`);
+      if (status && status !== event.metadata?.previousStatus) changes.push(`status to ${status}`);
+      const changeText = changes.length ? ` (${changes.join(', ')})` : '';
+      return `${actor} updated ${target || 'a member'}${changeText}.`;
+    }
+    case 'org.member.removed':
+      return `${actor} removed ${target || 'a member'} from the organisation.`;
+    case 'room.created':
+      return `${actor} created room "${event.metadata?.title || 'Untitled room'}".`;
+    case 'staff.console.unlocked':
+      return `${actor} unlocked the staff console.`;
+    default:
+      return event.metadata?.summary || 'Activity recorded.';
+  }
 }
 
 function setOrgEditFormDisabled(disabled) {
@@ -175,6 +222,62 @@ function renderOrganizations(list) {
   });
 }
 
+function populateAuditOrgFilter() {
+  const select = document.getElementById('auditOrgFilter');
+  if (!select) return;
+  const current = select.value;
+  select.innerHTML = '<option value="">All organisations</option>';
+  adminState.organizations.forEach(org => {
+    const option = document.createElement('option');
+    option.value = org.id;
+    option.textContent = `${org.name || 'Org'} (${org.slug || org.id})`;
+    select.appendChild(option);
+  });
+  if (current && adminState.organizations.some(org => org.id === current)) {
+    select.value = current;
+  }
+}
+
+function renderAuditEvents() {
+  const tbody = document.getElementById('auditTableBody');
+  const empty = document.getElementById('auditEmpty');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  const events = adminState.auditEvents || [];
+  if (empty) empty.style.display = events.length ? 'none' : '';
+  if (!events.length) return;
+
+  events.forEach(event => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td class="text-nowrap">${formatDate(event.createdAt)}</td>
+      <td>${formatActor(event.actorUser)}</td>
+      <td>${eventLabel(event.type)}</td>
+      <td>${buildSummary(event)}</td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+async function fetchAuditLog() {
+  try {
+    const params = new URLSearchParams();
+    const { orgId, userId } = adminState.auditFilters;
+    if (orgId) params.set('orgId', orgId);
+    if (userId) params.set('userId', userId.trim());
+    const query = params.toString();
+    const res = await fetch(`/api/agama-admin/audit${query ? `?${query}` : ''}`, { credentials: 'include' });
+    const json = await res.json();
+    if (!res.ok || !json.ok) throw new Error(json.error || 'Unable to load audit events');
+    adminState.auditEvents = json.events || [];
+    renderAuditEvents();
+  } catch (err) {
+    console.error(err);
+    adminState.auditEvents = [];
+    renderAuditEvents();
+  }
+}
+
 async function loadStatus() {
   try {
     const res = await fetch('/api/agama-admin/status', { credentials: 'include' });
@@ -220,10 +323,12 @@ async function loadOrganizations() {
       adminState.selectedOrgId = null;
     }
     renderOrganizations(adminState.organizations);
+    populateAuditOrgFilter();
     if (adminState.selectedOrgId) {
       const selected = adminState.organizations.find(org => org.id === adminState.selectedOrgId);
       updateOrgEditForm(selected || null);
     }
+    await fetchAuditLog();
   } catch (err) {
     console.error(err);
     showAccessDenied('Unable to load organizations.');
@@ -369,6 +474,40 @@ function initHandlers() {
   const orgEditForm = document.getElementById('orgEditForm');
   if (orgEditForm) {
     orgEditForm.addEventListener('submit', saveOrganization);
+  }
+
+  const refreshOrgs = document.getElementById('refreshOrgs');
+  if (refreshOrgs) {
+    refreshOrgs.addEventListener('click', () => loadOrganizations());
+  }
+
+  const auditForm = document.getElementById('auditFilters');
+  if (auditForm) {
+    auditForm.addEventListener('submit', event => {
+      event.preventDefault();
+      const orgSelect = document.getElementById('auditOrgFilter');
+      const userInput = document.getElementById('auditUserFilter');
+      adminState.auditFilters.orgId = orgSelect?.value || '';
+      adminState.auditFilters.userId = (userInput?.value || '').trim();
+      fetchAuditLog();
+    });
+  }
+
+  const clearAudit = document.getElementById('clearAuditFilters');
+  if (clearAudit) {
+    clearAudit.addEventListener('click', () => {
+      const orgSelect = document.getElementById('auditOrgFilter');
+      const userInput = document.getElementById('auditUserFilter');
+      if (orgSelect) orgSelect.value = '';
+      if (userInput) userInput.value = '';
+      adminState.auditFilters = { orgId: '', userId: '' };
+      fetchAuditLog();
+    });
+  }
+
+  const refreshAudit = document.getElementById('refreshAudit');
+  if (refreshAudit) {
+    refreshAudit.addEventListener('click', () => fetchAuditLog());
   }
 
   updateOrgEditForm(null);

@@ -3,7 +3,9 @@ const adminState = {
   memberships: [],
   effectiveLicense: null,
   organization: null,
-  members: []
+  members: [],
+  auditEvents: [],
+  auditLoaded: false
 };
 
 function setText(id, text) {
@@ -116,6 +118,85 @@ function renderMembers() {
   });
 }
 
+function eventLabel(type) {
+  const labels = {
+    'org.member.added': 'Member invited',
+    'org.member.updated': 'Member updated',
+    'org.member.removed': 'Member removed',
+    'room.created': 'Room created',
+    'staff.console.unlocked': 'Staff console unlocked'
+  };
+  return labels[type] || type;
+}
+
+function formatActor(actor) {
+  if (!actor) return 'Unknown';
+  return actor.name || actor.email || 'Unknown';
+}
+
+function buildSummary(event) {
+  const actor = formatActor(event.actorUser);
+  const target = formatActor(event.targetUser);
+  const role = event.metadata?.role;
+  const status = event.metadata?.status || event.metadata?.membershipStatus;
+  switch (event.type) {
+    case 'org.member.added':
+      return `${actor} invited ${target || 'a member'}${role ? ` as ${role}` : ''}.`;
+    case 'org.member.updated': {
+      const changes = [];
+      if (role && role !== event.metadata?.previousRole) changes.push(`role to ${role}`);
+      if (status && status !== event.metadata?.previousStatus) changes.push(`status to ${status}`);
+      const changeText = changes.length ? ` (${changes.join(', ')})` : '';
+      return `${actor} updated ${target || 'a member'}${changeText}.`;
+    }
+    case 'org.member.removed':
+      return `${actor} removed ${target || 'a member'} from the organisation.`;
+    case 'room.created':
+      return `${actor} created room "${event.metadata?.title || 'Untitled room'}".`;
+    case 'staff.console.unlocked':
+      return `${actor} unlocked the staff console.`;
+    default:
+      return event.metadata?.summary || 'Activity recorded.';
+  }
+}
+
+function renderAuditEvents() {
+  const tbody = document.getElementById('auditRows');
+  const empty = document.getElementById('auditEmpty');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  const events = adminState.auditEvents || [];
+  if (empty) empty.style.display = events.length ? 'none' : '';
+  if (!events.length) return;
+
+  events.forEach(event => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td class="text-nowrap">${formatDate(event.createdAt)}</td>
+      <td>${formatActor(event.actorUser)}</td>
+      <td>${eventLabel(event.type)}</td>
+      <td>${buildSummary(event)}</td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+async function fetchAuditLog() {
+  try {
+    const res = await fetch('/api/org/admin/audit', { credentials: 'include' });
+    const json = await res.json();
+    if (!res.ok || !json.ok) throw new Error(json.error || 'Unable to load audit log');
+    adminState.auditEvents = json.events || [];
+    adminState.auditLoaded = true;
+    renderAuditEvents();
+  } catch (err) {
+    console.error(err);
+    adminState.auditEvents = [];
+    adminState.auditLoaded = true;
+    renderAuditEvents();
+  }
+}
+
 async function fetchAuthContext() {
   try {
     const res = await fetch('/api/auth/me', { credentials: 'include' });
@@ -158,6 +239,7 @@ async function fetchOverview() {
     adminState.members = json.members || [];
     renderOverview();
     renderMembers();
+    fetchAuditLog();
   } catch (err) {
     setText('orgName', 'Unable to load organisation');
   }
@@ -227,6 +309,13 @@ function bindInviteForm() {
   }
 }
 
+function bindAuditControls() {
+  const refresh = document.getElementById('refreshAudit');
+  if (refresh) {
+    refresh.addEventListener('click', () => fetchAuditLog());
+  }
+}
+
 function bindLogout() {
   const logoutButton = document.getElementById('logout');
   if (logoutButton) {
@@ -240,5 +329,6 @@ function bindLogout() {
 document.addEventListener('DOMContentLoaded', () => {
   bindInviteForm();
   bindLogout();
+  bindAuditControls();
   fetchAuthContext();
 });
