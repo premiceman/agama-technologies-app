@@ -105,7 +105,12 @@ function renderAccountCard() {
 
   const narrative = document.getElementById('accountNarrative');
   const meta = document.getElementById('accountMeta');
+  const requestRow = document.getElementById('businessRequestRow');
+  const requestButton = document.getElementById('requestBusinessBtn');
+  const requestHint = document.getElementById('requestBusinessHint');
   meta.innerHTML = '';
+  if (requestRow) requestRow.style.display = 'none';
+  if (narrative) narrative.textContent = '';
 
   if (effectiveLicense?.tier === 'business') {
     const home = effectiveLicense.homeOrg;
@@ -116,6 +121,7 @@ function renderAccountCard() {
     if (narrative) {
       narrative.textContent = 'You are on a Business workspace with organisation-wide access to suites and rooms.';
     }
+    if (requestRow) requestRow.style.display = 'none';
     if (home) {
       const badge = document.createElement('span');
       badge.className = 'badge-soft';
@@ -127,6 +133,18 @@ function renderAccountCard() {
       details.textContent = pieces.join(' • ');
       meta.appendChild(details);
     }
+  } else if (effectiveLicense?.tier === 'personal') {
+    if (narrative) {
+      narrative.textContent = 'You are on a Personal workspace. Agama provisions Business workspaces directly for teams.';
+    }
+    if (requestRow) requestRow.style.display = '';
+    const subject = encodeURIComponent('Request Business Workspace');
+    const body = encodeURIComponent(
+      `Hi Agama team,%0D%0A%0D%0AI would like to request a Business workspace for my organisation.%0D%0AAccount email: ${user.email}%0D%0ACurrent organisation context: ${organizationContext?.name || 'N/A'}%0D%0A`
+    );
+    const href = `mailto:sales@agamatechnologies.com?subject=${subject}&body=${body}`;
+    if (requestButton) requestButton.href = href;
+    if (requestHint) requestHint.textContent = 'We will coordinate onboarding via Agama or SSO.';
   } else if (effectiveLicense?.tier === 'guest') {
     if (narrative) {
       narrative.textContent = 'You have been invited into rooms as a guest. Organisation settings are not available to guests.';

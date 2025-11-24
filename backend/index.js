@@ -599,13 +599,15 @@ const issueCreateSchema = z.object({
 function serializeMembership(membership) {
   const user = membership.user || {};
   const userId = typeof membership.user === 'string' ? membership.user : user._id;
+  const allowedStatuses = new Set(['invited', 'active', 'suspended', 'removed']);
+  const status = allowedStatuses.has(membership.status) ? membership.status : 'active';
   return {
     id: membership._id.toString(),
     userId: userId ? userId.toString() : null,
     name: user.name || null,
     email: user.email || membership.invitedEmail || null,
     role: membership.role,
-    status: membership.status,
+    status,
     licenseTier: user.licenseTier || null,
     lastLoginAt: user.lastLoginAt || null,
     createdAt: membership.createdAt
@@ -1953,6 +1955,29 @@ app.patch(
     }
   }
 );
+
+app.post('/api/org/admin/members/:membershipId/resend-invite', requireAuth, requireOrgAdmin, async (req, res) => {
+  try {
+    const membership = await OrganizationMembership.findById(req.params.membershipId).populate({
+      path: 'user',
+      select: 'name email licenseTier lastLoginAt'
+    });
+    if (!membership) {
+      return res.status(404).json({ error: 'Membership not found' });
+    }
+    if (membership.organization.toString() !== req.organization._id.toString()) {
+      return res.status(403).json({ error: 'ORG_ADMIN_ONLY' });
+    }
+    if (membership.status !== 'invited') {
+      return res.status(400).json({ error: 'Only pending invites can be resent.' });
+    }
+
+    return res.json({ ok: true, member: serializeMembership(membership) });
+  } catch (err) {
+    console.error('Org admin resend invite error', err);
+    return res.status(500).json({ error: 'Unable to resend invite' });
+  }
+});
 
 app.delete('/api/org/admin/members/:membershipId', requireAuth, requireOrgAdmin, async (req, res) => {
   try {

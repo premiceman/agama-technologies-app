@@ -156,9 +156,13 @@
               <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
                 <div>
                   <h2 class="h5 mb-1">Members &amp; access</h2>
-                  <p class="text-fg-3 small mb-0">Invite teammates, adjust roles, and deactivate access.</p>
+                  <p class="text-fg-3 small mb-1">Invite teammates, adjust roles, and deactivate access.</p>
+                  <p class="text-fg-3 small mb-0" id="inviteHelper">Invited users will be onboarded via SSO or by Agama. If they have trouble accessing, contact support.</p>
                 </div>
-                <span class="badge-soft" id="memberCount">0 members</span>
+                <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                  <button class="btn btn-outline-light btn-sm" type="button" id="memberFilterToggle">Show only active</button>
+                  <span class="badge-soft" id="memberCount">0 members</span>
+                </div>
               </div>
               <div class="table-responsive">
                 <table class="table align-middle text-sm">
@@ -175,6 +179,7 @@
                   <tbody id="memberRows"></tbody>
                 </table>
               </div>
+              <div class="form-text" id="memberFeedback"></div>
             </div>
 
             <div class="card glass p-4">
