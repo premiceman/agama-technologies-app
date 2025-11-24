@@ -480,6 +480,10 @@ const adminUnlockSchema = z.object({
   secret: z.string().min(1)
 });
 
+const personaUpdateSchema = z.object({
+  persona: z.enum(['vendor', 'buyer', 'both', 'explorer', 'unknown'])
+});
+
 const profileUpdateSchema = z.object({
   name: z.string().trim().max(120).optional(),
   company: z.string().trim().max(160).optional(),
@@ -1453,6 +1457,21 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.patch('/api/auth/persona', requireAuth, validateBody(personaUpdateSchema), async (req, res) => {
+  try {
+    const user = await User.findById(req.auth.uid);
+    if (!user) return res.status(404).json({ error: 'Not found' });
+
+    user.persona = req.validatedBody.persona;
+    await user.save();
+
+    return res.json({ ok: true, user: user.public() });
+  } catch (err) {
+    console.error('Persona update error', err);
+    return res.status(500).json({ error: 'Unable to update persona' });
   }
 });
 
