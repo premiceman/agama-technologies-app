@@ -294,6 +294,26 @@ function requirePlatformAccess(platformId) {
   };
 }
 
+async function requireStaff(req, res, next) {
+  try {
+    if (!req.auth || !req.auth.uid) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const user = req.requestingUser || (await User.findById(req.auth.uid));
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (user.isStaff !== true) {
+      return res.status(403).json({ error: 'STAFF_ONLY' });
+    }
+
+    req.requestingUser = user;
+    return next();
+  } catch (err) {
+    console.error('requireStaff error', err);
+    return res.status(500).json({ error: 'Unable to verify staff access' });
+  }
+}
+
 function normalisePlatformAccess(licenseTier, requested) {
   if (!LICENSE_OPTIONS.includes(licenseTier)) {
     return { error: 'Unknown license tier.' };
@@ -319,6 +339,28 @@ function normalisePlatformAccess(licenseTier, requested) {
     return { error: 'Select at least one platform for your business license.' };
   }
   return { platformAccess: filtered };
+}
+
+function normaliseProductAccess(requested) {
+  const selections = Array.isArray(requested)
+    ? Array.from(new Set(requested.map(value => String(value))))
+    : [];
+  return selections.filter(id => PLATFORM_IDS.has(id));
+}
+
+async function generateUniqueOrgSlug(baseValue) {
+  const baseSlug = String(baseValue || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)+/g, '')
+    .slice(0, 60);
+
+  let slug = baseSlug || `org-${Date.now()}`;
+  let suffix = 1;
+  while (await Organization.findOne({ slug })) {
+    slug = `${baseSlug || `org-${Date.now()}`}-${suffix++}`;
+  }
+  return slug;
 }
 
 const signupSchema = z.object({
@@ -358,9 +400,37 @@ const organizationUpdateSchema = z.object({
   platformAccess: z.array(z.string()).optional()
 });
 
+const adminOrganizationCreateSchema = z
+  .object({
+    name: z.string().trim().min(2),
+    orgType: z.enum(['vendor', 'buyer', 'both']).default('both'),
+    tier: z.enum(['personal', 'business']).default('business'),
+    productAccess: z.array(z.string()).default([]),
+    seatLimit: z.number().int().positive().max(10000).default(10),
+    domains: z.array(z.string().trim()).default([])
+  })
+  .refine(payload => payload.productAccess.every(id => PLATFORM_IDS.has(id)), {
+    message: 'Invalid product access selection',
+    path: ['productAccess']
+  });
+
+const adminOrganizationUpdateSchema = z
+  .object({
+    name: z.string().trim().min(2).optional(),
+    orgType: z.enum(['vendor', 'buyer', 'both']).optional(),
+    tier: z.enum(['personal', 'business']).optional(),
+    productAccess: z.array(z.string()).optional(),
+    seatLimit: z.number().int().positive().max(10000).optional(),
+    domains: z.array(z.string().trim()).optional()
+  })
+  .refine(payload => !payload.productAccess || payload.productAccess.every(id => PLATFORM_IDS.has(id)), {
+    message: 'Invalid product access selection',
+    path: ['productAccess']
+  });
+
 const membershipUpdateSchema = z.object({
   role: z.enum(['owner', 'admin', 'member', 'viewer']).optional(),
-  status: z.enum(['active', 'invited', 'suspended']).optional()
+  status: z.enum(['active', 'invited', 'suspended', 'removed']).optional()
 });
 
 const membershipCreateSchema = z.object({
@@ -1182,11 +1252,32 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
 
     const effectiveLicense = computeEffectiveLicense(user, organizationContext);
 
+    const memberships = await OrganizationMembership.find({
+      user: user._id,
+      status: { $ne: 'removed' }
+    }).populate('organization');
+
+    const membershipsPayload = memberships
+      .filter(membership => membership.organization)
+      .map(membership => ({
+        id: membership._id.toString(),
+        organizationId: membership.organization._id.toString(),
+        organizationName: membership.organization.name,
+        organizationTier: membership.organization.tier,
+        organizationOrgType: membership.organization.orgType || 'both',
+        role: membership.role,
+        status: membership.status,
+        isHome:
+          !!user.defaultOrganization &&
+          membership.organization._id.toString() === user.defaultOrganization.toString()
+      }));
+
     res.json({
       ok: true,
       user: user.public(),
       platforms: PLATFORM_DEFINITIONS,
       organizationContext,
+      memberships: membershipsPayload,
       effectiveLicense
     });
   } catch (err) {
@@ -1252,6 +1343,59 @@ app.get('/api/org/current', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Org current error', err);
     res.status(500).json({ error: 'Unable to fetch organization context' });
+  }
+});
+
+app.get('/api/org/members', requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.auth.uid);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const orgId = req.auth.orgId || user.defaultOrganization;
+    if (!orgId) {
+      return res.status(400).json({ error: 'No organization selected' });
+    }
+
+    const membership = await OrganizationMembership.findOne({
+      organization: orgId,
+      user: user._id,
+      status: 'active'
+    });
+
+    if (!membership) {
+      return res.status(403).json({ error: 'Not a member of this organization.' });
+    }
+
+    const organization = await Organization.findById(orgId);
+    if (!organization) {
+      return res.status(404).json({ error: 'Organization not found' });
+    }
+
+    const members = await OrganizationMembership.find({ organization: orgId, status: { $ne: 'removed' } }).populate({
+      path: 'user',
+      select: 'name email'
+    });
+
+    res.json({
+      ok: true,
+      organization: {
+        id: organization._id.toString(),
+        name: organization.name,
+        tier: organization.tier,
+        orgType: organization.orgType || 'both'
+      },
+      members: members.map(member => ({
+        id: member._id.toString(),
+        userId: member.user ? member.user._id.toString() : null,
+        name: member.user ? member.user.name : null,
+        email: member.user ? member.user.email : member.invitedEmail,
+        role: member.role,
+        status: member.status
+      }))
+    });
+  } catch (err) {
+    console.error('Org members error', err);
+    res.status(500).json({ error: 'Unable to fetch organization members' });
   }
 });
 
@@ -1342,6 +1486,114 @@ app.delete('/api/auth/me', requireAuth, async (req, res) => {
   }
 });
 
+app.post(
+  '/api/admin/organizations',
+  requireAuth,
+  requireStaff,
+  validateBody(adminOrganizationCreateSchema),
+  async (req, res) => {
+    try {
+      const { name, orgType, tier, productAccess, seatLimit, domains } = req.validatedBody;
+      const slug = await generateUniqueOrgSlug(name);
+      const normalizedProductAccess = normaliseProductAccess(productAccess);
+
+      const organization = await Organization.create({
+        name,
+        slug,
+        orgType,
+        tier,
+        productAccess: normalizedProductAccess,
+        platformAccess: normalizedProductAccess,
+        seatLimit,
+        domains: domains || [],
+        createdBy: req.auth.uid
+      });
+
+      res.status(201).json({
+        ok: true,
+        organization: {
+          id: organization._id.toString(),
+          name: organization.name,
+          orgType: organization.orgType,
+          tier: organization.tier,
+          productAccess: organization.productAccess,
+          seatLimit: organization.seatLimit,
+          createdAt: organization.createdAt
+        }
+      });
+    } catch (err) {
+      console.error('Admin create org error', err);
+      res.status(500).json({ error: 'Unable to create organization' });
+    }
+  }
+);
+
+app.get('/api/admin/organizations', requireAuth, requireStaff, async (req, res) => {
+  try {
+    const organizations = await Organization.find({}).sort({ createdAt: -1 });
+    res.json({
+      ok: true,
+      organizations: organizations.map(org => ({
+        id: org._id.toString(),
+        name: org.name,
+        orgType: org.orgType || 'both',
+        tier: org.tier,
+        productAccess: Array.isArray(org.productAccess) ? org.productAccess : [],
+        seatLimit: org.seatLimit,
+        createdAt: org.createdAt
+      }))
+    });
+  } catch (err) {
+    console.error('Admin list orgs error', err);
+    res.status(500).json({ error: 'Unable to list organizations' });
+  }
+});
+
+app.patch(
+  '/api/admin/organizations/:id',
+  requireAuth,
+  requireStaff,
+  validateBody(adminOrganizationUpdateSchema),
+  async (req, res) => {
+    try {
+      const organization = await Organization.findById(req.params.id);
+      if (!organization) {
+        return res.status(404).json({ error: 'Organization not found' });
+      }
+
+      const payload = req.validatedBody;
+      if (payload.name !== undefined) organization.name = payload.name.trim();
+      if (payload.orgType) organization.orgType = payload.orgType;
+      if (payload.tier) organization.tier = payload.tier;
+      if (payload.productAccess) {
+        const normalized = normaliseProductAccess(payload.productAccess);
+        organization.productAccess = normalized;
+        organization.platformAccess = normalized;
+      }
+      if (payload.seatLimit !== undefined) organization.seatLimit = payload.seatLimit;
+      if (payload.domains) organization.domains = payload.domains;
+
+      await organization.save();
+
+      res.json({
+        ok: true,
+        organization: {
+          id: organization._id.toString(),
+          name: organization.name,
+          orgType: organization.orgType,
+          tier: organization.tier,
+          productAccess: organization.productAccess,
+          seatLimit: organization.seatLimit,
+          domains: organization.domains
+        }
+      });
+    } catch (err) {
+      console.error('Admin update org error', err);
+      res.status(500).json({ error: 'Unable to update organization' });
+    }
+  }
+);
+
 app.get('/api/orgs', requireAuth, async (req, res) => {
   try {
     const memberships = await OrganizationMembership.find({ user: req.auth.uid, status: 'active' }).populate(
@@ -1376,6 +1628,11 @@ app.get('/api/orgs', requireAuth, async (req, res) => {
 app.post('/api/orgs', requireAuth, validateBody(organizationCreateSchema), async (req, res) => {
   try {
     const payload = req.validatedBody;
+    const normalizedProductAccess = normaliseProductAccess(payload.platformAccess || ['valuesphere']);
+    const personalProductAccess = normalizedProductAccess.filter(id => PERSONAL_ALLOWED_PLATFORMS.has(id));
+    const productAccess = personalProductAccess.length > 0 ? personalProductAccess : ['valuesphere'];
+    const orgType =
+      payload.orgType && ['vendor', 'buyer', 'both'].includes(payload.orgType) ? payload.orgType : 'both';
     const baseSlug = payload.slug
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
@@ -1393,10 +1650,10 @@ app.post('/api/orgs', requireAuth, validateBody(organizationCreateSchema), async
       slug,
       domains: payload.domains || [],
       seatLimit: payload.seatLimit || 10,
-      tier: 'business',
-      platformAccess: payload.platformAccess || ['valuesphere'],
-      productAccess: payload.platformAccess || ['valuesphere'],
-      orgType: payload.orgType || 'both',
+      tier: 'personal',
+      platformAccess: productAccess,
+      productAccess,
+      orgType,
       createdBy: req.auth.uid
     });
 
@@ -1456,14 +1713,23 @@ app.get('/api/orgs/:orgId', requireAuth, requireOrgRole('viewer'), async (req, r
 
 app.put('/api/orgs/:orgId', requireAuth, requireOrgRole('owner'), validateBody(organizationUpdateSchema), async (req, res) => {
   try {
+    const requestingUser = req.requestingUser || (await User.findById(req.auth.uid));
+    if (req.organization.tier === 'business' && (!requestingUser || requestingUser.isStaff !== true)) {
+      return res.status(403).json({ error: 'STAFF_ONLY' });
+    }
+
     const payload = req.validatedBody;
     if (payload.name !== undefined) req.organization.name = payload.name.trim();
     if (payload.seatLimit !== undefined) req.organization.seatLimit = payload.seatLimit;
     if (payload.platformAccess) {
-      const normalized = payload.platformAccess.filter(id => PLATFORM_IDS.has(id));
-      if (normalized.length > 0) {
-        req.organization.platformAccess = normalized;
-        req.organization.productAccess = normalized;
+      const normalized = normaliseProductAccess(payload.platformAccess);
+      const allowedAccess =
+        req.organization.tier === 'personal'
+          ? normalized.filter(id => PERSONAL_ALLOWED_PLATFORMS.has(id))
+          : normalized;
+      if (allowedAccess.length > 0) {
+        req.organization.platformAccess = allowedAccess;
+        req.organization.productAccess = allowedAccess;
       }
     }
     await req.organization.save();

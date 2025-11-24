@@ -13,7 +13,7 @@ const OrganizationMembershipSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ['active', 'invited', 'suspended'],
+      enum: ['active', 'invited', 'suspended', 'removed'],
       default: 'active'
     },
     invitedEmail: { type: String, trim: true }
