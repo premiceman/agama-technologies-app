@@ -8,6 +8,7 @@ const mongoose = require('mongoose');
 const request = require('supertest');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const { installWorkOSStub, FakeWorkOS } = require('./helpers/workosStub');
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Organization = require('../models/Organization');
 const OrganizationMembership = require('../models/OrganizationMembership');
@@ -134,7 +135,7 @@ describe('WorkOS webhook endpoint', () => {
         id: 'om_123',
         user_id: 'user_999',
         organization_id: 'org_999',
-        role: { slug: 'admin' },
+        role: { slug: 'ADMIN' },
         status: 'active',
         user: {
           object: 'user',
@@ -170,5 +171,122 @@ describe('WorkOS webhook endpoint', () => {
     expect(membership.role).toBe('admin');
     expect(membership.status).toBe('active');
     expect(membership.roleOrigin).toBe('idp');
+  });
+
+  test('updates WorkOS membership role changes', async () => {
+    FakeWorkOS.mockEvent = {
+      id: 'evt_membership_create',
+      event: 'organization_membership.created',
+      data: {
+        object: 'organization_membership',
+        id: 'om_update',
+        user_id: 'user_update',
+        organization_id: 'org_update',
+        role: { slug: 'member' },
+        status: 'active',
+        user: {
+          object: 'user',
+          id: 'user_update',
+          email: 'update@example.com',
+          first_name: 'Update',
+          last_name: 'Member'
+        },
+        organization: {
+          object: 'organization',
+          id: 'org_update',
+          name: 'Update Org',
+          domains: [{ domain: 'update.com' }]
+        }
+      }
+    };
+
+    await request(app)
+      .post('/api/webhooks/workos')
+      .set('Content-Type', 'application/json')
+      .set('workos-signature', 'test')
+      .send({});
+
+    FakeWorkOS.mockEvent = {
+      id: 'evt_membership_update',
+      event: 'organization_membership.updated',
+      data: {
+        object: 'organization_membership',
+        id: 'om_update',
+        user_id: 'user_update',
+        organization_id: 'org_update',
+        role: { slug: 'viewer' },
+        status: 'active'
+      }
+    };
+
+    await request(app)
+      .post('/api/webhooks/workos')
+      .set('Content-Type', 'application/json')
+      .set('workos-signature', 'test')
+      .send({});
+
+    const org = await Organization.findOne({ workosOrganizationId: 'org_update' });
+    const user = await User.findOne({ workosUserId: 'user_update' });
+    const membership = await OrganizationMembership.findOne({ organization: org._id, user: user._id });
+
+    expect(membership.role).toBe('viewer');
+    expect(membership.status).toBe('active');
+    expect(membership.roleOrigin).toBe('idp');
+  });
+
+  test('invalidates existing sessions when a WorkOS user is deactivated', async () => {
+    FakeWorkOS.mockEvent = {
+      id: 'evt_user_active',
+      event: 'user.created',
+      data: {
+        object: 'user',
+        id: 'user_force',
+        email: 'force@example.com',
+        first_name: 'Force',
+        last_name: 'Active',
+        state: 'active'
+      }
+    };
+
+    await request(app)
+      .post('/api/webhooks/workos')
+      .set('Content-Type', 'application/json')
+      .set('workos-signature', 'test')
+      .send({});
+
+    const user = await User.findOne({ workosUserId: 'user_force' });
+
+    const tokenIssuedAt = Math.floor((Date.now() - 60 * 1000) / 1000);
+    const token = jwt.sign({ uid: user._id.toString(), iat: tokenIssuedAt }, process.env.JWT_SECRET, {
+      expiresIn: '1h'
+    });
+
+    FakeWorkOS.mockEvent = {
+      id: 'evt_user_deactivated',
+      event: 'user.deactivated',
+      data: {
+        object: 'user',
+        id: 'user_force',
+        email: 'force@example.com',
+        state: 'deactivated'
+      }
+    };
+
+    await request(app)
+      .post('/api/webhooks/workos')
+      .set('Content-Type', 'application/json')
+      .set('workos-signature', 'test')
+      .send({});
+
+    const updatedUser = await User.findById(user._id);
+    expect(updatedUser.status).toBe('deactivated');
+    expect(updatedUser.forceLogoutAt instanceof Date).toBe(true);
+
+    const authRes = await request(app)
+      .get('/api/auth/me')
+      .set('Cookie', [`at_session=${token}`]);
+
+    expect(authRes.status).toBe(401);
+    expect(/Session expired/i.test(authRes.body.error || '')).toBe(true);
   });
 });

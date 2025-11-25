@@ -125,6 +125,7 @@ app.post(
         case 'user.created':
         case 'user.updated':
         case 'user.deleted':
+        case 'user.deactivated':
           if (event.data && event.data.object === 'user') {
             await syncWorkOSUser(event.data);
           }
