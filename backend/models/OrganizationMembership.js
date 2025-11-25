@@ -16,6 +16,7 @@ const OrganizationMembershipSchema = new Schema(
       enum: ['active', 'invited', 'suspended', 'removed'],
       default: 'active'
     },
+    roleOrigin: { type: String, enum: ['app', 'idp'], default: 'app' },
     invitedEmail: { type: String, trim: true }
   },
   { timestamps: true }
