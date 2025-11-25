@@ -220,7 +220,7 @@
       </section>
     </section>
 
-    <section id="landingBuyerSection" class="d-none">
+    <section id="landingBuyerSection">
       <section class="container py-5" id="buyer">
         <div class="row g-4 align-items-center mb-4">
           <div class="col-lg-7" data-aos="fade-right">
@@ -427,34 +427,77 @@
       const body = document.body;
       const vendorBtn = toggle.querySelector('[data-suite="vendor"]');
       const buyerBtn = toggle.querySelector('[data-suite="buyer"]');
-      const vendorSection = document.getElementById('landingVendorSection');
-      const buyerSection = document.getElementById('landingBuyerSection');
+      const vendorSection = document.getElementById('vendor');
+      const buyerSection = document.getElementById('buyer');
+      const buyerLinks = document.querySelectorAll('a[href="#buyer"]');
+      const vendorLinks = document.querySelectorAll('a[href="#vendor"]');
 
-      function setSuite(suite) {
+      let currentSuite = 'vendor';
+      let themeTimeout;
+
+      function syncButtons(suite) {
         if (suite === 'buyer') {
-          body.setAttribute('data-theme', 'buyer');
-          buyerBtn.classList.add('active');
-          vendorBtn.classList.remove('active');
-          if (vendorSection) vendorSection.classList.add('d-none');
-          if (buyerSection) buyerSection.classList.remove('d-none');
+          buyerBtn?.classList.add('active');
+          vendorBtn?.classList.remove('active');
         } else {
-          body.setAttribute('data-theme', 'vendor');
-          vendorBtn.classList.add('active');
-          buyerBtn.classList.remove('active');
-          if (buyerSection) buyerSection.classList.add('d-none');
-          if (vendorSection) vendorSection.classList.remove('d-none');
+          vendorBtn?.classList.add('active');
+          buyerBtn?.classList.remove('active');
         }
+      }
+
+      function applyTheme(suite, { force = false } = {}) {
+        if (!force && currentSuite === suite) return;
+        currentSuite = suite;
+        body.classList.add('theme-transition');
+        body.setAttribute('data-theme', suite === 'buyer' ? 'buyer' : 'vendor');
+        syncButtons(suite);
+
+        clearTimeout(themeTimeout);
+        themeTimeout = setTimeout(() => body.classList.remove('theme-transition'), 650);
+      }
+
+      function setSuite(suite, { scrollIntoView = false } = {}) {
+        applyTheme(suite);
+        if (!scrollIntoView) return;
+
+        const target = suite === 'buyer' ? buyerSection : vendorSection;
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
 
       toggle.addEventListener('click', (e) => {
         const btn = e.target.closest('[data-suite]');
         if (!btn) return;
         const suite = btn.getAttribute('data-suite');
-        setSuite(suite);
+        setSuite(suite, { scrollIntoView: true });
       });
 
-      // Default: vendor theme
-      setSuite('vendor');
+      buyerLinks.forEach((link) => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          setSuite('buyer', { scrollIntoView: true });
+        });
+      });
+
+      vendorLinks.forEach((link) => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          setSuite('vendor', { scrollIntoView: true });
+        });
+      });
+
+      const observer = new IntersectionObserver((entries) => {
+        const visibleEntry = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+
+        if (!visibleEntry) return;
+        const suite = visibleEntry.target.id === 'buyer' ? 'buyer' : 'vendor';
+        applyTheme(suite);
+      }, { threshold: 0.4 });
+
+      [vendorSection, buyerSection].forEach((section) => section && observer.observe(section));
+
+      applyTheme('vendor', { force: true });
     })();
   </script>
 </body>
