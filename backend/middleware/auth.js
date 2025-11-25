@@ -37,6 +37,10 @@ async function requireAuth(req, res, next) {
   try {
     const decoded = jwt.verify(token, SECRET);
     const user = await User.findById(decoded.uid);
+    if (user?.forceLogoutAt && decoded.iat && decoded.iat * 1000 < user.forceLogoutAt.getTime()) {
+      clearTokenCookie(res);
+      return res.status(401).json({ error: 'Session expired. Please sign in again.' });
+    }
     if (!user || user.status !== 'active') {
       clearTokenCookie(res);
       return res.status(403).json({ error: 'Unauthorized' });

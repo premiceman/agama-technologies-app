@@ -141,11 +141,10 @@ async function syncWorkOSOrganization(workosOrg) {
   return organization;
 }
 
-function mapMembershipRole(role) {
-  const slug = typeof role === 'string' ? role : role?.slug;
-  if (['owner', 'admin', 'member', 'viewer'].includes(slug)) {
-    return slug;
-  }
+function mapWorkOSRoleSlugToOrgRole(slug) {
+  if (!slug) return 'member';
+  const normalised = slug.toLowerCase();
+  if (['owner', 'admin', 'member', 'viewer'].includes(normalised)) return normalised;
   return 'member';
 }
 
@@ -200,7 +199,7 @@ async function syncWorkOSOrganizationMembership(workosMembership) {
     });
   }
 
-  membership.role = mapMembershipRole(workosMembership.role);
+  membership.role = mapWorkOSRoleSlugToOrgRole(workosMembership.role?.slug || workosMembership.role);
   membership.status = mapMembershipStatus(workosMembership.status);
   membership.roleOrigin = 'idp';
 
