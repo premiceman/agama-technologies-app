@@ -2,7 +2,7 @@ const adminState = {
   user: null,
   unlocked: false,
   organizations: [],
-  selectedOrgId: null,
+  selectedOrg: null,
   saving: false,
   auditEvents: [],
   auditFilters: {
@@ -125,61 +125,73 @@ function buildSummary(event) {
   }
 }
 
-function setOrgEditFormDisabled(disabled) {
-  const form = document.getElementById('orgEditForm');
-  if (!form) return;
-  const inputs = form.querySelectorAll('input, select, button');
-  inputs.forEach(input => {
-    input.disabled = disabled || adminState.saving;
+function resetOrgEditor() {
+  adminState.selectedOrg = null;
+  const idInput = document.getElementById('agamaOrgId');
+  const nameInput = document.getElementById('agamaOrgName');
+  const typeSelect = document.getElementById('agamaOrgType');
+  const tierSelect = document.getElementById('agamaOrgTier');
+  const domainsInput = document.getElementById('agamaOrgDomains');
+  const seatInput = document.getElementById('agamaOrgSeatLimit');
+  const workosInput = document.getElementById('agamaOrgWorkosId');
+  const feedback = document.getElementById('agamaOrgFormFeedback');
+  const title = document.getElementById('agamaOrgEditorTitle');
+  const suiteChecks = document.querySelectorAll('#agamaOrgForm input[type="checkbox"]');
+
+  if (idInput) idInput.value = '';
+  if (nameInput) nameInput.value = '';
+  if (typeSelect) typeSelect.value = 'vendor';
+  if (tierSelect) tierSelect.value = 'business';
+  if (domainsInput) domainsInput.value = '';
+  if (seatInput) seatInput.value = '';
+  if (workosInput) workosInput.value = '';
+  suiteChecks.forEach(box => {
+    box.checked = false;
   });
+  if (feedback) feedback.textContent = '';
+  if (title) title.textContent = 'New organisation';
 }
 
-function updateOrgEditHeader(org) {
-  const nameLabel = document.getElementById('selectedOrgName');
-  const badge = document.getElementById('editOrgBadge');
+function populateOrgEditor(org) {
   if (!org) {
-    if (nameLabel) nameLabel.textContent = 'Select an organisation to edit its entitlements.';
-    if (badge) badge.textContent = 'Not selected';
-    setOrgEditFormDisabled(true);
+    resetOrgEditor();
     return;
   }
 
-  if (nameLabel) nameLabel.textContent = `${org.name || 'Organisation'} (${org.slug || 'slug'})`;
-  if (badge) badge.textContent = org.tier ? org.tier : 'Selected';
-  setOrgEditFormDisabled(false);
-}
+  adminState.selectedOrg = org;
+  const idInput = document.getElementById('agamaOrgId');
+  const nameInput = document.getElementById('agamaOrgName');
+  const typeSelect = document.getElementById('agamaOrgType');
+  const tierSelect = document.getElementById('agamaOrgTier');
+  const domainsInput = document.getElementById('agamaOrgDomains');
+  const seatInput = document.getElementById('agamaOrgSeatLimit');
+  const workosInput = document.getElementById('agamaOrgWorkosId');
+  const feedback = document.getElementById('agamaOrgFormFeedback');
+  const title = document.getElementById('agamaOrgEditorTitle');
+  const suiteChecks = document.querySelectorAll('#agamaOrgForm input[type="checkbox"]');
 
-function updateOrgEditForm(org) {
-  const tierSelect = document.getElementById('orgTier');
-  const typeSelect = document.getElementById('orgType');
-  const seatInput = document.getElementById('seatLimit');
-  const errorEl = document.getElementById('editOrgError');
-  const form = document.getElementById('orgEditForm');
-  if (errorEl) errorEl.textContent = '';
-  if (!form) return;
+  const products = Array.isArray(org.productAccess) ? org.productAccess : [];
+  const domains = Array.isArray(org.domains) ? org.domains : [];
 
-  const products = Array.isArray(org?.productAccess) ? org.productAccess : [];
-  const productCheckboxes = form.querySelectorAll('input[name="productAccess"]');
+  if (idInput) idInput.value = org.id || '';
+  if (nameInput) nameInput.value = org.name || '';
+  if (typeSelect) typeSelect.value = org.orgType || 'vendor';
+  if (tierSelect) tierSelect.value = org.tier || 'business';
+  if (domainsInput) domainsInput.value = domains.join(', ');
+  if (seatInput) seatInput.value = org.seatLimit ?? '';
+  if (workosInput) workosInput.value = org.workosOrganizationId || '';
 
-  if (tierSelect) tierSelect.value = org?.tier || 'personal';
-  if (typeSelect) typeSelect.value = org?.orgType || 'both';
-  if (seatInput) seatInput.value = org?.seatLimit ?? '';
-  productCheckboxes.forEach(box => {
+  suiteChecks.forEach(box => {
     box.checked = products.includes(box.value);
   });
 
-  updateOrgEditHeader(org);
-}
-
-function selectOrganization(orgId) {
-  const existing = adminState.organizations.find(org => org.id === orgId);
-  adminState.selectedOrgId = existing ? orgId : null;
-  updateOrgEditForm(existing || null);
+  if (feedback) feedback.textContent = '';
+  if (title) title.textContent = 'Edit organisation';
   renderOrganizations(adminState.organizations);
 }
 
 function renderOrganizations(list) {
-  const tbody = document.getElementById('orgTableBody');
+  const tbody = document.getElementById('agamaOrgRows');
   if (!tbody) return;
   tbody.innerHTML = '';
   if (!Array.isArray(list) || list.length === 0) {
@@ -190,7 +202,6 @@ function renderOrganizations(list) {
     cell.textContent = 'No organisations found.';
     row.appendChild(cell);
     tbody.appendChild(row);
-    updateOrgEditForm(null);
     return;
   }
 
@@ -198,24 +209,26 @@ function renderOrganizations(list) {
     const row = document.createElement('tr');
     const products = Array.isArray(org.productAccess) ? org.productAccess.join(', ') : '';
     const seatsLabel = `${org.seatsUsed ?? 0} / ${org.seatLimit ?? '—'}`;
-    row.classList.toggle('table-active', adminState.selectedOrgId === org.id);
+    const workosId = org.workosOrganizationId || '-';
+    row.classList.toggle('table-active', adminState.selectedOrg?.id === org.id);
     row.innerHTML = `
       <td>${org.name || '-'}</td>
       <td>${org.tier || '-'}</td>
       <td>${org.orgType || '-'}</td>
       <td>${products || '-'}</td>
       <td>${seatsLabel}</td>
-      <td>${formatDate(org.createdAt)}</td>
+      <td class="text-truncate" title="${workosId}">${workosId}</td>
       <td class="text-end">
         <button class="btn btn-outline-light btn-sm" data-org-id="${org.id}" type="button">Edit</button>
       </td>
     `;
-    row.addEventListener('click', () => selectOrganization(org.id));
+
+    row.addEventListener('click', () => populateOrgEditor(org));
     const editBtn = row.querySelector('button[data-org-id]');
     if (editBtn) {
       editBtn.addEventListener('click', event => {
         event.stopPropagation();
-        selectOrganization(org.id);
+        populateOrgEditor(org);
       });
     }
     tbody.appendChild(row);
@@ -303,7 +316,7 @@ async function loadStatus() {
   }
 }
 
-async function loadOrganizations() {
+async function loadOrganizations(focusOrgId) {
   try {
     const res = await fetch('/api/agama-admin/organizations', { credentials: 'include' });
     if (res.status === 403) {
@@ -316,18 +329,18 @@ async function loadOrganizations() {
     }
     const json = await res.json();
     adminState.organizations = json.organizations || [];
-    if (adminState.organizations.length > 0) {
-      const stillSelected = adminState.organizations.some(org => org.id === adminState.selectedOrgId);
-      adminState.selectedOrgId = stillSelected ? adminState.selectedOrgId : adminState.organizations[0].id;
-    } else {
-      adminState.selectedOrgId = null;
+    const targetId = focusOrgId || adminState.selectedOrg?.id || null;
+    const selected = targetId
+      ? adminState.organizations.find(org => org.id === targetId) || null
+      : null;
+    adminState.selectedOrg = selected || null;
+    if (!adminState.selectedOrg && adminState.organizations.length > 0) {
+      adminState.selectedOrg = adminState.organizations[0];
     }
+
     renderOrganizations(adminState.organizations);
     populateAuditOrgFilter();
-    if (adminState.selectedOrgId) {
-      const selected = adminState.organizations.find(org => org.id === adminState.selectedOrgId);
-      updateOrgEditForm(selected || null);
-    }
+    populateOrgEditor(adminState.selectedOrg);
     await fetchAuditLog();
   } catch (err) {
     console.error(err);
@@ -335,63 +348,61 @@ async function loadOrganizations() {
   }
 }
 
-function collectProductAccess() {
-  const form = document.getElementById('orgEditForm');
-  if (!form) return [];
-  const checked = form.querySelectorAll('input[name="productAccess"]:checked');
-  return Array.from(checked).map(el => el.value);
-}
-
 async function saveOrganization(event) {
   event.preventDefault();
-  const orgId = adminState.selectedOrgId;
-  const errorEl = document.getElementById('editOrgError');
-  if (errorEl) errorEl.textContent = '';
-  if (!orgId) {
-    if (errorEl) errorEl.textContent = 'Select an organisation before saving.';
+  const feedback = document.getElementById('agamaOrgFormFeedback');
+  if (feedback) feedback.textContent = '';
+
+  const orgId = document.getElementById('agamaOrgId')?.value?.trim();
+  const name = document.getElementById('agamaOrgName')?.value?.trim();
+  const orgType = document.getElementById('agamaOrgType')?.value;
+  const tier = document.getElementById('agamaOrgTier')?.value;
+  const domainsRaw = document.getElementById('agamaOrgDomains')?.value || '';
+  const seatLimitInput = document.getElementById('agamaOrgSeatLimit')?.value;
+  const workosId = document.getElementById('agamaOrgWorkosId')?.value?.trim();
+  const suiteChecks = document.querySelectorAll('#agamaOrgForm input[type="checkbox"]:checked');
+
+  if (!name) {
+    if (feedback) feedback.textContent = 'Name is required to save the organisation.';
     return;
   }
 
-  const tierSelect = document.getElementById('orgTier');
-  const typeSelect = document.getElementById('orgType');
-  const seatInput = document.getElementById('seatLimit');
-  const productAccess = collectProductAccess();
-  const seatLimit = seatInput ? parseInt(seatInput.value, 10) : undefined;
+  const productAccess = Array.from(suiteChecks).map(el => el.value);
+  const domains = domainsRaw
+    .split(',')
+    .map(value => value.trim())
+    .filter(Boolean);
+  const seatLimit = seatLimitInput ? parseInt(seatLimitInput, 10) : undefined;
 
-  const payload = {
-    tier: tierSelect?.value,
-    orgType: typeSelect?.value,
-    productAccess
+  const payload = { name, orgType, tier, productAccess, domains };
+  if (!Number.isNaN(seatLimit)) payload.seatLimit = seatLimit;
+  payload.workosOrganizationId = workosId || '';
+
+  const requestInit = {
+    method: orgId ? 'PATCH' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload)
   };
 
-  if (!Number.isNaN(seatLimit)) {
-    payload.seatLimit = seatLimit;
-  }
-
-  adminState.saving = true;
-  setOrgEditFormDisabled(false);
+  const endpoint = orgId ? `/api/admin/organizations/${orgId}` : '/api/admin/organizations';
 
   try {
-    const res = await fetch(`/api/admin/organizations/${orgId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(payload)
-    });
-
-    if (!res.ok) {
-      const errorJson = await res.json().catch(() => ({}));
-      const message = errorJson?.error || 'Unable to save organisation changes.';
+    const res = await fetch(endpoint, requestInit);
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.ok) {
+      const message = json.error || 'Unable to save organisation changes.';
       throw new Error(message);
     }
 
-    await loadOrganizations();
+    const savedId = json.organization?.id || orgId;
+    if (feedback) feedback.textContent = 'Saved organisation.';
+    await loadOrganizations(savedId);
+    const selected = adminState.organizations.find(org => org.id === savedId);
+    populateOrgEditor(selected || null);
   } catch (err) {
     console.error(err);
-    if (errorEl) errorEl.textContent = err.message || 'Unable to save organisation changes.';
-  } finally {
-    adminState.saving = false;
-    setOrgEditFormDisabled(false);
+    if (feedback) feedback.textContent = err.message || 'Unable to save organisation changes.';
   }
 }
 
@@ -471,14 +482,17 @@ function initHandlers() {
     });
   }
 
-  const orgEditForm = document.getElementById('orgEditForm');
-  if (orgEditForm) {
-    orgEditForm.addEventListener('submit', saveOrganization);
+  const orgForm = document.getElementById('agamaOrgForm');
+  if (orgForm) {
+    orgForm.addEventListener('submit', saveOrganization);
   }
 
-  const refreshOrgs = document.getElementById('refreshOrgs');
-  if (refreshOrgs) {
-    refreshOrgs.addEventListener('click', () => loadOrganizations());
+  const createOrgBtn = document.getElementById('agamaCreateOrgBtn');
+  if (createOrgBtn) {
+    createOrgBtn.addEventListener('click', () => {
+      resetOrgEditor();
+      renderOrganizations(adminState.organizations);
+    });
   }
 
   const auditForm = document.getElementById('auditFilters');
@@ -510,7 +524,7 @@ function initHandlers() {
     refreshAudit.addEventListener('click', () => fetchAuditLog());
   }
 
-  updateOrgEditForm(null);
+  resetOrgEditor();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
