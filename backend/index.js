@@ -1468,7 +1468,12 @@ app.get('/api/auth/workos/callback', async (req, res) => {
       if (organization) {
         membership = await OrganizationMembership.findOne({ organization: organization._id, user: user._id });
         if (!membership) {
-          membership = new OrganizationMembership({ organization: organization._id, user: user._id, role: 'member' });
+          membership = new OrganizationMembership({
+            organization: organization._id,
+            user: user._id,
+            role: 'member',
+            roleOrigin: 'app'
+          });
           membershipCreated = true;
         }
 
@@ -2173,6 +2178,7 @@ app.post('/api/org/admin/members', requireAuth, requireOrgAdmin, validateBody(me
         user: user._id,
         role,
         status: 'invited',
+        roleOrigin: 'app',
         invitedEmail: normalizedEmail
       });
     }
@@ -2617,7 +2623,8 @@ app.post('/api/orgs', requireAuth, validateBody(organizationCreateSchema), async
       organization: organization._id,
       user: req.auth.uid,
       role: 'owner',
-      status: 'active'
+      status: 'active',
+      roleOrigin: 'app'
     });
 
     const user = await User.findById(req.auth.uid);
@@ -2747,7 +2754,11 @@ app.post(
 
       let membership = await OrganizationMembership.findOne({ organization: req.organization._id, user: user._id });
       if (!membership) {
-        membership = new OrganizationMembership({ organization: req.organization._id, user: user._id });
+        membership = new OrganizationMembership({
+          organization: req.organization._id,
+          user: user._id,
+          roleOrigin: 'app'
+        });
       }
 
       if (role) membership.role = role;

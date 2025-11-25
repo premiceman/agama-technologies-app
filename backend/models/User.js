@@ -19,6 +19,8 @@ const UserSchema = new Schema(
       enum: ['free-personal', 'vendor-enterprise', 'procurement-enterprise', 'consulting-enterprise'],
       default: 'free-personal'
     },
+    authSource: { type: String, enum: ['workos', 'local'], default: 'workos' },
+    forceLogoutAt: { type: Date, default: null },
     onboardingStatus: { type: String, enum: ['pending', 'in-progress', 'completed'], default: 'pending' },
     onboardingResponses: { type: Schema.Types.Mixed, default: {} },
     valueAssessmentLimit: { type: Number, default: 3 },
@@ -38,6 +40,7 @@ UserSchema.methods.public = function() {
     name: this.name,
     email: this.email,
     workosUserId: this.workosUserId,
+    authSource: this.authSource,
     company: this.company,
     role: this.role,
     industry: this.industry,
@@ -81,6 +84,7 @@ UserSchema.statics.createSecure = async function({
     name,
     email: email.toLowerCase(),
     passwordHash: hash,
+    authSource: 'local',
     company,
     role,
     industry,
@@ -112,6 +116,7 @@ UserSchema.statics.findOrCreateFromWorkOSProfile = async function(profile) {
       email,
       name: fullName,
       passwordHash: null,
+      authSource: 'workos',
       licenseTier: 'personal',
       licensePlan: 'free-personal',
       platformAccess: ['valuesphere'],
@@ -149,6 +154,11 @@ UserSchema.statics.findOrCreateFromWorkOSProfile = async function(profile) {
 
   if (!user.licensePlan) {
     user.licensePlan = user.licenseTier === 'business' ? 'consulting-enterprise' : 'free-personal';
+    changed = true;
+  }
+
+  if (user.authSource !== 'workos') {
+    user.authSource = 'workos';
     changed = true;
   }
 
