@@ -4,7 +4,9 @@ class FakeWorkOS {
   constructor() {
     this.userManagement = {
       authenticateWithCode: async () => FakeWorkOS.mockAuthResponse,
-      getAuthorizationUrl: () => 'https://example.com/auth'
+      getAuthorizationUrl: () => 'https://example.com/auth',
+      getLogoutUrl: ({ sessionId, redirectUri }) =>
+        `https://example.com/logout/${sessionId || 'session'}?redirect=${encodeURIComponent(redirectUri || '')}`
     };
     this.portal = {
       generateLink: async ({ organization }) => ({ link: `https://example.com/portal/${organization || 'org'}` })

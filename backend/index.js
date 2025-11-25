@@ -45,6 +45,8 @@ const WORKOS_CLIENT_ID = process.env.WORKOS_CLIENT_ID;
 const WORKOS_REDIRECT_URI = process.env.WORKOS_REDIRECT_URI;
 const WORKOS_SUCCESS_REDIRECT = process.env.WORKOS_SUCCESS_REDIRECT || '/workspace.html';
 const WORKOS_STATE_COOKIE = 'workos_auth_state';
+const WORKOS_SESSION_COOKIE = 'workos_session';
+const WORKOS_SESSION_TTL_MS = 14 * 24 * 60 * 60 * 1000; // Keep alignment with WorkOS session defaults
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -202,6 +204,30 @@ function consumeWorkOSState(req, res) {
     path: '/api/auth'
   });
   return value;
+}
+
+function persistWorkOSSession(res, sessionId) {
+  if (!sessionId) return null;
+
+  res.cookie(WORKOS_SESSION_COOKIE, sessionId, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: 'lax',
+    maxAge: WORKOS_SESSION_TTL_MS,
+    path: '/api/auth'
+  });
+  return sessionId;
+}
+
+function consumeWorkOSSession(req, res) {
+  const sessionId = req.cookies?.[WORKOS_SESSION_COOKIE];
+  res.clearCookie(WORKOS_SESSION_COOKIE, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: 'lax',
+    path: '/api/auth'
+  });
+  return sessionId;
 }
 
 function resolveWorkOSSuccessRedirect(req) {
@@ -1401,6 +1427,8 @@ app.get('/api/auth/workos/callback', async (req, res) => {
     });
 
     const workosOrgId = authentication.organization_id || authentication.organizationId || null;
+    const workosSessionId =
+      authentication.session?.id || authentication.session_id || authentication.sessionId || null;
     const profile = authentication?.user || authentication?.profile;
     if (!profile) {
       throw new Error('Missing WorkOS user profile');
@@ -1420,6 +1448,22 @@ app.get('/api/auth/workos/callback', async (req, res) => {
 
     if (workosOrgId) {
       organization = await Organization.findOne({ workosOrganizationId: workosOrgId });
+
+      if (!organization) {
+        const workosOrgName =
+          authentication.organization?.name || profile.organization?.name || profile.orgName || 'WorkOS Organization';
+        const slug = await generateUniqueOrgSlug(workosOrgName);
+        organization = new Organization({
+          name: workosOrgName,
+          slug,
+          workosOrganizationId: workosOrgId,
+          orgType: 'both',
+          tier: 'business',
+          platformAccess: ['valuesphere'],
+          productAccess: ['valuesphere']
+        });
+        await organization.save();
+      }
 
       if (organization) {
         membership = await OrganizationMembership.findOne({ organization: organization._id, user: user._id });
@@ -1488,6 +1532,7 @@ app.get('/api/auth/workos/callback', async (req, res) => {
       uid: user._id.toString(),
       orgId: user.defaultOrganization ? user.defaultOrganization.toString() : null
     });
+    persistWorkOSSession(res, workosSessionId);
     if (wantsJson) {
       return res.json({ ok: true, user: user.public(), token, redirect: redirectUrl });
     }
@@ -1542,6 +1587,7 @@ app.post('/api/auth/deactivate', requireAuth, async (req, res) => {
     user.status = 'deactivated';
     await user.save();
     clearTokenCookie(res);
+    consumeWorkOSSession(req, res);
     res.json({ ok: true });
   } catch (err) {
     console.error('User deactivate error', err);
@@ -1549,13 +1595,31 @@ app.post('/api/auth/deactivate', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/auth/logout', requireAuth, (req, res) => {
+app.post('/api/auth/logout', requireAuth, async (req, res) => {
   clearTokenCookie(res);
   const wantsJson = req.accepts(['json']) && !req.accepts(['html']);
-  if (wantsJson) {
-    return res.json({ ok: true, redirect: WORKOS_LOGOUT_REDIRECT });
+  const workosSessionId = consumeWorkOSSession(req, res);
+  const fallbackRedirect = WORKOS_LOGOUT_REDIRECT;
+
+  if (workosClient && workosSessionId && typeof workosClient.userManagement?.getLogoutUrl === 'function') {
+    try {
+      const logoutUrl = await workosClient.userManagement.getLogoutUrl({
+        sessionId: workosSessionId,
+        redirectUri: fallbackRedirect
+      });
+      if (wantsJson) {
+        return res.json({ ok: true, redirect: logoutUrl });
+      }
+      return res.redirect(logoutUrl);
+    } catch (err) {
+      console.error('WorkOS logout error', err);
+    }
   }
-  return res.redirect(WORKOS_LOGOUT_REDIRECT);
+
+  if (wantsJson) {
+    return res.json({ ok: true, redirect: fallbackRedirect });
+  }
+  return res.redirect(fallbackRedirect);
 });
 
 app.get('/api/auth/me', requireAuth, async (req, res) => {
@@ -2360,6 +2424,7 @@ app.delete('/api/auth/me', requireAuth, async (req, res) => {
       await User.deleteOne({ _id: req.auth.uid });
     }
     clearTokenCookie(res);
+    consumeWorkOSSession(req, res);
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
@@ -2533,12 +2598,15 @@ app.post('/api/orgs', requireAuth, validateBody(organizationCreateSchema), async
       slug = `${baseSlug}-${suffix++}`;
     }
 
+    const creator = req.requestingUser || (await User.findById(req.auth.uid));
+    const tier = creator && creator.licenseTier === 'business' ? 'business' : 'personal';
+
     const organization = await Organization.create({
       name: payload.name,
       slug,
       domains: payload.domains || [],
       seatLimit: payload.seatLimit || 10,
-      tier: 'personal',
+      tier,
       platformAccess: productAccess,
       productAccess,
       orgType,
