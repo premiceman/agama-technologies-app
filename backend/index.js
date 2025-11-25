@@ -43,6 +43,7 @@ const WORKOS_LOGOUT_REDIRECT = process.env.WORKOS_LOGOUT_REDIRECT || 'https://ww
 const workosClient = process.env.WORKOS_API_KEY ? new WorkOS(process.env.WORKOS_API_KEY) : null;
 const WORKOS_CLIENT_ID = process.env.WORKOS_CLIENT_ID;
 const WORKOS_REDIRECT_URI = process.env.WORKOS_REDIRECT_URI;
+const WORKOS_WEBHOOK_SECRET = process.env.WORKOS_WEBHOOK_SECRET;
 const WORKOS_SUCCESS_REDIRECT = process.env.WORKOS_SUCCESS_REDIRECT || '/workspace.html';
 const WORKOS_STATE_COOKIE = 'workos_auth_state';
 const WORKOS_SESSION_COOKIE = 'workos_session';
@@ -84,6 +85,46 @@ if (isProduction) {
 }
 app.use(helmet.frameguard({ action: 'deny' }));
 app.use(helmet.referrerPolicy({ policy: 'no-referrer' }));
+
+app.post(
+  '/api/webhooks/workos',
+  express.raw({ type: 'application/json' }),
+  async (req, res) => {
+    try {
+      if (!workosClient || !WORKOS_WEBHOOK_SECRET) {
+        console.error('WorkOS webhook called but client or secret is missing');
+        return res.status(503).json({ error: 'WorkOS webhook not configured' });
+      }
+
+      const sigHeader = req.headers['workos-signature'] || req.headers['WorkOS-Signature'];
+      if (!sigHeader) {
+        console.error('Missing workos-signature header on webhook');
+        return res.status(400).json({ error: 'Missing WorkOS signature header' });
+      }
+
+      const payload = req.body; // this is a Buffer because of express.raw
+
+      const event = await workosClient.webhooks.constructEvent({
+        payload,
+        sigHeader,
+        secret: WORKOS_WEBHOOK_SECRET
+      });
+
+      // For now, just log basic info. No DB writes yet.
+      console.log('WorkOS webhook received', {
+        id: event.id,
+        event: event.event,
+        object: event.data && event.data.object
+      });
+
+      // Always respond 200 on success to avoid retries
+      return res.status(200).json({ ok: true });
+    } catch (err) {
+      console.error('WorkOS webhook error', err);
+      return res.status(400).json({ error: 'Invalid webhook payload or signature' });
+    }
+  }
+);
 
 app.use(express.json({ limit: '512kb' }));
 app.use(express.urlencoded({ extended: true }));
