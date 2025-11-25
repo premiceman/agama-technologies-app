@@ -24,7 +24,7 @@ const UserSchema = new Schema(
     valueAssessmentLimit: { type: Number, default: 3 },
     billingProfile: { type: Schema.Types.Mixed, default: {} },
     platformAccess: { type: [String], default: ['valuesphere'] },
-    persona: { type: String, enum: ['vendor', 'buyer', 'both', 'explorer', 'unknown'], default: 'unknown' },
+    persona: { type: String, enum: ['vendor', 'buyer', 'both', 'explorer', 'unknown', 'consultant'], default: 'unknown' },
     valuesphereMode: { type: String, enum: ['vendor', 'buyer'], default: 'vendor' },
     defaultOrganization: { type: Schema.Types.ObjectId, ref: 'Organization', default: null },
     lastLoginAt: { type: Date }

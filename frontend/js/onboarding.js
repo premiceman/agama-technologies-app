@@ -138,6 +138,40 @@ function recommendedLabel(plan) {
   }
 }
 
+function buildBillingDetails() {
+  const billingName = document.getElementById('billingName')?.value?.trim();
+  const billingEmail = document.getElementById('billingEmail')?.value?.trim();
+  const details = {};
+  if (billingName) details.billingName = billingName;
+  if (billingEmail) details.email = billingEmail;
+  return Object.keys(details).length ? details : null;
+}
+
+function setOrgManagedState(isManaged) {
+  onboardingState.orgManagedLicense = isManaged;
+  if (isManaged) {
+    onboardingState.answers.licenseSelection = null;
+    document.querySelectorAll('[data-license]').forEach(card => {
+      card.classList.remove('border-success', 'shadow');
+    });
+  }
+
+  document.querySelectorAll('.license-card').forEach(card => {
+    card.classList.toggle('opacity-50', isManaged);
+  });
+
+  document.querySelectorAll('.license-card [data-license-select]').forEach(button => {
+    button.classList.toggle('disabled', isManaged);
+    if (isManaged) {
+      button.setAttribute('aria-disabled', 'true');
+      button.disabled = true;
+    } else {
+      button.removeAttribute('aria-disabled');
+      button.disabled = false;
+    }
+  });
+}
+
 async function handleNextStep() {
   if (!(await validateCurrentStep())) return;
   if (onboardingState.currentStep < steps.length - 1) {
@@ -157,15 +191,14 @@ async function handleNextStep() {
       status: 'completed'
     };
   } else {
-    const billingName = document.getElementById('billingName')?.value?.trim();
-    const billingEmail = document.getElementById('billingEmail')?.value?.trim();
     const licenseSelection = onboardingState.answers.licenseSelection || 'free-personal';
     onboardingState.answers.licenseSelection = licenseSelection;
+    const billingDetails = buildBillingDetails();
     payload = {
       ...onboardingState.answers,
       licenseSelection,
       useCases: onboardingState.answers.useCases ? [onboardingState.answers.useCases] : [],
-      billingDetails: { billingName, email: billingEmail },
+      ...(billingDetails ? { billingDetails } : {}),
       status: 'completed'
     };
   }
@@ -290,11 +323,10 @@ function bindLicenseSelection() {
       const license = btn.getAttribute('data-license-select');
       selectLicenseCard(license);
       onboardingState.answers.licenseSelection = license;
-      const billingName = document.getElementById('billingName')?.value?.trim();
-      const billingEmail = document.getElementById('billingEmail')?.value?.trim();
+      const billingDetails = buildBillingDetails();
       await persistProgress({
         licenseSelection: license,
-        billingDetails: { billingName, email: billingEmail },
+        ...(billingDetails ? { billingDetails } : {}),
         status: 'in-progress'
       });
       if (license === 'vendor-enterprise' || license === 'procurement-enterprise') {
@@ -329,32 +361,14 @@ function bindOrgLicenseCheck() {
       const org = json.organization || null;
 
       if (org) {
-        onboardingState.orgManagedLicense = true;
-
-        document.querySelectorAll('.license-card').forEach(card => {
-          card.classList.add('opacity-50');
-        });
-
-        document.querySelectorAll('.license-card [data-license-select]').forEach(button => {
-          button.classList.add('disabled');
-          button.setAttribute('aria-disabled', 'true');
-          button.disabled = true;
-        });
+        setOrgManagedState(true);
 
         if (feedback) {
           feedback.textContent =
             'We found your organisation (' + (org.name || 'Your organisation') + '). Your licence is managed by your admin. You can continue without selecting a plan.';
         }
       } else {
-        onboardingState.orgManagedLicense = false;
-        document.querySelectorAll('.license-card').forEach(card => {
-          card.classList.remove('opacity-50');
-        });
-        document.querySelectorAll('.license-card [data-license-select]').forEach(button => {
-          button.classList.remove('disabled');
-          button.removeAttribute('aria-disabled');
-          button.disabled = false;
-        });
+        setOrgManagedState(false);
 
         if (feedback) {
           feedback.textContent =
@@ -403,6 +417,15 @@ async function loadOnboarding() {
     onboardingState.answers.useCases = (json.onboarding?.responses?.useCases || [])[0] || '';
     onboardingState.answers.usage = json.onboarding?.responses?.usage || [];
     onboardingState.answers.licenseSelection = json.onboarding?.responses?.licenseSelection || null;
+
+    const orgFeedback = document.getElementById('orgLicenseFeedback');
+    const isOrgManagedUser = json.user?.licenseTier === 'business' || !!json.user?.defaultOrganizationId;
+    if (isOrgManagedUser) {
+      setOrgManagedState(true);
+      if (orgFeedback) {
+        orgFeedback.textContent = 'Your licence is managed by your organisation. You can continue without selecting a plan.';
+      }
+    }
 
     if (onboardingState.status === 'completed' && !new URLSearchParams(window.location.search).has('force')) {
       window.location.href = '/workspace.html';

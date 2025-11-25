@@ -589,10 +589,19 @@ const onboardingSchema = z.object({
   licenseSelection: z.enum(LICENSE_PLANS).optional(),
   billingDetails: z
     .object({
-      billingName: z.string().trim().max(200).optional(),
+      billingName: z.preprocess(
+        val => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+        z.string().trim().max(200).optional()
+      ),
       company: z.string().trim().max(200).optional(),
-      email: z.string().email().optional(),
-      notes: z.string().trim().max(400).optional()
+      email: z.preprocess(
+        val => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+        z.string().email().optional()
+      ),
+      notes: z.preprocess(
+        val => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+        z.string().trim().max(400).optional()
+      )
     })
     .optional(),
   status: z.enum(['pending', 'in-progress', 'completed']).optional()
