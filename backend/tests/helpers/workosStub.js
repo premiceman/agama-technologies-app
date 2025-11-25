@@ -11,10 +11,21 @@ class FakeWorkOS {
     this.portal = {
       generateLink: async ({ organization }) => ({ link: `https://example.com/portal/${organization || 'org'}` })
     };
+    this.webhooks = {
+      constructEvent: ({ payload, sigHeader, secret }) => {
+        // Minimal fake event, tests can override FakeWorkOS.mockEvent if needed
+        return FakeWorkOS.mockEvent || {
+          id: 'event_test',
+          event: 'user.created',
+          data: payload || { object: 'test' }
+        };
+      }
+    };
   }
 }
 
 FakeWorkOS.mockAuthResponse = {};
+FakeWorkOS.mockEvent = null;
 
 function installWorkOSStub() {
   require.cache[modulePath] = {
