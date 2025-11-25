@@ -619,14 +619,23 @@ const profileUpdateSchema = z.object({
 const organizationCreateSchema = z.object({
   name: z.string().trim().min(2),
   slug: z.string().trim().min(2),
-  domains: z.array(z.string().trim()).default([]),
-  seatLimit: z.number().int().positive().max(10000).default(10),
+  orgType: z.enum(['vendor', 'buyer', 'both']).optional(),
+  tier: z.enum(['personal', 'business']).optional(),
+  productAccess: z.array(z.string().trim()).optional(),
+  domains: z.array(z.string().trim()).optional(),
+  workosOrganizationId: z.string().trim().optional(),
+  seatLimit: z.number().int().positive().max(100000).optional(),
   platformAccess: z.array(z.string()).optional()
 });
 
 const organizationUpdateSchema = z.object({
   name: z.string().trim().min(2).optional(),
-  seatLimit: z.number().int().positive().max(10000).optional(),
+  orgType: z.enum(['vendor', 'buyer', 'both']).optional(),
+  tier: z.enum(['personal', 'business']).optional(),
+  productAccess: z.array(z.string().trim()).optional(),
+  domains: z.array(z.string().trim()).optional(),
+  workosOrganizationId: z.string().trim().optional(),
+  seatLimit: z.number().int().positive().max(100000).optional(),
   platformAccess: z.array(z.string()).optional()
 });
 
@@ -636,8 +645,9 @@ const adminOrganizationCreateSchema = z
     orgType: z.enum(['vendor', 'buyer', 'both']).default('both'),
     tier: z.enum(['personal', 'business']).default('business'),
     productAccess: z.array(z.string()).default([]),
-    seatLimit: z.number().int().positive().max(10000).default(10),
-    domains: z.array(z.string().trim()).default([])
+    seatLimit: z.number().int().positive().max(100000).default(10),
+    domains: z.array(z.string().trim()).default([]),
+    workosOrganizationId: z.string().trim().optional()
   })
   .refine(payload => payload.productAccess.every(id => PLATFORM_IDS.has(id)), {
     message: 'Invalid product access selection',
@@ -650,8 +660,9 @@ const adminOrganizationUpdateSchema = z
     orgType: z.enum(['vendor', 'buyer', 'both']).optional(),
     tier: z.enum(['personal', 'business']).optional(),
     productAccess: z.array(z.string()).optional(),
-    seatLimit: z.number().int().positive().max(10000).optional(),
-    domains: z.array(z.string().trim()).optional()
+    seatLimit: z.number().int().positive().max(100000).optional(),
+    domains: z.array(z.string().trim()).optional(),
+    workosOrganizationId: z.string().trim().optional()
   })
   .refine(payload => !payload.productAccess || payload.productAccess.every(id => PLATFORM_IDS.has(id)), {
     message: 'Invalid product access selection',
@@ -1809,8 +1820,10 @@ app.get(
               : Array.isArray(org.platformAccess)
                 ? org.platformAccess
                 : [],
+            domains: Array.isArray(org.domains) ? org.domains : [],
             seatLimit: org.seatLimit,
             seatsUsed,
+            workosOrganizationId: org.workosOrganizationId,
             createdAt: org.createdAt
           };
         })
@@ -2361,7 +2374,7 @@ app.post(
   validateBody(adminOrganizationCreateSchema),
   async (req, res) => {
     try {
-      const { name, orgType, tier, productAccess, seatLimit, domains } = req.validatedBody;
+      const { name, orgType, tier, productAccess, seatLimit, domains, workosOrganizationId } = req.validatedBody;
       const slug = await generateUniqueOrgSlug(name);
       const normalizedProductAccess = normaliseProductAccess(productAccess);
 
@@ -2372,8 +2385,9 @@ app.post(
         tier,
         productAccess: normalizedProductAccess,
         platformAccess: normalizedProductAccess,
-        seatLimit,
+        seatLimit: seatLimit ?? 10,
         domains: domains || [],
+        workosOrganizationId,
         createdBy: req.auth.uid
       });
 
@@ -2386,6 +2400,8 @@ app.post(
           tier: organization.tier,
           productAccess: organization.productAccess,
           seatLimit: organization.seatLimit,
+          domains: organization.domains,
+          workosOrganizationId: organization.workosOrganizationId,
           createdAt: organization.createdAt
         }
       });
@@ -2407,7 +2423,9 @@ app.get('/api/admin/organizations', requireAuth, requireStaff, async (req, res) 
         orgType: org.orgType || 'both',
         tier: org.tier,
         productAccess: Array.isArray(org.productAccess) ? org.productAccess : [],
+        domains: org.domains || [],
         seatLimit: org.seatLimit,
+        workosOrganizationId: org.workosOrganizationId,
         createdAt: org.createdAt
       }))
     });
@@ -2433,13 +2451,14 @@ app.patch(
       if (payload.name !== undefined) organization.name = payload.name.trim();
       if (payload.orgType) organization.orgType = payload.orgType;
       if (payload.tier) organization.tier = payload.tier;
-      if (payload.productAccess) {
+      if (payload.productAccess !== undefined) {
         const normalized = normaliseProductAccess(payload.productAccess);
         organization.productAccess = normalized;
         organization.platformAccess = normalized;
       }
       if (payload.seatLimit !== undefined) organization.seatLimit = payload.seatLimit;
-      if (payload.domains) organization.domains = payload.domains;
+      if (payload.domains !== undefined) organization.domains = payload.domains;
+      if (payload.workosOrganizationId !== undefined) organization.workosOrganizationId = payload.workosOrganizationId;
 
       await organization.save();
 
@@ -2452,7 +2471,8 @@ app.patch(
           tier: organization.tier,
           productAccess: organization.productAccess,
           seatLimit: organization.seatLimit,
-          domains: organization.domains
+          domains: organization.domains,
+          workosOrganizationId: organization.workosOrganizationId
         }
       });
     } catch (err) {
