@@ -34,6 +34,11 @@ const EngagementRoomFileVersion = require('./models/EngagementRoomFileVersion');
 const EngagementRoomFileComment = require('./models/EngagementRoomFileComment');
 const AuditEvent = require('./models/AuditEvent');
 const { requireOrgRole } = require('./middleware/orgAuth');
+const {
+  syncWorkOSUser,
+  syncWorkOSOrganization,
+  syncWorkOSOrganizationMembership
+} = require('./services/workosSync');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -110,12 +115,41 @@ app.post(
         secret: WORKOS_WEBHOOK_SECRET
       });
 
-      // For now, just log basic info. No DB writes yet.
       console.log('WorkOS webhook received', {
         id: event.id,
         event: event.event,
         object: event.data && event.data.object
       });
+
+      switch (event.event) {
+        case 'user.created':
+        case 'user.updated':
+        case 'user.deleted':
+          if (event.data && event.data.object === 'user') {
+            await syncWorkOSUser(event.data);
+          }
+          break;
+
+        case 'organization.created':
+        case 'organization.updated':
+        case 'organization.deleted':
+          if (event.data && event.data.object === 'organization') {
+            await syncWorkOSOrganization(event.data);
+          }
+          break;
+
+        case 'organization_membership.created':
+        case 'organization_membership.updated':
+        case 'organization_membership.deleted':
+          if (event.data && event.data.object === 'organization_membership') {
+            await syncWorkOSOrganizationMembership(event.data);
+          }
+          break;
+
+        default:
+          // For now, ignore other events
+          break;
+      }
 
       // Always respond 200 on success to avoid retries
       return res.status(200).json({ ok: true });
