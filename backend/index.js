@@ -651,6 +651,28 @@ async function generateUniqueOrgSlug(baseValue) {
   return slug;
 }
 
+async function ensureWorkOSOrganization({ name, domains = [], existingWorkOSId = null }) {
+  if (!workosClient) return existingWorkOSId || null;
+
+  if (existingWorkOSId) {
+    // Optionally we could verify it exists, but for now just trust the ID
+    return existingWorkOSId;
+  }
+
+  const domainObjects = (domains || [])
+    .filter(Boolean)
+    .map(domain => ({ domain, state: 'verified' }));
+
+  const workosOrg = await workosClient.organizations.createOrganization({
+    name,
+    // Use domainData if available in current SDK; fallback to domains otherwise.
+    domainData: domainObjects.length > 0 ? domainObjects : undefined,
+    domains: domainObjects.length === 0 ? domains : undefined
+  });
+
+  return workosOrg.id;
+}
+
 const signupSchema = z.object({
   name: z.string().trim().min(1).max(120),
   email: z.string().email(),
@@ -2524,6 +2546,19 @@ app.post(
       const slug = await generateUniqueOrgSlug(name);
       const normalizedProductAccess = normaliseProductAccess(productAccess);
 
+      let resolvedWorkOSId = workosOrganizationId || null;
+      if (!resolvedWorkOSId) {
+        try {
+          resolvedWorkOSId = await ensureWorkOSOrganization({
+            name,
+            domains: domains || []
+          });
+        } catch (err) {
+          console.error('Failed to create WorkOS organization for /api/admin/organizations', err);
+          // Keep resolvedWorkOSId as null on failure
+        }
+      }
+
       const organization = await Organization.create({
         name,
         slug,
@@ -2533,7 +2568,7 @@ app.post(
         platformAccess: normalizedProductAccess,
         seatLimit: seatLimit ?? 10,
         domains: domains || [],
-        workosOrganizationId,
+        workosOrganizationId: resolvedWorkOSId,
         createdBy: req.auth.uid
       });
 
@@ -2604,6 +2639,7 @@ app.patch(
       }
       if (payload.seatLimit !== undefined) organization.seatLimit = payload.seatLimit;
       if (payload.domains !== undefined) organization.domains = payload.domains;
+      // This should typically be set during creation/linking flows rather than edited directly.
       if (payload.workosOrganizationId !== undefined) organization.workosOrganizationId = payload.workosOrganizationId;
 
       await organization.save();
@@ -2682,6 +2718,19 @@ app.post('/api/orgs', requireAuth, validateBody(organizationCreateSchema), async
     const creator = req.requestingUser || (await User.findById(req.auth.uid));
     const tier = creator && creator.licenseTier === 'business' ? 'business' : 'personal';
 
+    let workosOrganizationId = payload.workosOrganizationId || null;
+    if (!workosOrganizationId) {
+      try {
+        workosOrganizationId = await ensureWorkOSOrganization({
+          name: payload.name,
+          domains: payload.domains || []
+        });
+      } catch (err) {
+        console.error('Failed to create WorkOS organization for /api/orgs', err);
+        // Do not block org creation if WorkOS fails – we just leave workosOrganizationId null
+      }
+    }
+
     const organization = await Organization.create({
       name: payload.name,
       slug,
@@ -2691,6 +2740,7 @@ app.post('/api/orgs', requireAuth, validateBody(organizationCreateSchema), async
       platformAccess: productAccess,
       productAccess,
       orgType,
+      workosOrganizationId,
       createdBy: req.auth.uid
     });
 

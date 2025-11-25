@@ -45,6 +45,12 @@ describe('Organizations and memberships', () => {
     await mongoose.disconnect();
   });
 
+  beforeEach(() => {
+    FakeWorkOS.lastOrganizationCreateInput = null;
+    FakeWorkOS.organizationCounter = 0;
+    FakeWorkOS.nextOrganizationId = null;
+  });
+
   afterEach(async () => {
     if (mongoose.connection.readyState === 1) {
       await mongoose.connection.db.dropDatabase();
@@ -68,6 +74,65 @@ describe('Organizations and memberships', () => {
     const listRes = await agent.get('/api/orgs');
     expect(listRes.status).toBe(200);
     expect(listRes.body.organizations[0]).toMatchObject({ name: 'Acme Corp', role: 'owner' });
+  });
+
+  test('self-service org creation stores WorkOS organization id when configured', async () => {
+    const agent = request.agent(app);
+    await agent.post('/api/auth/signup').send({
+      name: 'WorkOS Owner',
+      email: 'workos-owner@example.com',
+      password: 'password123',
+      licenseTier: 'business',
+      platformAccess: ['valuesphere']
+    });
+
+    const createRes = await agent.post('/api/orgs').send({
+      name: 'WorkOS Self Org',
+      slug: 'workos-self-org',
+      domains: ['self.example.com']
+    });
+
+    expect(createRes.status).toBe(201);
+
+    const Organization = require('../models/Organization');
+    const organization = await Organization.findOne({ slug: 'workos-self-org' });
+    expect(organization.workosOrganizationId).toBe('org_test_1');
+    expect(FakeWorkOS.lastOrganizationCreateInput).toMatchObject({
+      name: 'WorkOS Self Org',
+      domainData: [{ domain: 'self.example.com', state: 'verified' }]
+    });
+  });
+
+  test('admin org creation syncs WorkOS organization id', async () => {
+    const agent = request.agent(app);
+    await agent.post('/api/auth/signup').send({
+      name: 'Staff Admin',
+      email: 'staff@example.com',
+      password: 'password123',
+      licenseTier: 'business',
+      platformAccess: ['valuesphere']
+    });
+
+    const User = require('../models/User');
+    const staffUser = await User.findOne({ email: 'staff@example.com' });
+    staffUser.isStaff = true;
+    await staffUser.save();
+
+    const res = await agent.post('/api/admin/organizations').send({
+      name: 'Admin WorkOS Org',
+      productAccess: ['valuesphere'],
+      domains: ['admin.example.com']
+    });
+
+    expect(res.status).toBe(201);
+
+    const Organization = require('../models/Organization');
+    const organization = await Organization.findOne({ name: 'Admin WorkOS Org' });
+    expect(organization.workosOrganizationId).toBe('org_test_1');
+    expect(FakeWorkOS.lastOrganizationCreateInput).toMatchObject({
+      name: 'Admin WorkOS Org',
+      domainData: [{ domain: 'admin.example.com', state: 'verified' }]
+    });
   });
 
   test('enforces seat limit when activating new members', async () => {

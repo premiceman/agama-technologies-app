@@ -10,6 +10,7 @@ const UserSchema = new Schema(
     workosUserId: { type: String, unique: true, sparse: true },
     emailVerified: { type: Boolean, default: false },
     status: { type: String, enum: ['active', 'deactivated'], default: 'active' },
+    isStaff: { type: Boolean, default: false },
     company: { type: String, trim: true },
     role: { type: String, trim: true },
     industry: { type: String, trim: true },
