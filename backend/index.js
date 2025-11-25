@@ -571,7 +571,7 @@ const adminUnlockSchema = z.object({
 });
 
 const personaUpdateSchema = z.object({
-  persona: z.enum(['vendor', 'buyer', 'both', 'explorer', 'unknown'])
+  persona: z.enum(['vendor', 'buyer', 'both', 'explorer', 'unknown', 'consultant'])
 });
 
 const valuesphereModeUpdateSchema = z.object({
@@ -579,7 +579,7 @@ const valuesphereModeUpdateSchema = z.object({
 });
 
 const onboardingSchema = z.object({
-  persona: z.enum(['vendor', 'buyer', 'both', 'explorer', 'unknown']).optional(),
+  persona: z.enum(['vendor', 'buyer', 'both', 'explorer', 'unknown', 'consultant']).optional(),
   usage: z.array(z.enum(['assessments', 'procurement', 'gtm'])).optional(),
   goals: z.array(z.string().trim().max(200)).optional(),
   intent: z.string().trim().max(400).optional(),
@@ -589,10 +589,19 @@ const onboardingSchema = z.object({
   licenseSelection: z.enum(LICENSE_PLANS).optional(),
   billingDetails: z
     .object({
-      billingName: z.string().trim().max(200).optional(),
+      billingName: z.preprocess(
+        val => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+        z.string().trim().max(200).optional()
+      ),
       company: z.string().trim().max(200).optional(),
-      email: z.string().email().optional(),
-      notes: z.string().trim().max(400).optional()
+      email: z.preprocess(
+        val => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+        z.string().email().optional()
+      ),
+      notes: z.preprocess(
+        val => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+        z.string().trim().max(400).optional()
+      )
     })
     .optional(),
   status: z.enum(['pending', 'in-progress', 'completed']).optional()
@@ -1663,8 +1672,18 @@ app.post('/api/onboarding', requireAuth, validateBody(onboardingSchema), async (
     user.onboardingStatus = payload.status || user.onboardingStatus || 'in-progress';
 
     const selection = payload.licenseSelection || nextResponses.licenseSelection;
+    let isOrgManaged = user.licenseTier === 'business';
+    if (!isOrgManaged && user.defaultOrganization) {
+      const defaultOrg = await Organization.findById(user.defaultOrganization);
+      if (defaultOrg && defaultOrg.tier === 'business') {
+        isOrgManaged = true;
+      }
+    }
+
     if (selection) {
-      applyLicenseSelection(user, selection);
+      if (!isOrgManaged) {
+        applyLicenseSelection(user, selection);
+      }
       user.onboardingStatus = 'completed';
     }
 
