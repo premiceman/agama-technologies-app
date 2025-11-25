@@ -6,7 +6,7 @@ process.env.WORKOS_CLIENT_ID = 'test-client-id';
 const mongoose = require('mongoose');
 const request = require('supertest');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { installWorkOSStub } = require('./helpers/workosStub');
+const { installWorkOSStub, FakeWorkOS } = require('./helpers/workosStub');
 
 let app;
 let mongo;
@@ -110,5 +110,30 @@ describe('Authentication & licensing', () => {
 
     expect(updateRes.status).toBe(400);
     expect(Boolean(updateRes.body.error && /select at least one platform/i.test(updateRes.body.error))).toBeTruthy();
+  });
+
+  test('logs out via WorkOS when a hosted session is present', async () => {
+    const agent = request.agent(app);
+    FakeWorkOS.mockAuthResponse = {
+      user: { id: 'user_123', email: 'workos@example.com', firstName: 'Work', lastName: 'OS' },
+      session: { id: 'sess_123' }
+    };
+
+    const loginStart = await agent.get('/api/auth/workos/login').set('Accept', 'application/json');
+    const stateCookie = (loginStart.headers['set-cookie'] || []).find(cookie => cookie.startsWith('workos_auth_state='));
+    const stateValue = stateCookie?.match(/workos_auth_state=([^;]+)/)?.[1];
+    expect(stateValue).toBeTruthy();
+
+    const callbackRes = await agent
+      .get('/api/auth/workos/callback')
+      .query({ code: 'abc123', state: stateValue })
+      .set('Accept', 'application/json');
+
+    expect(callbackRes.status).toBe(200);
+    expect(callbackRes.body.token).toBeTruthy();
+
+    const logoutRes = await agent.post('/api/auth/logout').set('Accept', 'application/json');
+    expect(logoutRes.status).toBe(200);
+    expect(/https:\/\/example\.com\/logout\/sess_123/.test(logoutRes.body.redirect)).toBeTruthy();
   });
 });
