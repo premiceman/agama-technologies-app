@@ -1698,11 +1698,21 @@ app.post('/api/auth/deactivate', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/auth/logout', requireAuth, async (req, res) => {
-  clearTokenCookie(res);
-  const wantsJson = req.accepts(['json']) && !req.accepts(['html']);
-  const workosSessionId = consumeWorkOSSession(req, res);
+async function performLogout(req, res) {
+  try {
+    clearTokenCookie(res);
+    res.clearCookie(AGAMA_ADMIN_UNLOCK_COOKIE, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      path: '/'
+    });
+  } catch (err) {
+    console.error('Error clearing logout cookies', err);
+  }
+
   const fallbackRedirect = WORKOS_LOGOUT_REDIRECT;
+  const workosSessionId = consumeWorkOSSession(req, res);
 
   if (workosClient && workosSessionId && typeof workosClient.userManagement?.getLogoutUrl === 'function') {
     try {
@@ -1710,19 +1720,39 @@ app.post('/api/auth/logout', requireAuth, async (req, res) => {
         sessionId: workosSessionId,
         redirectUri: fallbackRedirect
       });
-      if (wantsJson) {
-        return res.json({ ok: true, redirect: logoutUrl });
-      }
-      return res.redirect(logoutUrl);
+      return logoutUrl || fallbackRedirect;
     } catch (err) {
       console.error('WorkOS logout error', err);
     }
   }
 
-  if (wantsJson) {
-    return res.json({ ok: true, redirect: fallbackRedirect });
+  return fallbackRedirect;
+}
+
+app.get('/api/auth/logout', requireAuth, async (req, res) => {
+  try {
+    const logoutRedirect = await performLogout(req, res);
+    return res.redirect(logoutRedirect);
+  } catch (err) {
+    console.error('GET logout error', err);
+    return res.redirect(WORKOS_LOGOUT_REDIRECT);
   }
-  return res.redirect(fallbackRedirect);
+});
+
+app.post('/api/auth/logout', requireAuth, async (req, res) => {
+  try {
+    const wantsJson = req.accepts(['json']) && !req.accepts(['html']);
+    const logoutRedirect = await performLogout(req, res);
+
+    if (!wantsJson) {
+      return res.redirect(logoutRedirect);
+    }
+
+    return res.json({ ok: true, redirect: logoutRedirect });
+  } catch (err) {
+    console.error('POST logout error', err);
+    return res.status(500).json({ error: 'Unable to logout' });
+  }
 });
 
 app.get('/api/auth/me', requireAuth, async (req, res) => {
