@@ -1741,7 +1741,13 @@ app.get('/api/auth/logout', requireAuth, async (req, res) => {
 
 app.post('/api/auth/logout', requireAuth, async (req, res) => {
   try {
+    const wantsJson = req.accepts(['json']) && !req.accepts(['html']);
     const logoutRedirect = await performLogout(req, res);
+
+    if (!wantsJson) {
+      return res.redirect(logoutRedirect);
+    }
+
     return res.json({ ok: true, redirect: logoutRedirect });
   } catch (err) {
     console.error('POST logout error', err);
