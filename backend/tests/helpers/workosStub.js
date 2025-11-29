@@ -20,8 +20,8 @@ class FakeWorkOS {
       }
     };
     this.webhooks = {
-      constructEvent: (payload, sigHeader, secret) => {
-        // Minimal fake event, tests can override FakeWorkOS.mockEvent if needed
+      constructEvent: ({ payload, sigHeader, secret }) => {
+        // Minimal fake event; tests can override FakeWorkOS.mockEvent if needed
         return FakeWorkOS.mockEvent || {
           id: 'event_test',
           event: 'user.created',
