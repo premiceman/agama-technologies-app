@@ -101,19 +101,27 @@ app.post(
         return res.status(503).json({ error: 'WorkOS webhook not configured' });
       }
 
-      const sigHeader = req.get('workos-signature');
+      const sigHeader =
+        req.get('workos-signature') ||
+        req.headers['workos-signature'] ||
+        req.headers['WorkOS-Signature'];
+
       if (!sigHeader) {
-        console.error('Missing workos-signature header on webhook');
+        console.error('Missing WorkOS signature header on webhook', { headers: req.headers });
         return res.status(400).json({ error: 'Missing WorkOS signature header' });
       }
 
-      const payload = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : req.body;
-
-      const event = await workosClient.webhooks.constructEvent(
-        payload,
-        sigHeader,
-        WORKOS_WEBHOOK_SECRET
-      );
+      let event;
+      try {
+        event = await workosClient.webhooks.constructEvent({
+          payload: req.body,
+          sigHeader,
+          secret: WORKOS_WEBHOOK_SECRET
+        });
+      } catch (err) {
+        console.error('WorkOS webhook signature verification failed', err);
+        return res.status(400).json({ error: 'Invalid webhook payload or signature' });
+      }
 
       console.log('WorkOS webhook received', {
         id: event.id,
