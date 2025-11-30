@@ -21,11 +21,12 @@ class FakeWorkOS {
     };
     this.webhooks = {
       constructEvent: ({ payload, sigHeader, secret }) => {
+        const data = typeof payload === 'string' ? JSON.parse(payload || '{}') : payload;
         // Minimal fake event; tests can override FakeWorkOS.mockEvent if needed
         return FakeWorkOS.mockEvent || {
           id: 'event_test',
           event: 'user.created',
-          data: payload || { object: 'test' }
+          data
         };
       }
     };

@@ -119,10 +119,13 @@ app.post(
         return res.status(400).json({ error: 'Missing WorkOS signature header' });
       }
 
+      const rawBody =
+        Buffer.isBuffer(req.body) ? req.body.toString('utf8') : String(req.body || '');
+
       let event;
       try {
         event = await workosClient.webhooks.constructEvent({
-          payload: req.body,
+          payload: rawBody,
           sigHeader,
           secret: WORKOS_WEBHOOK_SECRET
         });
