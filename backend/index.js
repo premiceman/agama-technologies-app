@@ -130,7 +130,8 @@ app.post(
         sigHeaderPreview: String(sigHeader).split(',')[0]
       });
 
-      // Deep signature debug: compare WorkOS v1 hash to our own HMAC using WORKOS_WEBHOOK_SECRET
+      // Manually verify WorkOS signature using HMAC-SHA256
+      let event;
       try {
         const parts = String(sigHeader).split(',');
         const tPart = parts.find((p) => p.trim().startsWith('t='));
@@ -139,36 +140,52 @@ app.post(
         const timestamp = tPart && tPart.split('=')[1];
         const headerV1 = v1Part && v1Part.split('=')[1];
 
-        let computedV1 = null;
-        if (timestamp && headerV1) {
-          const signingPayload = `${timestamp}.${rawBody}`;
-          computedV1 = crypto
-            .createHmac('sha256', WORKOS_WEBHOOK_SECRET)
-            .update(signingPayload)
-            .digest('hex');
+        if (!timestamp || !headerV1) {
+          console.error('WorkOS signature missing timestamp or v1', {
+            sigHeader
+          });
+          return res.status(400).json({ error: 'Invalid WorkOS signature header' });
         }
 
-        console.log('WorkOS signature deep debug', {
-          timestamp,
-          headerV1,
-          computedV1,
-          headerV1First8: headerV1 ? headerV1.slice(0, 8) : null,
-          computedV1First8: computedV1 ? computedV1.slice(0, 8) : null,
-          same: Boolean(headerV1 && computedV1 && headerV1 === computedV1)
-        });
-      } catch (sigErr) {
-        console.error('Error during WorkOS signature deep debug', sigErr);
-      }
+        const signingPayload = `${timestamp}.${rawBody}`;
+        const computedV1 = crypto
+          .createHmac('sha256', WORKOS_WEBHOOK_SECRET)
+          .update(signingPayload)
+          .digest('hex');
 
-      let event;
-      try {
-        event = await workosClient.webhooks.constructEvent({
-          payload: rawBody,
-          sigHeader,
-          secret: WORKOS_WEBHOOK_SECRET
+        const hashesMatch = computedV1 === headerV1;
+
+        console.log('WorkOS signature verification', {
+          timestamp,
+          headerV1First8: headerV1.slice(0, 8),
+          computedV1First8: computedV1.slice(0, 8),
+          hashesMatch
         });
-      } catch (err) {
-        console.error('WorkOS webhook signature verification failed', err);
+
+        if (!hashesMatch) {
+          console.error('WorkOS signature mismatch, rejecting webhook');
+          return res.status(400).json({ error: 'Invalid webhook payload or signature' });
+        }
+
+        // OPTIONAL: implement a basic timestamp tolerance (e.g. 5 minutes)
+        const toleranceSeconds = 300;
+        const nowMs = Date.now();
+        const tsMs = Number(timestamp);
+        if (Number.isFinite(tsMs)) {
+          const ageSeconds = Math.abs(nowMs - tsMs) / 1000;
+          if (ageSeconds > toleranceSeconds) {
+            console.error('WorkOS webhook timestamp outside tolerance', {
+              timestamp,
+              ageSeconds
+            });
+            return res.status(400).json({ error: 'Stale webhook' });
+          }
+        }
+
+        // Signature is valid; parse the JSON body directly.
+        event = JSON.parse(rawBody);
+      } catch (sigErr) {
+        console.error('Error during WorkOS manual signature verification', sigErr);
         return res.status(400).json({ error: 'Invalid webhook payload or signature' });
       }
 
