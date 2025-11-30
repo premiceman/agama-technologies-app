@@ -99,90 +99,83 @@ if (isProduction) {
 app.use(helmet.frameguard({ action: 'deny' }));
 app.use(helmet.referrerPolicy({ policy: 'no-referrer' }));
 
-app.post(
-  '/api/webhooks/workos',
-  express.raw({ type: 'application/json' }),
-  async (req, res) => {
-    try {
-      if (!workosClient || !WORKOS_WEBHOOK_SECRET) {
-        console.error('WorkOS webhook called but client or secret is missing');
-        return res.status(503).json({ error: 'WorkOS webhook not configured' });
-      }
-
-      const sigHeader =
-        req.get('workos-signature') ||
-        req.headers['workos-signature'] ||
-        req.headers['WorkOS-Signature'];
-
-      if (!sigHeader) {
-        console.error('Missing WorkOS signature header on webhook', { headers: req.headers });
-        return res.status(400).json({ error: 'Missing WorkOS signature header' });
-      }
-
-      const rawBody =
-        Buffer.isBuffer(req.body) ? req.body.toString('utf8') : String(req.body || '');
-
-      let event;
-      try {
-        event = await workosClient.webhooks.constructEvent({
-          payload: rawBody,
-          sigHeader,
-          secret: WORKOS_WEBHOOK_SECRET
-        });
-      } catch (err) {
-        console.error('WorkOS webhook signature verification failed', err);
-        return res.status(400).json({ error: 'Invalid webhook payload or signature' });
-      }
-
-      console.log('WorkOS webhook received', {
-        id: event.id,
-        event: event.event,
-        object: event.data && event.data.object
-      });
-
-      switch (event.event) {
-        case 'user.created':
-        case 'user.updated':
-        case 'user.deleted':
-        case 'user.deactivated':
-          if (event.data && event.data.object === 'user') {
-            await syncWorkOSUser(event.data);
-          }
-          break;
-
-        case 'organization.created':
-        case 'organization.updated':
-        case 'organization.deleted':
-          if (event.data && event.data.object === 'organization') {
-            await syncWorkOSOrganization(event.data);
-          }
-          break;
-
-        case 'organization_membership.created':
-        case 'organization_membership.updated':
-        case 'organization_membership.deleted':
-          if (event.data && event.data.object === 'organization_membership') {
-            await syncWorkOSOrganizationMembership(event.data);
-          }
-          break;
-
-        default:
-          // For now, ignore other events
-          break;
-      }
-
-      // Always respond 200 on success to avoid retries
-      return res.status(200).json({ ok: true });
-    } catch (err) {
-      console.error('WorkOS webhook error', err);
-      return res.status(400).json({ error: 'Invalid webhook payload or signature' });
-    }
-  }
-);
-
 app.use(express.json({ limit: '512kb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+app.post('/api/webhooks/workos', async (req, res) => {
+  try {
+    if (!workosClient || !WORKOS_WEBHOOK_SECRET) {
+      console.error('WorkOS webhook called but client or secret is missing');
+      return res.status(503).json({ error: 'WorkOS webhook not configured' });
+    }
+
+    const sigHeader =
+      req.get('workos-signature') ||
+      req.headers['workos-signature'] ||
+      req.headers['WorkOS-Signature'];
+
+    if (!sigHeader) {
+      console.error('Missing WorkOS signature header on webhook', { headers: req.headers });
+      return res.status(400).json({ error: 'Missing WorkOS signature header' });
+    }
+
+    let event;
+    try {
+      event = await workosClient.webhooks.constructEvent({
+        payload: req.body,
+        sigHeader,
+        secret: WORKOS_WEBHOOK_SECRET
+      });
+    } catch (err) {
+      console.error('WorkOS webhook signature verification failed', err);
+      return res.status(400).json({ error: 'Invalid webhook payload or signature' });
+    }
+
+    console.log('WorkOS webhook received', {
+      id: event.id,
+      event: event.event,
+      object: event.data && event.data.object
+    });
+
+    switch (event.event) {
+      case 'user.created':
+      case 'user.updated':
+      case 'user.deleted':
+      case 'user.deactivated':
+        if (event.data && event.data.object === 'user') {
+          await syncWorkOSUser(event.data);
+        }
+        break;
+
+      case 'organization.created':
+      case 'organization.updated':
+      case 'organization.deleted':
+        if (event.data && event.data.object === 'organization') {
+          await syncWorkOSOrganization(event.data);
+        }
+        break;
+
+      case 'organization_membership.created':
+      case 'organization_membership.updated':
+      case 'organization_membership.deleted':
+        if (event.data && event.data.object === 'organization_membership') {
+          await syncWorkOSOrganizationMembership(event.data);
+        }
+        break;
+
+      default:
+        // For now, ignore other events
+        break;
+    }
+
+    // Always respond 200 on success to avoid retries
+    return res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error('WorkOS webhook error', err);
+    return res.status(400).json({ error: 'Invalid webhook payload or signature' });
+  }
+});
 
 const allowedOrigins = new Set(
   (process.env.ALLOWED_ORIGINS || '')
