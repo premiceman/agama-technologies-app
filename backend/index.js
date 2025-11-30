@@ -101,7 +101,8 @@ app.use(helmet.referrerPolicy({ policy: 'no-referrer' }));
 
 app.post(
   '/api/webhooks/workos',
-  express.raw({ type: 'application/json' }),
+  // Accept any content-type so we ALWAYS get the raw body buffer
+  express.raw({ type: '*/*' }),
   async (req, res) => {
     try {
       if (!workosClient || !WORKOS_WEBHOOK_SECRET) {
@@ -111,16 +112,23 @@ app.post(
 
       const sigHeader =
         req.get('workos-signature') ||
-        req.headers['workos-signature'] ||
-        req.headers['WorkOS-Signature'];
+        req.headers['workos-signature'];
 
       if (!sigHeader) {
         console.error('Missing WorkOS signature header on webhook', { headers: req.headers });
         return res.status(400).json({ error: 'Missing WorkOS signature header' });
       }
 
-      const rawBody =
-        Buffer.isBuffer(req.body) ? req.body.toString('utf8') : String(req.body || '');
+      const isBuffer = Buffer.isBuffer(req.body);
+      const rawBody = isBuffer ? req.body.toString('utf8') : String(req.body || '');
+
+      // Temporary debug logging to verify we're getting the real payload.
+      console.log('WorkOS webhook debug', {
+        contentType: req.headers['content-type'],
+        isBuffer,
+        bodyLength: isBuffer ? req.body.length : rawBody.length,
+        sigHeaderPreview: String(sigHeader).split(',')[0]
+      });
 
       let event;
       try {
