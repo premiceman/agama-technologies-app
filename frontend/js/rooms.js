@@ -117,9 +117,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const logoutButton = document.getElementById('logoutButton');
   if (logoutButton) {
-    logoutButton.addEventListener('click', async () => {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      window.location.href = '/login.html';
+    logoutButton.addEventListener('click', event => {
+      event.preventDefault();
+      window.location.href = '/api/auth/logout';
     });
   }
 });
