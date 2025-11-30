@@ -1773,6 +1773,7 @@ app.post('/api/auth/deactivate', requireAuth, async (req, res) => {
 });
 
 async function performLogout(req, res) {
+  // 1. Clear our own app cookies / session
   try {
     clearTokenCookie(res);
     res.clearCookie(AGAMA_ADMIN_UNLOCK_COOKIE, {
@@ -1785,21 +1786,45 @@ async function performLogout(req, res) {
     console.error('Error clearing logout cookies', err);
   }
 
-  const fallbackRedirect = WORKOS_LOGOUT_REDIRECT;
+  // 2. Read and clear the WorkOS session cookie
+  const fallbackRedirect = WORKOS_LOGOUT_REDIRECT || '/';
   const workosSessionId = consumeWorkOSSession(req, res);
 
-  if (workosClient && workosSessionId && typeof workosClient.userManagement?.getLogoutUrl === 'function') {
+  // 3. If we have a WorkOS session, revoke it and try to generate a logout URL
+  if (workosClient && workosSessionId) {
     try {
-      const logoutUrl = await workosClient.userManagement.getLogoutUrl({
-        sessionId: workosSessionId,
-        redirectUri: fallbackRedirect
+      // Explicitly revoke the WorkOS session so it can't be reused
+      await workosClient.userManagement.revokeSession({
+        sessionId: workosSessionId
       });
-      return logoutUrl || fallbackRedirect;
     } catch (err) {
-      console.error('WorkOS logout error', err);
+      console.error('WorkOS revokeSession error', err);
+    }
+
+    try {
+      // Try to get a logout URL so WorkOS can clear its hosted cookies as well
+      if (typeof workosClient.userManagement?.getLogoutUrl === 'function') {
+        const logoutUrl = await workosClient.userManagement.getLogoutUrl({
+          sessionId: workosSessionId,
+          // optional: you can omit redirectUri and let the dashboard Sign-out redirect handle it
+          // redirectUri: fallbackRedirect,
+        });
+
+        if (logoutUrl) {
+          console.log('WorkOS logout URL generated', { logoutUrl, workosSessionId });
+          return logoutUrl;
+        }
+      }
+    } catch (err) {
+      console.error('WorkOS getLogoutUrl error', err);
+    }
+  } else {
+    if (!workosSessionId) {
+      console.log('No WorkOS session ID found during logout');
     }
   }
 
+  // 4. Fallback: just send them home
   return fallbackRedirect;
 }
 
