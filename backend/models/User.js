@@ -58,7 +58,10 @@ UserSchema.methods.public = function() {
     platformAccess: Array.isArray(this.platformAccess) ? [...this.platformAccess] : [],
     defaultOrganizationId: this.defaultOrganization ? this.defaultOrganization.toString() : null,
     lastLoginAt: this.lastLoginAt || null,
-    createdAt: this.createdAt
+    createdAt: this.createdAt,
+
+    // expose staff flag to the frontend
+    isStaff: this.isStaff === true
   };
 };
 
