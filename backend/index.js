@@ -357,26 +357,59 @@ function consumeWorkOSState(req, res) {
 }
 
 function persistWorkOSSession(res, sessionId) {
-  if (!sessionId) return null;
+  if (!sessionId) {
+    console.warn('persistWorkOSSession called with empty sessionId');
+    return null;
+  }
 
-  res.cookie(WORKOS_SESSION_COOKIE, sessionId, {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: 'lax',
-    maxAge: WORKOS_SESSION_TTL_MS,
-    path: '/api/auth'
-  });
+  try {
+    res.cookie(WORKOS_SESSION_COOKIE, sessionId, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: WORKOS_SESSION_TTL_MS,
+      // Make cookie visible on all paths so logout can always see it
+      path: '/'
+    });
+
+    console.log('Persisted WorkOS session cookie', {
+      cookieName: WORKOS_SESSION_COOKIE,
+      sessionId
+    });
+  } catch (err) {
+    console.error('Error setting WorkOS session cookie', err);
+  }
+
   return sessionId;
 }
 
 function consumeWorkOSSession(req, res) {
-  const sessionId = req.cookies?.[WORKOS_SESSION_COOKIE];
-  res.clearCookie(WORKOS_SESSION_COOKIE, {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: 'lax',
-    path: '/api/auth'
-  });
+  const cookies = req.cookies || {};
+  const sessionId = cookies[WORKOS_SESSION_COOKIE];
+
+  if (!sessionId) {
+    console.log('consumeWorkOSSession: no WorkOS session cookie found', {
+      cookiesPresent: Object.keys(cookies)
+    });
+  } else {
+    console.log('consumeWorkOSSession: found WorkOS session cookie', {
+      cookieName: WORKOS_SESSION_COOKIE,
+      sessionId
+    });
+  }
+
+  try {
+    res.clearCookie(WORKOS_SESSION_COOKIE, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      // Must match the path used when setting the cookie
+      path: '/'
+    });
+  } catch (err) {
+    console.error('Error clearing WorkOS session cookie', err);
+  }
+
   return sessionId;
 }
 
