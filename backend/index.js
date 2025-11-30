@@ -1790,23 +1790,14 @@ async function performLogout(req, res) {
   const fallbackRedirect = WORKOS_LOGOUT_REDIRECT || '/';
   const workosSessionId = consumeWorkOSSession(req, res);
 
-  // 3. If we have a WorkOS session, revoke it and try to generate a logout URL
+  // 3. If we have a WorkOS session, first try to get a logout URL
   if (workosClient && workosSessionId) {
+    // Try logout URL FIRST so WorkOS can clear its own browser cookies
     try {
-      // Explicitly revoke the WorkOS session so it can't be reused
-      await workosClient.userManagement.revokeSession({
-        sessionId: workosSessionId
-      });
-    } catch (err) {
-      console.error('WorkOS revokeSession error', err);
-    }
-
-    try {
-      // Try to get a logout URL so WorkOS can clear its hosted cookies as well
       if (typeof workosClient.userManagement?.getLogoutUrl === 'function') {
         const logoutUrl = await workosClient.userManagement.getLogoutUrl({
           sessionId: workosSessionId,
-          // optional: you can omit redirectUri and let the dashboard Sign-out redirect handle it
+          // you can set redirectUri explicitly or rely on the dashboard sign-out redirect
           // redirectUri: fallbackRedirect,
         });
 
@@ -1817,6 +1808,16 @@ async function performLogout(req, res) {
       }
     } catch (err) {
       console.error('WorkOS getLogoutUrl error', err);
+    }
+
+    // If we couldn't get a logout URL, at least revoke the session server-side
+    try {
+      await workosClient.userManagement.revokeSession({
+        sessionId: workosSessionId
+      });
+      console.log('WorkOS session revoked without logout URL', { workosSessionId });
+    } catch (err) {
+      console.error('WorkOS revokeSession error (fallback)', err);
     }
   } else {
     if (!workosSessionId) {
