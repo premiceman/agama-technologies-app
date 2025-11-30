@@ -397,6 +397,24 @@ function resolveWorkOSRedirectUri(req) {
   return `${origin}/api/auth/workos/callback`;
 }
 
+function decodeJwtPayload(token) {
+  if (!token || typeof token !== 'string') return null;
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+
+    const payloadPart = parts[1];
+    // Base64URL decode
+    const base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=');
+    const json = Buffer.from(padded, 'base64').toString('utf8');
+    return JSON.parse(json);
+  } catch (err) {
+    console.error('Failed to decode JWT payload', err);
+    return null;
+  }
+}
+
 function computeEffectiveLicense(user, organizationContext) {
   if (!user) return { tier: 'guest', homeOrg: null };
   if (user.licenseTier === 'guest') return { tier: 'guest', homeOrg: null };
@@ -1599,8 +1617,14 @@ app.get('/api/auth/workos/callback', async (req, res) => {
     });
 
     const workosOrgId = authentication.organization_id || authentication.organizationId || null;
-    const workosSessionId =
-      authentication.session?.id || authentication.session_id || authentication.sessionId || null;
+    const accessToken = authentication.access_token || authentication.accessToken || null;
+    const accessPayload = decodeJwtPayload(accessToken);
+    const workosSessionId = (accessPayload && accessPayload.sid) || null;
+    console.log('WorkOS authenticateWithCode result', {
+      hasAccessToken: Boolean(accessToken),
+      sessionIdFromToken: workosSessionId,
+      orgId: workosOrgId
+    });
     const profile = authentication?.user || authentication?.profile;
     if (!profile) {
       throw new Error('Missing WorkOS user profile');
