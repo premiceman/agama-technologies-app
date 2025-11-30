@@ -49,6 +49,14 @@ const workosClient = process.env.WORKOS_API_KEY ? new WorkOS(process.env.WORKOS_
 const WORKOS_CLIENT_ID = process.env.WORKOS_CLIENT_ID;
 const WORKOS_REDIRECT_URI = process.env.WORKOS_REDIRECT_URI;
 const WORKOS_WEBHOOK_SECRET = process.env.WORKOS_WEBHOOK_SECRET;
+console.log(
+  'WORKOS_WEBHOOK_SECRET debug',
+  {
+    length: WORKOS_WEBHOOK_SECRET && WORKOS_WEBHOOK_SECRET.length,
+    prefix: WORKOS_WEBHOOK_SECRET && WORKOS_WEBHOOK_SECRET.slice(0, 8),
+  }
+);
+
 const WORKOS_SUCCESS_REDIRECT = process.env.WORKOS_SUCCESS_REDIRECT || '/workspace.html';
 const WORKOS_STATE_COOKIE = 'workos_auth_state';
 const WORKOS_SESSION_COOKIE = 'workos_session';
