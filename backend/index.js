@@ -130,6 +130,36 @@ app.post(
         sigHeaderPreview: String(sigHeader).split(',')[0]
       });
 
+      // Deep signature debug: compare WorkOS v1 hash to our own HMAC using WORKOS_WEBHOOK_SECRET
+      try {
+        const parts = String(sigHeader).split(',');
+        const tPart = parts.find((p) => p.trim().startsWith('t='));
+        const v1Part = parts.find((p) => p.trim().startsWith('v1='));
+
+        const timestamp = tPart && tPart.split('=')[1];
+        const headerV1 = v1Part && v1Part.split('=')[1];
+
+        let computedV1 = null;
+        if (timestamp && headerV1) {
+          const signingPayload = `${timestamp}.${rawBody}`;
+          computedV1 = crypto
+            .createHmac('sha256', WORKOS_WEBHOOK_SECRET)
+            .update(signingPayload)
+            .digest('hex');
+        }
+
+        console.log('WorkOS signature deep debug', {
+          timestamp,
+          headerV1,
+          computedV1,
+          headerV1First8: headerV1 ? headerV1.slice(0, 8) : null,
+          computedV1First8: computedV1 ? computedV1.slice(0, 8) : null,
+          same: Boolean(headerV1 && computedV1 && headerV1 === computedV1)
+        });
+      } catch (sigErr) {
+        console.error('Error during WorkOS signature deep debug', sigErr);
+      }
+
       let event;
       try {
         event = await workosClient.webhooks.constructEvent({
