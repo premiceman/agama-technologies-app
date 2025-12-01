@@ -183,7 +183,18 @@
             <div class="row g-3">
               <div class="col-lg-7">
                 <div class="card glass p-3 h-100">
-                  <h2 class="h6 mb-2">Organisations</h2>
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h2 class="h6 mb-0">Organisations</h2>
+                    <div class="d-flex align-items-center gap-2 small">
+                      <span class="text-fg-3">Sort by</span>
+                      <select class="form-select form-select-sm w-auto" id="agamaOrgSort">
+                        <option value="utilisation">Seat utilisation</option>
+                        <option value="name">Name</option>
+                        <option value="createdAt">Created date</option>
+                        <option value="lastActivity">Last activity</option>
+                      </select>
+                    </div>
+                  </div>
                   <div class="table-responsive">
                     <table class="table table-sm align-middle mb-0" id="agamaOrgTable">
                       <thead>
@@ -193,6 +204,9 @@
                           <th>Type</th>
                           <th>Suites</th>
                           <th>Seats</th>
+                          <th>Members</th>
+                          <th>Last activity</th>
+                          <th>SSO</th>
                           <th>WorkOS Org ID</th>
                           <th></th>
                         </tr>
