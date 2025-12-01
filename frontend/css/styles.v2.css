@@ -422,6 +422,10 @@ a:hover{text-decoration:none;color:var(--accent);}
   box-shadow: 0 0 0 1px rgba(15, 23, 42, .9);
 }
 
+.org-tab-panel {
+  padding-top: .5rem;
+}
+
 /* Global admin refresh button */
 #adminRefreshBtn.is-loading i {
   animation: admin-refresh-spin .9s linear infinite;

@@ -284,6 +284,101 @@
               </div>
             </div>
 
+            <section class="card glass p-4 mt-3 d-none" id="agamaOrgDetail">
+              <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                  <span class="eyebrow d-block mb-1">Organisation</span>
+                  <h2 class="h4 mb-1" id="agamaOrgDetailName">Select an organisation</h2>
+                  <div class="text-fg-3 small" id="agamaOrgDetailMeta">Tier • Type • Suites</div>
+                </div>
+                <div class="d-flex flex-wrap gap-3">
+                  <div class="text-end">
+                    <div class="small text-fg-3">Seat usage</div>
+                    <div class="fw-semibold" id="agamaOrgDetailSeats">-</div>
+                  </div>
+                  <div class="text-end">
+                    <div class="small text-fg-3">Members</div>
+                    <div class="fw-semibold" id="agamaOrgDetailMembers">-</div>
+                  </div>
+                  <div class="text-end">
+                    <div class="small text-fg-3">Last activity</div>
+                    <div class="fw-semibold" id="agamaOrgDetailLastActivity">-</div>
+                  </div>
+                </div>
+              </div>
+
+              <ul class="nav nav-pills mb-3" id="agamaOrgTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link active" id="org-tab-overview" type="button" data-org-tab="overview" role="tab">
+                    Overview
+                  </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="org-tab-members" type="button" data-org-tab="members" role="tab">
+                    Members
+                  </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="org-tab-access" type="button" data-org-tab="access" role="tab">
+                    Access &amp; licensing
+                  </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="org-tab-sso" type="button" data-org-tab="sso" role="tab">
+                    SSO &amp; Groups
+                  </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="org-tab-audit" type="button" data-org-tab="audit" role="tab">
+                    Audit &amp; activity
+                  </button>
+                </li>
+              </ul>
+
+              <div id="agamaOrgTabPanels">
+                <div class="org-tab-panel" data-org-tab-panel="overview">
+                  <p class="text-fg-3 small mb-2">
+                    High-level summary of this organisation. Future iterations can include billing notes, contract dates, etc.
+                  </p>
+                  <dl class="row small mb-0">
+                    <dt class="col-sm-3">Email domains</dt>
+                    <dd class="col-sm-9" id="agamaOrgDetailDomains">-</dd>
+                    <dt class="col-sm-3">WorkOS Org ID</dt>
+                    <dd class="col-sm-9" id="agamaOrgDetailWorkosId">-</dd>
+                    <dt class="col-sm-3">Created</dt>
+                    <dd class="col-sm-9" id="agamaOrgDetailCreatedAt">-</dd>
+                  </dl>
+                </div>
+
+                <div class="org-tab-panel d-none" data-org-tab-panel="members">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h3 class="h6 mb-0">Members</h3>
+                    <span class="badge-soft small" id="agamaOrgMembersCountBadge">0 members</span>
+                  </div>
+                  <div class="table-responsive">
+                    <table class="table align-middle text-sm mb-0">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Email</th>
+                          <th>Role</th>
+                          <th>Status</th>
+                          <th>Last login</th>
+                        </tr>
+                      </thead>
+                      <tbody id="agamaOrgMembersRows"></tbody>
+                    </table>
+                  </div>
+                  <div class="form-text small" id="agamaOrgMembersFeedback"></div>
+                </div>
+
+                <!-- Access, SSO, Audit tab panels will be filled in later prompts -->
+                <div class="org-tab-panel d-none" data-org-tab-panel="access" id="agamaOrgAccessPanel"></div>
+                <div class="org-tab-panel d-none" data-org-tab-panel="sso" id="agamaOrgSsoPanel"></div>
+                <div class="org-tab-panel d-none" data-org-tab-panel="audit" id="agamaOrgAuditPanel"></div>
+              </div>
+            </section>
+
             <div class="border-top pt-4">
               <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
                 <div>
