@@ -4,6 +4,10 @@ const adminState = {
   organizations: [],
   selectedOrg: null,
   currentView: 'overview',
+  currentOrgId: null,
+  currentOrgTab: 'overview',
+  currentOrgOverview: null,
+  currentOrgMembers: [],
   saving: false,
   auditEvents: [],
   auditFilters: {
@@ -120,6 +124,9 @@ async function refreshAdminData() {
   try {
     if (adminState.currentView === 'overview' || adminState.currentView === 'organizations') {
       await loadOrganizations(adminState.selectedOrg?.id || null);
+      if (adminState.currentOrgId) {
+        await loadOrgOverview(adminState.currentOrgId);
+      }
     } else if (adminState.currentView === 'audit') {
       await fetchAuditLog();
     } else {
@@ -360,12 +367,194 @@ function renderOrganizations(list) {
     actionsCell.appendChild(editBtn);
     row.appendChild(actionsCell);
 
-    row.addEventListener('click', () => populateOrgEditor(org));
+    row.addEventListener('click', () => {
+      openOrgDetail(org);
+      populateOrgEditor(org);
+    });
     editBtn.addEventListener('click', event => {
       event.stopPropagation();
       populateOrgEditor(org);
     });
     tbody.appendChild(row);
+  });
+}
+
+async function openOrgDetail(org) {
+  if (!org || !org.id) return;
+  adminState.selectedOrg = org;
+  adminState.currentOrgId = org.id;
+  adminState.currentOrgTab = 'overview';
+
+  const detailCard = document.getElementById('agamaOrgDetail');
+  if (detailCard) {
+    detailCard.classList.remove('d-none');
+  }
+
+  await loadOrgOverview(org.id);
+  setOrgTab('overview');
+}
+
+async function loadOrgOverview(orgId) {
+  if (!orgId) return;
+  try {
+    const res = await fetch(`/api/agama-admin/organizations/${orgId}/overview`, {
+      credentials: 'include'
+    });
+    if (res.status === 403) {
+      adminState.unlocked = false;
+      setLockedState();
+      return;
+    }
+    const json = await res.json();
+    if (!res.ok || !json.ok) {
+      throw new Error(json.error || 'Unable to load org overview');
+    }
+
+    adminState.currentOrgOverview = json.organization || null;
+    adminState.currentOrgMembers = json.members || [];
+    renderOrgOverview();
+    renderOrgMembers();
+  } catch (err) {
+    console.error(err);
+    adminState.currentOrgOverview = null;
+    adminState.currentOrgMembers = [];
+    renderOrgOverview();
+    renderOrgMembers();
+  }
+}
+
+function renderOrgOverview() {
+  const org = adminState.currentOrgOverview;
+  const nameEl = document.getElementById('agamaOrgDetailName');
+  const metaEl = document.getElementById('agamaOrgDetailMeta');
+  const seatsEl = document.getElementById('agamaOrgDetailSeats');
+  const membersEl = document.getElementById('agamaOrgDetailMembers');
+  const lastEl = document.getElementById('agamaOrgDetailLastActivity');
+  const domainsEl = document.getElementById('agamaOrgDetailDomains');
+  const workosEl = document.getElementById('agamaOrgDetailWorkosId');
+  const createdEl = document.getElementById('agamaOrgDetailCreatedAt');
+
+  if (!org) {
+    if (nameEl) nameEl.textContent = 'Select an organisation';
+    if (metaEl) metaEl.textContent = '';
+    if (seatsEl) seatsEl.textContent = '-';
+    if (membersEl) membersEl.textContent = '-';
+    if (lastEl) lastEl.textContent = '-';
+    if (domainsEl) domainsEl.textContent = '-';
+    if (workosEl) workosEl.textContent = '-';
+    if (createdEl) createdEl.textContent = '-';
+    return;
+  }
+
+  if (nameEl) nameEl.textContent = org.name || 'Untitled organisation';
+  const suites = Array.isArray(org.productAccess) ? org.productAccess.join(', ') : 'None';
+  if (metaEl) {
+    metaEl.textContent = `${org.tier || 'tier'} • ${org.orgType || 'type'} • ${suites}`;
+  }
+
+  const seatsUsed = org.seatsUsed ?? 0;
+  const seatLimit = org.seatLimit ?? 0;
+  if (seatsEl) seatsEl.textContent = seatLimit ? `${seatsUsed} / ${seatLimit}` : `${seatsUsed}`;
+
+  const memberCount = typeof org.memberCount === 'number' ? org.memberCount : adminState.currentOrgMembers.length;
+  if (membersEl) membersEl.textContent = memberCount || 0;
+
+  if (lastEl) lastEl.textContent = formatShortDate(org.lastActivityAt);
+
+  if (domainsEl) {
+    const domains = Array.isArray(org.domains) ? org.domains.join(', ') : '';
+    domainsEl.textContent = domains || '—';
+  }
+
+  if (workosEl) {
+    workosEl.textContent = org.workosOrganizationId || '—';
+  }
+
+  if (createdEl) {
+    createdEl.textContent = formatShortDate(org.createdAt);
+  }
+
+  const badge = document.getElementById('agamaOrgMembersCountBadge');
+  if (badge) {
+    const count = adminState.currentOrgMembers.length;
+    badge.textContent = `${count} member${count === 1 ? '' : 's'}`;
+  }
+}
+
+function renderOrgMembers() {
+  const tbody = document.getElementById('agamaOrgMembersRows');
+  const feedback = document.getElementById('agamaOrgMembersFeedback');
+  if (!tbody) return;
+
+  tbody.innerHTML = '';
+  const members = adminState.currentOrgMembers || [];
+  if (members.length === 0) {
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = 5;
+    cell.className = 'text-fg-3';
+    cell.textContent = 'No members found for this organisation.';
+    row.appendChild(cell);
+    tbody.appendChild(row);
+    if (feedback) feedback.textContent = '';
+    return;
+  }
+
+  members.forEach(member => {
+    const row = document.createElement('tr');
+
+    const nameCell = document.createElement('td');
+    nameCell.textContent = member.name || '—';
+    row.appendChild(nameCell);
+
+    const emailCell = document.createElement('td');
+    emailCell.textContent = member.email || member.userId || '—';
+    row.appendChild(emailCell);
+
+    const roleCell = document.createElement('td');
+    roleCell.textContent = member.role || 'member';
+    row.appendChild(roleCell);
+
+    const statusCell = document.createElement('td');
+    statusCell.textContent = member.status || 'active';
+    row.appendChild(statusCell);
+
+    const lastLoginCell = document.createElement('td');
+    lastLoginCell.textContent = formatShortDate(member.lastLoginAt);
+    row.appendChild(lastLoginCell);
+
+    tbody.appendChild(row);
+  });
+
+  if (feedback) feedback.textContent = '';
+}
+
+function setOrgTab(tab) {
+  adminState.currentOrgTab = tab;
+  const tabs = document.querySelectorAll('#agamaOrgTabs [data-org-tab]');
+  tabs.forEach(btn => {
+    const btnTab = btn.getAttribute('data-org-tab');
+    btn.classList.toggle('active', btnTab === tab);
+  });
+
+  const panels = document.querySelectorAll('#agamaOrgTabPanels [data-org-tab-panel]');
+  panels.forEach(panel => {
+    const panelTab = panel.getAttribute('data-org-tab-panel');
+    panel.classList.toggle('d-none', panelTab !== tab);
+  });
+
+  if (tab === 'members') {
+    renderOrgMembers();
+  }
+}
+
+function initOrgTabs() {
+  const tabs = document.querySelectorAll('#agamaOrgTabs [data-org-tab]');
+  tabs.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.getAttribute('data-org-tab') || 'overview';
+      setOrgTab(tab);
+    });
   });
 }
 
@@ -671,5 +860,6 @@ function initHandlers() {
 document.addEventListener('DOMContentLoaded', () => {
   initHandlers();
   initAdminNav();
+  initOrgTabs();
   initAdminConsole();
 });
