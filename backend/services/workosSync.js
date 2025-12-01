@@ -114,31 +114,74 @@ function extractOrgDomains(workosOrg) {
 }
 
 async function syncWorkOSOrganization(workosOrg) {
-  if (!workosOrg) return null;
-
-  const domains = extractOrgDomains(workosOrg);
-  let organization = await Organization.findOne({ workosOrganizationId: workosOrg.id });
-
-  if (!organization) {
-    const slug = await generateUniqueOrgSlug(workosOrg.name || 'WorkOS Organization');
-    organization = new Organization({
-      name: workosOrg.name || 'WorkOS Organization',
-      slug,
-      workosOrganizationId: workosOrg.id,
-      orgType: 'both',
-      tier: 'business',
-      platformAccess: ['valuesphere'],
-      productAccess: ['valuesphere'],
-      domains,
-      seatLimit: 10
-    });
-  } else {
-    organization.name = workosOrg.name || organization.name;
-    organization.domains = domains;
+  if (!workosOrg) {
+    console.warn('[workosSync] syncWorkOSOrganization called with empty workosOrg payload');
+    return null;
   }
 
-  await organization.save();
-  return organization;
+  const workosOrgId = workosOrg.id || workosOrg.organization || workosOrg.organizationId;
+  const rawName = workosOrg.name;
+  const effectiveName = rawName && String(rawName).trim().length > 0 ? String(rawName).trim() : null;
+
+  try {
+    const domains = extractOrgDomains(workosOrg);
+    let organization = await Organization.findOne({ workosOrganizationId: workosOrgId });
+
+    if (!organization) {
+      const baseName = effectiveName || 'Unnamed WorkOS Organization';
+      const slug = await generateUniqueOrgSlug(baseName);
+
+      console.log('[workosSync] Creating local Organization from WorkOS organization', {
+        workosOrgId,
+        name: baseName,
+        domains
+      });
+
+      organization = new Organization({
+        name: baseName,
+        slug,
+        workosOrganizationId: workosOrgId,
+        orgType: 'both',
+        tier: 'business',
+        platformAccess: ['valuesphere'],
+        productAccess: ['valuesphere'],
+        domains,
+        seatLimit: 10
+      });
+    } else {
+      const before = {
+        name: organization.name,
+        domains: organization.domains
+      };
+
+      if (effectiveName) {
+        organization.name = effectiveName;
+      }
+
+      organization.domains = domains;
+
+      console.log('[workosSync] Updating local Organization from WorkOS organization', {
+        workosOrgId,
+        mongoOrgId: organization._id.toString(),
+        before,
+        after: {
+          name: organization.name,
+          domains: organization.domains
+        }
+      });
+    }
+
+    await organization.save();
+
+    return organization;
+  } catch (err) {
+    console.error('[workosSync] Failed to sync WorkOS organization', {
+      workosOrgId,
+      name: effectiveName,
+      error: err && err.message ? err.message : err
+    });
+    throw err;
+  }
 }
 
 function mapWorkOSRoleSlugToOrgRole(slug) {

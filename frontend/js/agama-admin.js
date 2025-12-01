@@ -401,6 +401,20 @@ function renderOrganizations(list) {
     editBtn.dataset.orgId = org.id;
     editBtn.textContent = 'Edit';
     actionsCell.appendChild(editBtn);
+
+    // Only show Resync button if this org is linked to WorkOS
+    if (org.workosOrganizationId) {
+      const resyncBtn = document.createElement('button');
+      resyncBtn.className = 'btn btn-outline-light btn-sm ms-1';
+      resyncBtn.type = 'button';
+      resyncBtn.dataset.orgId = org.id;
+      resyncBtn.textContent = 'Resync';
+      resyncBtn.title = 'Resync this organization from WorkOS';
+      resyncBtn.addEventListener('click', event => {
+        resyncOrgFromWorkOS(org, event);
+      });
+      actionsCell.appendChild(resyncBtn);
+    }
     row.appendChild(actionsCell);
 
     row.addEventListener('click', () => {
@@ -944,6 +958,67 @@ async function loadOrganizations(focusOrgId) {
   } catch (err) {
     console.error(err);
     showAccessDenied('Unable to load organizations.');
+  }
+}
+
+async function resyncOrgFromWorkOS(org, event) {
+  if (!org || !org.id) return;
+
+  if (event) {
+    event.stopPropagation();
+  }
+
+  const btn = event?.currentTarget || null;
+  if (btn) {
+    btn.disabled = true;
+    btn.classList.add('is-loading');
+  }
+
+  try {
+    console.log('[admin-ui] Resync from WorkOS requested for org', {
+      orgId: org.id,
+      workosOrganizationId: org.workosOrganizationId
+    });
+
+    const res = await fetch(
+      `/api/agama-admin/organizations/${encodeURIComponent(org.id)}/resync-from-workos`,
+      {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (!res.ok) {
+      let body = null;
+      try {
+        body = await res.json();
+      } catch (e) {
+        // ignore JSON parse errors
+      }
+      console.error('[admin-ui] Resync from WorkOS failed', {
+        status: res.status,
+        body
+      });
+      window.alert('Unable to resync organization from WorkOS. Check server logs for details.');
+      return;
+    }
+
+    const json = await res.json();
+    console.log('[admin-ui] Resync from WorkOS succeeded', json);
+
+    // Reload organizations and keep focus on this org
+    await loadOrganizations(org.id);
+  } catch (err) {
+    console.error('[admin-ui] Resync from WorkOS error', err);
+    window.alert('Error resyncing organization from WorkOS. Check console for details.');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.classList.remove('is-loading');
+    }
   }
 }
 

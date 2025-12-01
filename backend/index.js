@@ -2273,6 +2273,76 @@ app.get(
 );
 
 app.post(
+  '/api/agama-admin/organizations/:id/resync-from-workos',
+  requireAuth,
+  requireAgamaStaff,
+  requireAdminConsoleUnlocked,
+  async (req, res) => {
+    const orgId = req.params.id;
+
+    try {
+      const organization = await Organization.findById(orgId);
+
+      if (!organization) {
+        console.warn('[admin] Resync from WorkOS requested for missing organization', { orgId });
+        return res.status(404).json({ error: 'Organization not found' });
+      }
+
+      if (!organization.workosOrganizationId) {
+        console.warn('[admin] Resync from WorkOS requested but organization has no workosOrganizationId', {
+          orgId,
+          slug: organization.slug
+        });
+        return res.status(400).json({ error: 'Organization is not linked to WorkOS' });
+      }
+
+      if (!workosClient) {
+        console.error('[admin] Resync from WorkOS requested but WorkOS client is not configured', {
+          orgId,
+          workosOrganizationId: organization.workosOrganizationId
+        });
+        return res.status(503).json({ error: 'WorkOS client not configured' });
+      }
+
+      console.log('[admin] Resyncing organization from WorkOS', {
+        orgId,
+        workosOrganizationId: organization.workosOrganizationId
+      });
+
+      const workosOrg = await workosClient.organizations.getOrganization(
+        organization.workosOrganizationId
+      );
+
+      const updated = await syncWorkOSOrganization(workosOrg);
+
+      console.log('[admin] Resync from WorkOS complete', {
+        orgId,
+        workosOrganizationId: organization.workosOrganizationId,
+        name: updated.name,
+        domains: updated.domains
+      });
+
+      return res.json({
+        ok: true,
+        organization: {
+          id: updated._id.toString(),
+          name: updated.name,
+          slug: updated.slug,
+          domains: updated.domains,
+          workosOrganizationId: updated.workosOrganizationId
+        }
+      });
+    } catch (err) {
+      console.error('[admin] Resync from WorkOS failed', {
+        orgId,
+        error: err && err.message ? err.message : err
+      });
+      return res.status(500).json({ error: 'Unable to resync organization from WorkOS' });
+    }
+  }
+);
+
+app.post(
   '/api/agama-admin/organizations/:id/members',
   requireAuth,
   requireAgamaStaff,
@@ -3064,33 +3134,105 @@ app.patch(
     try {
       const organization = await Organization.findById(req.params.id);
       if (!organization) {
+        console.warn('[admin] Organization update requested for missing id', {
+          orgId: req.params.id
+        });
         return res.status(404).json({ error: 'Organization not found' });
       }
 
       const payload = req.validatedBody;
-      if (payload.name !== undefined) organization.name = payload.name.trim();
+      const previous = {
+        name: organization.name,
+        orgType: organization.orgType,
+        tier: organization.tier,
+        productAccess: organization.productAccess,
+        platformAccess: organization.platformAccess,
+        seatLimit: organization.seatLimit,
+        domains: organization.domains,
+        workosOrganizationId: organization.workosOrganizationId
+      };
+
+      if (payload.name !== undefined) {
+        organization.name = payload.name.trim();
+      }
       if (payload.orgType) organization.orgType = payload.orgType;
       if (payload.tier) organization.tier = payload.tier;
-      if (payload.productAccess !== undefined) {
-        const normalized = normaliseProductAccess(payload.productAccess);
-        organization.productAccess = normalized;
-        organization.platformAccess = normalized;
-      }
+      if (payload.productAccess) organization.productAccess = payload.productAccess;
+      if (payload.platformAccess) organization.platformAccess = payload.platformAccess;
       if (payload.seatLimit !== undefined) organization.seatLimit = payload.seatLimit;
       if (payload.domains !== undefined) organization.domains = payload.domains;
-      // This should typically be set during creation/linking flows rather than edited directly.
-      if (payload.workosOrganizationId !== undefined) organization.workosOrganizationId = payload.workosOrganizationId;
+      if (payload.workosOrganizationId !== undefined) {
+        organization.workosOrganizationId = payload.workosOrganizationId || undefined;
+      }
+
+      const nameChanged =
+        payload.name !== undefined && payload.name.trim() !== (previous.name || '');
+      const domainsChanged =
+        payload.domains !== undefined &&
+        JSON.stringify(payload.domains || []) !== JSON.stringify(previous.domains || []);
 
       await organization.save();
 
-      res.json({
-        ok: true,
-        organization: {
-          id: organization._id.toString(),
+      console.log('[admin] Organization updated via admin API', {
+        orgId: organization._id.toString(),
+        workosOrganizationId: organization.workosOrganizationId,
+        previous,
+        updated: {
           name: organization.name,
           orgType: organization.orgType,
           tier: organization.tier,
           productAccess: organization.productAccess,
+          platformAccess: organization.platformAccess,
+          seatLimit: organization.seatLimit,
+          domains: organization.domains,
+          workosOrganizationId: organization.workosOrganizationId
+        }
+      });
+
+      // Best-effort sync of the name to WorkOS if this org is linked
+      if (
+        workosClient &&
+        organization.workosOrganizationId &&
+        (nameChanged /* || domainsChanged */)
+      ) {
+        try {
+          console.log('[admin] Syncing organization update to WorkOS', {
+            orgId: organization._id.toString(),
+            workosOrganizationId: organization.workosOrganizationId,
+            nameChanged,
+            domainsChanged
+          });
+
+          // For now, only sync the name. Domain management can stay in WorkOS for now.
+          await workosClient.organizations.updateOrganization({
+            organization: organization.workosOrganizationId,
+            name: organization.name
+          });
+
+          console.log('[admin] WorkOS organization update succeeded', {
+            orgId: organization._id.toString(),
+            workosOrganizationId: organization.workosOrganizationId
+          });
+        } catch (err) {
+          console.error('[admin] Failed to sync organization update to WorkOS', {
+            orgId: organization._id.toString(),
+            workosOrganizationId: organization.workosOrganizationId,
+            error: err && err.message ? err.message : err
+          });
+          // Do not fail the API response; treat this as best-effort.
+        }
+      }
+
+      return res.json({
+        ok: true,
+        organization: {
+          id: organization._id.toString(),
+          name: organization.name,
+          slug: organization.slug,
+          orgType: organization.orgType,
+          tier: organization.tier,
+          productAccess: organization.productAccess,
+          platformAccess: organization.platformAccess,
           seatLimit: organization.seatLimit,
           domains: organization.domains,
           workosOrganizationId: organization.workosOrganizationId
