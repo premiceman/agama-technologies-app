@@ -2208,6 +2208,240 @@ app.get(
   }
 );
 
+app.get(
+  '/api/agama-admin/organizations/:id/overview',
+  requireAuth,
+  requireAgamaStaff,
+  requireAdminConsoleUnlocked,
+  async (req, res) => {
+    try {
+      const organization = await Organization.findById(req.params.id);
+      if (!organization) {
+        return res.status(404).json({ error: 'Organization not found' });
+      }
+
+      const members = await OrganizationMembership.find({
+        organization: organization._id,
+        status: { $ne: 'removed' }
+      }).populate({
+        path: 'user',
+        select: 'name email licenseTier lastLoginAt'
+      });
+
+      const memberCount = members.length;
+      const seatsUsed = members.filter(m => m.status === 'active').length;
+
+      let lastActivityAt = null;
+      for (const m of members) {
+        const ts = m.user?.lastLoginAt;
+        if (ts && (!lastActivityAt || ts > lastActivityAt)) {
+          lastActivityAt = ts;
+        }
+      }
+
+      const productAccess = Array.isArray(organization.productAccess)
+        ? organization.productAccess
+        : Array.isArray(organization.platformAccess)
+          ? organization.platformAccess
+          : [];
+
+      res.json({
+        ok: true,
+        organization: {
+          id: organization._id.toString(),
+          name: organization.name,
+          slug: organization.slug,
+          orgType: organization.orgType || 'both',
+          tier: organization.tier,
+          productAccess,
+          domains: organization.domains || [],
+          seatLimit: organization.seatLimit,
+          seatsUsed,
+          memberCount,
+          lastActivityAt,
+          workosOrganizationId: organization.workosOrganizationId || null,
+          ssoEnabled: Boolean(organization.workosOrganizationId),
+          createdAt: organization.createdAt
+        },
+        members: members.map(serializeMembership)
+      });
+    } catch (err) {
+      console.error('Agama staff organization overview failed', err);
+      return res.status(500).json({ error: 'Unable to load organization overview' });
+    }
+  }
+);
+
+app.post(
+  '/api/agama-admin/organizations/:id/members',
+  requireAuth,
+  requireAgamaStaff,
+  requireAdminConsoleUnlocked,
+  validateBody(membershipCreateSchema),
+  async (req, res) => {
+    try {
+      const organization = await Organization.findById(req.params.id);
+      if (!organization) {
+        return res.status(404).json({ error: 'Organization not found' });
+      }
+
+      const { email, role } = req.validatedBody;
+      const normalizedEmail = email.toLowerCase().trim();
+
+      let user = await User.findOne({ email: normalizedEmail });
+      if (!user) {
+        user = await User.create({
+          email: normalizedEmail,
+          licenseTier: 'guest',
+          platformAccess: []
+        });
+      }
+
+      let membership = await OrganizationMembership.findOne({ organization: organization._id, user: user._id });
+      if (membership && membership.status !== 'removed') {
+        return res.status(400).json({ error: 'User is already a member of this organization.' });
+      }
+
+      if (membership && membership.status === 'removed') {
+        membership.role = role;
+        membership.status = 'invited';
+        membership.invitedEmail = normalizedEmail;
+        await membership.save();
+      } else {
+        membership = await OrganizationMembership.create({
+          organization: organization._id,
+          user: user._id,
+          role,
+          status: 'invited',
+          roleOrigin: 'app',
+          invitedEmail: normalizedEmail
+        });
+      }
+
+      await membership.populate({ path: 'user', select: 'name email licenseTier lastLoginAt' });
+      await recordAuditEvent({
+        type: 'org.member.added',
+        actorUser: req.requestingUser?._id || req.auth.uid,
+        actorOrganization: organization._id,
+        targetUser: membership.user?._id || membership.user,
+        targetOrganization: organization._id,
+        metadata: { role: membership.role, status: membership.status }
+      });
+      res.status(201).json({ ok: true, member: serializeMembership(membership) });
+    } catch (err) {
+      console.error('Agama staff invite member error', err);
+      res.status(500).json({ error: 'Unable to invite member' });
+    }
+  }
+);
+
+app.patch(
+  '/api/agama-admin/organizations/:id/members/:membershipId',
+  requireAuth,
+  requireAgamaStaff,
+  requireAdminConsoleUnlocked,
+  validateBody(membershipUpdateSchema),
+  async (req, res) => {
+    try {
+      const membership = await OrganizationMembership.findById(req.params.membershipId).populate({
+        path: 'user',
+        select: 'name email licenseTier lastLoginAt'
+      });
+      if (!membership) {
+        return res.status(404).json({ error: 'Membership not found' });
+      }
+
+      if (membership.organization.toString() !== req.params.id) {
+        return res.status(403).json({ error: 'ORG_ADMIN_ONLY' });
+      }
+
+      const ownerCount = await OrganizationMembership.countDocuments({
+        organization: membership.organization,
+        role: 'owner',
+        status: { $ne: 'removed' }
+      });
+
+      const nextRole = req.validatedBody.role;
+      const nextStatus = req.validatedBody.status;
+      const previousRole = membership.role;
+      const previousStatus = membership.status;
+
+      if (membership.role === 'owner' && ownerCount <= 1) {
+        if (nextRole && nextRole !== 'owner') {
+          return res.status(400).json({ error: 'Cannot remove the last owner.' });
+        }
+        if (nextStatus && nextStatus === 'removed') {
+          return res.status(400).json({ error: 'Cannot remove the last owner.' });
+        }
+      }
+
+      const isSelf =
+        membership.user &&
+        membership.user._id &&
+        req.requestingUser &&
+        membership.user._id.toString() === req.requestingUser._id.toString();
+      if (isSelf && membership.role === 'owner' && ownerCount <= 1 && nextRole && nextRole !== 'owner') {
+        return res.status(400).json({ error: 'You must keep at least one owner on the organization.' });
+      }
+
+      if (nextRole) {
+        membership.role = nextRole;
+      }
+      if (nextStatus) {
+        membership.status = nextStatus;
+      }
+
+      await membership.save();
+      await recordAuditEvent({
+        type: 'org.member.updated',
+        actorUser: req.requestingUser?._id || req.auth.uid,
+        actorOrganization: membership.organization,
+        targetUser: membership.user?._id || membership.user,
+        targetOrganization: membership.organization,
+        metadata: {
+          previousRole,
+          previousStatus,
+          role: membership.role,
+          status: membership.status
+        }
+      });
+      res.json({ ok: true, member: serializeMembership(membership) });
+    } catch (err) {
+      console.error('Agama staff update member error', err);
+      res.status(500).json({ error: 'Unable to update member' });
+    }
+  }
+);
+
+app.post(
+  '/api/agama-admin/organizations/:id/members/:membershipId/resend-invite',
+  requireAuth,
+  requireAgamaStaff,
+  requireAdminConsoleUnlocked,
+  async (req, res) => {
+    try {
+      const membership = await OrganizationMembership.findById(req.params.membershipId).populate({
+        path: 'user',
+        select: 'name email licenseTier lastLoginAt'
+      });
+      if (!membership) {
+        return res.status(404).json({ error: 'Membership not found' });
+      }
+      if (membership.organization.toString() !== req.params.id) {
+        return res.status(403).json({ error: 'ORG_ADMIN_ONLY' });
+      }
+      if (membership.status !== 'invited') {
+        return res.status(400).json({ error: 'Only pending invites can be resent.' });
+      }
+
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error('Agama staff resend invite error', err);
+      return res.status(500).json({ error: 'Unable to resend invite' });
+    }
+  }
+);
+
 app.get('/api/agama-admin/audit', requireAuth, requireAgamaStaff, requireAdminConsoleUnlocked, async (req, res) => {
   try {
     const { orgId, userId } = req.query;
