@@ -222,4 +222,108 @@ describe('Organizations and memberships', () => {
     const user = await User.findById(res.body.user.id);
     expect(String(user.defaultOrganization)).toEqual(String(org._id));
   });
+
+  test('admin org update cascades product access changes to active members', async () => {
+    const agent = request.agent(app);
+    await agent.post('/api/auth/signup').send({
+      name: 'Staff User',
+      email: 'staff-update@example.com',
+      password: 'password123',
+      licenseTier: 'business',
+      platformAccess: ['valuesphere']
+    });
+
+    const User = require('../models/User');
+    const Organization = require('../models/Organization');
+    const OrganizationMembership = require('../models/OrganizationMembership');
+
+    const staff = await User.findOne({ email: 'staff-update@example.com' });
+    staff.isStaff = true;
+    await staff.save();
+
+    const createRes = await agent.post('/api/admin/organizations').send({
+      name: 'Cascade Org',
+      productAccess: ['valuesphere', 'procurepath']
+    });
+    expect(createRes.status).toBe(201);
+
+    const organization = await Organization.findOne({ name: 'Cascade Org' });
+
+    await request(app).post('/api/auth/signup').send({
+      name: 'Member User',
+      email: 'member-update@example.com',
+      password: 'password123',
+      licenseTier: 'business',
+      platformAccess: ['valuesphere', 'procurepath']
+    });
+    const memberUser = await User.findOne({ email: 'member-update@example.com' });
+
+    await OrganizationMembership.create({
+      organization: organization._id,
+      user: memberUser._id,
+      role: 'member',
+      status: 'active'
+    });
+
+    const patchRes = await agent
+      .patch(`/api/admin/organizations/${organization._id}`)
+      .send({ productAccess: ['valuesphere'] });
+
+    expect(patchRes.status).toBe(200);
+
+    const refreshedMember = await User.findById(memberUser._id);
+    expect(refreshedMember.platformAccess).toEqual(['valuesphere']);
+  });
+
+  test('admin org update respects member license constraints when syncing access', async () => {
+    const agent = request.agent(app);
+    await agent.post('/api/auth/signup').send({
+      name: 'Staff Two',
+      email: 'staff-constraints@example.com',
+      password: 'password123',
+      licenseTier: 'business',
+      platformAccess: ['valuesphere']
+    });
+
+    const User = require('../models/User');
+    const Organization = require('../models/Organization');
+    const OrganizationMembership = require('../models/OrganizationMembership');
+
+    const staff = await User.findOne({ email: 'staff-constraints@example.com' });
+    staff.isStaff = true;
+    await staff.save();
+
+    const orgRes = await agent.post('/api/admin/organizations').send({
+      name: 'Constraint Org',
+      productAccess: ['valuesphere']
+    });
+    expect(orgRes.status).toBe(201);
+
+    const organization = await Organization.findOne({ name: 'Constraint Org' });
+
+    await request(app).post('/api/auth/signup').send({
+      name: 'Personal Member',
+      email: 'personal-member@example.com',
+      password: 'password123',
+      licenseTier: 'personal',
+      platformAccess: ['valuesphere']
+    });
+    const personalUser = await User.findOne({ email: 'personal-member@example.com' });
+
+    await OrganizationMembership.create({
+      organization: organization._id,
+      user: personalUser._id,
+      role: 'member',
+      status: 'active'
+    });
+
+    const updateRes = await agent
+      .patch(`/api/admin/organizations/${organization._id}`)
+      .send({ productAccess: ['revenueforge'] });
+
+    expect(updateRes.status).toBe(200);
+
+    const refreshedPersonal = await User.findById(personalUser._id);
+    expect(refreshedPersonal.platformAccess).toEqual([]);
+  });
 });

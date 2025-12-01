@@ -3173,6 +3173,41 @@ app.patch(
 
       await organization.save();
 
+      const orgAccess = Array.isArray(organization.productAccess)
+        ? normaliseProductAccess(organization.productAccess)
+        : Array.isArray(organization.platformAccess)
+          ? normaliseProductAccess(organization.platformAccess)
+          : [];
+
+      const activeMemberships = await OrganizationMembership.find({
+        organization: organization._id,
+        status: 'active'
+      }).populate({ path: 'user', select: 'platformAccess licenseTier' });
+
+      await Promise.all(
+        activeMemberships.map(async membership => {
+          if (!membership.user) return;
+
+          const user = membership.user;
+          const licenseTier = user.licenseTier || 'personal';
+          let nextAccess = orgAccess;
+
+          if (licenseTier === 'personal') {
+            nextAccess = orgAccess.filter(id => PERSONAL_ALLOWED_PLATFORMS.has(id));
+          } else if (licenseTier === 'guest') {
+            nextAccess = [];
+          }
+
+          const uniqueNextAccess = Array.from(new Set(nextAccess));
+          const currentAccess = Array.isArray(user.platformAccess) ? user.platformAccess : [];
+
+          if (JSON.stringify(uniqueNextAccess) !== JSON.stringify(currentAccess)) {
+            user.platformAccess = uniqueNextAccess;
+            await user.save();
+          }
+        })
+      );
+
       console.log('[admin] Organization updated via admin API', {
         orgId: organization._id.toString(),
         workosOrganizationId: organization.workosOrganizationId,
