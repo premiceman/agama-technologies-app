@@ -962,6 +962,12 @@ const membershipUpdateSchema = z.object({
   status: z.enum(['active', 'invited', 'suspended', 'removed']).optional()
 });
 
+const adminMembershipSuitesUpdateSchema = z.object({
+  sellerSuiteProvisioned: z.boolean().optional(),
+  buyerSuiteProvisioned: z.boolean().optional(),
+  engagementRoomsProvisioned: z.boolean().optional()
+});
+
 const membershipCreateSchema = z.object({
   email: z.string().email(),
   role: z.enum(['owner', 'admin', 'member', 'viewer']).default('member')
@@ -2312,7 +2318,11 @@ app.get(
           tier: organization.tier,
           productAccess,
           domains: organization.domains || [],
+          sellerSuiteEnabled: Boolean(organization.sellerSuiteEnabled),
+          buyerSuiteEnabled: Boolean(organization.buyerSuiteEnabled),
+          engagementRoomsEnabled: Boolean(organization.engagementRoomsEnabled),
           seatLimit: organization.seatLimit,
+          seatLimits: organization.seatLimits || null,
           seatsUsed,
           memberCount,
           lastActivityAt,
@@ -2325,6 +2335,73 @@ app.get(
     } catch (err) {
       console.error('Agama staff organization overview failed', err);
       return res.status(500).json({ error: 'Unable to load organization overview' });
+    }
+  }
+);
+
+app.patch(
+  '/api/agama-admin/organizations/:orgId/members/:memberId/suites',
+  requireAuth,
+  requireAgamaStaff,
+  requireAdminConsoleUnlocked,
+  validateBody(adminMembershipSuitesUpdateSchema),
+  async (req, res) => {
+    const { orgId, memberId } = req.params;
+    const payload = req.validatedBody;
+
+    try {
+      const organization = await Organization.findById(orgId);
+      if (!organization) {
+        return res.status(404).json({ error: 'Organization not found' });
+      }
+
+      const membership = await OrganizationMembership.findById(memberId).populate('user');
+      if (!membership || membership.organization.toString() !== orgId) {
+        return res.status(404).json({ error: 'Membership not found for this organization' });
+      }
+
+      const user = membership.user;
+
+      // enforce org ceilings: cannot provision suites the org hasn't bought
+      const orgSuites = {
+        sellerSuiteEnabled: Boolean(organization.sellerSuiteEnabled),
+        buyerSuiteEnabled: Boolean(organization.buyerSuiteEnabled),
+        engagementRoomsEnabled: Boolean(organization.engagementRoomsEnabled)
+      };
+
+      if (payload.sellerSuiteProvisioned !== undefined) {
+        if (!orgSuites.sellerSuiteEnabled && payload.sellerSuiteProvisioned) {
+          return res.status(400).json({ error: 'Seller suite is not enabled for this organization.' });
+        }
+        membership.sellerSuiteProvisioned = Boolean(payload.sellerSuiteProvisioned);
+      }
+
+      if (payload.buyerSuiteProvisioned !== undefined) {
+        if (!orgSuites.buyerSuiteEnabled && payload.buyerSuiteProvisioned) {
+          return res.status(400).json({ error: 'Buyer suite is not enabled for this organization.' });
+        }
+        membership.buyerSuiteProvisioned = Boolean(payload.buyerSuiteProvisioned);
+      }
+
+      if (payload.engagementRoomsProvisioned !== undefined) {
+        if (!orgSuites.engagementRoomsEnabled && payload.engagementRoomsProvisioned) {
+          return res.status(400).json({ error: 'Engagement Rooms are not enabled for this organization.' });
+        }
+        membership.engagementRoomsProvisioned = Boolean(payload.engagementRoomsProvisioned);
+      }
+
+      await membership.save();
+
+      const updated = await OrganizationMembership.findById(memberId)
+        .populate({ path: 'user', select: 'name email licenseTier lastLoginAt' });
+
+      return res.json({
+        ok: true,
+        member: serializeMembership(updated)
+      });
+    } catch (err) {
+      console.error('[agama-admin] Update member suites failed', err);
+      return res.status(500).json({ error: 'Unable to update member suites' });
     }
   }
 );
