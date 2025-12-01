@@ -17,7 +17,10 @@ const OrganizationMembershipSchema = new Schema(
       default: 'active'
     },
     roleOrigin: { type: String, enum: ['app', 'idp'], default: 'app' },
-    invitedEmail: { type: String, trim: true }
+    invitedEmail: { type: String, trim: true },
+    sellerSuiteProvisioned: { type: Boolean, default: false },
+    buyerSuiteProvisioned: { type: Boolean, default: false },
+    engagementRoomsProvisioned: { type: Boolean, default: false }
   },
   { timestamps: true }
 );

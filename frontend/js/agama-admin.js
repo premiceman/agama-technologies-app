@@ -742,11 +742,10 @@ function renderOrgAccessTab() {
     return;
   }
 
-  const suites = Array.isArray(org.productAccess)
-    ? org.productAccess
-    : Array.isArray(org.platformAccess)
-      ? org.platformAccess
-      : [];
+  const suites = [];
+  if (org.sellerSuiteEnabled) suites.push('seller');
+  if (org.buyerSuiteEnabled) suites.push('buyer');
+  if (org.engagementRoomsEnabled) suites.push('rooms');
 
   setSelectedSuitesOnTiles('agamaOrgAccessSuites', suites);
 
@@ -768,9 +767,14 @@ async function saveOrgAccessSettings() {
   const seatRaw = seatInput?.value || '';
   const seatLimit = seatRaw ? parseInt(seatRaw, 10) : undefined;
 
-  const productAccess = getSelectedSuitesFromTiles('agamaOrgAccessSuites');
+  const selectedSuites = getSelectedSuitesFromTiles('agamaOrgAccessSuites');
 
-  const payload = { tier, productAccess };
+  const payload = {
+    tier,
+    sellerSuiteEnabled: selectedSuites.includes('seller'),
+    buyerSuiteEnabled: selectedSuites.includes('buyer'),
+    engagementRoomsEnabled: selectedSuites.includes('rooms')
+  };
   if (!Number.isNaN(seatLimit)) {
     payload.seatLimit = seatLimit;
   }
