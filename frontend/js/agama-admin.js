@@ -692,7 +692,7 @@ function renderOrgMembers() {
   if (members.length === 0) {
     const row = document.createElement('tr');
     const cell = document.createElement('td');
-    cell.colSpan = 5;
+    cell.colSpan = 6;
     cell.className = 'text-fg-3';
     cell.textContent = 'No members found for this organisation.';
     row.appendChild(cell);
@@ -720,11 +720,110 @@ function renderOrgMembers() {
     statusCell.textContent = member.status || 'active';
     row.appendChild(statusCell);
 
+    // NEW: access cell
+    const accessCell = document.createElement('td');
+
+    const org = adminState.currentOrgOverview || {};
+    const canSeller = !!org.sellerSuiteEnabled;
+    const canBuyer = !!org.buyerSuiteEnabled;
+    const canRooms = !!org.engagementRoomsEnabled;
+
+    function buildSuiteCheckbox(label, key, enabledForOrg) {
+      const wrapper = document.createElement('label');
+      wrapper.className = 'form-check form-check-inline form-check-sm';
+
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.className = 'form-check-input';
+      input.disabled = !enabledForOrg;
+      input.checked = Boolean(member[key]);
+      input.dataset.suiteKey = key;
+      input.dataset.memberId = member.id;
+      input.dataset.orgId = org.id;
+
+      const span = document.createElement('span');
+      span.className = 'form-check-label';
+      span.textContent = label;
+
+      wrapper.appendChild(input);
+      wrapper.appendChild(span);
+
+      return { wrapper, input };
+    }
+
+    const suiteControls = [];
+
+    suiteControls.push(
+      buildSuiteCheckbox('Vendor', 'sellerSuiteProvisioned', canSeller),
+      buildSuiteCheckbox('Buyer', 'buyerSuiteProvisioned', canBuyer),
+      buildSuiteCheckbox('Rooms', 'engagementRoomsProvisioned', canRooms)
+    );
+
+    suiteControls.forEach(ctrl => {
+      accessCell.appendChild(ctrl.wrapper);
+    });
+
+    row.appendChild(accessCell);
+
     const lastLoginCell = document.createElement('td');
     lastLoginCell.textContent = formatShortDate(member.lastLoginAt);
     row.appendChild(lastLoginCell);
 
     tbody.appendChild(row);
+  });
+
+  // Attach change handlers after table is rendered
+  const checkboxes = tbody.querySelectorAll('input[type="checkbox"][data-suite-key]');
+  checkboxes.forEach(input => {
+    input.addEventListener('change', async event => {
+      const suiteKey = input.dataset.suiteKey;
+      const memberId = input.dataset.memberId;
+      const orgId = input.dataset.orgId;
+      const checked = input.checked;
+
+      if (!suiteKey || !memberId || !orgId) return;
+
+      // Optimistic UI: disable while saving
+      input.disabled = true;
+
+      try {
+        const payload = { [suiteKey]: checked };
+        const res = await fetch(
+          `/api/agama-admin/organizations/${encodeURIComponent(orgId)}/members/${encodeURIComponent(
+            memberId
+          )}/suites`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload)
+          }
+        );
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.ok) {
+          throw new Error(json.error || 'Unable to update member access');
+        }
+
+        const updated = json.member;
+        const idx = adminState.currentOrgMembers.findIndex(m => m.id === updated.id);
+        if (idx >= 0) {
+          adminState.currentOrgMembers[idx] = { ...adminState.currentOrgMembers[idx], ...updated };
+        }
+
+        // Re-render to keep state consistent
+        renderOrgMembers();
+      } catch (err) {
+        console.error('[agama-admin] Failed to update member suites', err);
+        // revert checkbox
+        input.checked = !checked;
+        const feedback = document.getElementById('agamaOrgMembersFeedback');
+        if (feedback) {
+          feedback.textContent = err.message || 'Unable to update member access. Check logs.';
+        }
+      } finally {
+        // The re-render call will recreate inputs, so we don't re-enable here.
+      }
+    });
   });
 
   if (feedback) feedback.textContent = '';
