@@ -503,6 +503,8 @@ function renderOrgOverview() {
     const count = adminState.currentOrgMembers.length;
     badge.textContent = `${count} member${count === 1 ? '' : 's'}`;
   }
+
+  renderOrgAccessTab();
 }
 
 function renderOrgMembers() {
@@ -553,6 +555,76 @@ function renderOrgMembers() {
   if (feedback) feedback.textContent = '';
 }
 
+function renderOrgAccessTab() {
+  const org = adminState.currentOrgOverview;
+  const tierInput = document.getElementById('agamaOrgAccessTier');
+  const seatInput = document.getElementById('agamaOrgAccessSeatLimit');
+
+  if (!org) {
+    setSelectedSuitesOnTiles('agamaOrgAccessSuites', []);
+    if (tierInput) tierInput.value = 'business';
+    if (seatInput) seatInput.value = '';
+    return;
+  }
+
+  const suites = Array.isArray(org.productAccess)
+    ? org.productAccess
+    : Array.isArray(org.platformAccess)
+      ? org.platformAccess
+      : [];
+
+  setSelectedSuitesOnTiles('agamaOrgAccessSuites', suites);
+
+  if (tierInput) tierInput.value = org.tier || 'business';
+  if (seatInput) seatInput.value = org.seatLimit != null ? org.seatLimit : '';
+}
+
+async function saveOrgAccessSettings() {
+  const org = adminState.currentOrgOverview;
+  const feedback = document.getElementById('agamaOrgAccessFeedback');
+  if (!org || !org.id) {
+    if (feedback) feedback.textContent = 'Select an organisation first.';
+    return;
+  }
+
+  const tierInput = document.getElementById('agamaOrgAccessTier');
+  const seatInput = document.getElementById('agamaOrgAccessSeatLimit');
+  const tier = tierInput?.value || org.tier || 'business';
+  const seatRaw = seatInput?.value || '';
+  const seatLimit = seatRaw ? parseInt(seatRaw, 10) : undefined;
+
+  const productAccess = getSelectedSuitesFromTiles('agamaOrgAccessSuites');
+
+  const payload = { tier, productAccess };
+  if (!Number.isNaN(seatLimit)) {
+    payload.seatLimit = seatLimit;
+  }
+
+  try {
+    if (feedback) feedback.textContent = '';
+    const res = await fetch(`/api/admin/organizations/${org.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.ok) {
+      throw new Error(json.error || 'Unable to save access settings.');
+    }
+
+    const updatedOrg = json.organization || {};
+    adminState.currentOrgOverview = { ...org, ...updatedOrg };
+    await loadOrganizations(org.id);
+    await loadOrgOverview(org.id);
+
+    if (feedback) feedback.textContent = 'Access settings saved.';
+  } catch (err) {
+    console.error(err);
+    if (feedback) feedback.textContent = err.message || 'Unable to save access settings.';
+  }
+}
+
 function setOrgTab(tab) {
   adminState.currentOrgTab = tab;
   const tabs = document.querySelectorAll('#agamaOrgTabs [data-org-tab]');
@@ -567,12 +639,22 @@ function setOrgTab(tab) {
     panel.classList.toggle('d-none', panelTab !== tab);
   });
 
-  if (tab === 'members') {
+  if (tab === 'access') {
+    renderOrgAccessTab();
+  } else if (tab === 'members') {
     renderOrgMembers();
   }
 }
 
 function initOrgTabs() {
+  const accessSuites = document.getElementById('agamaOrgAccessSuites');
+  const sourceSuites = document.getElementById('agamaOrgSuites');
+  if (accessSuites && sourceSuites && accessSuites.childElementCount === 0) {
+    accessSuites.innerHTML = sourceSuites.innerHTML;
+  }
+
+  initSuiteTiles('agamaOrgAccessSuites');
+
   const tabs = document.querySelectorAll('#agamaOrgTabs [data-org-tab]');
   tabs.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -580,6 +662,13 @@ function initOrgTabs() {
       setOrgTab(tab);
     });
   });
+
+  const accessSaveBtn = document.getElementById('agamaOrgAccessSave');
+  if (accessSaveBtn) {
+    accessSaveBtn.addEventListener('click', async () => {
+      await saveOrgAccessSettings();
+    });
+  }
 }
 
 function populateAuditOrgFilter() {

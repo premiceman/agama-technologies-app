@@ -395,8 +395,42 @@
                   <div class="form-text small" id="agamaOrgMembersFeedback"></div>
                 </div>
 
-                <!-- Access, SSO, Audit tab panels will be filled in later prompts -->
-                <div class="org-tab-panel d-none" data-org-tab-panel="access" id="agamaOrgAccessPanel"></div>
+                <div class="org-tab-panel d-none" data-org-tab-panel="access" id="agamaOrgAccessPanel">
+                  <div class="row g-4">
+                    <div class="col-lg-6">
+                      <h3 class="h6 mb-2">Suites &amp; access</h3>
+                      <p class="text-fg-3 small mb-2">
+                        Control which Agama suites this organisation is entitled to use.
+                      </p>
+                      <div class="suite-tile-grid" id="agamaOrgAccessSuites"></div>
+                      <div class="form-text small" id="agamaOrgAccessFeedback"></div>
+                    </div>
+                    <div class="col-lg-6">
+                      <h3 class="h6 mb-2">License &amp; seats</h3>
+                      <div class="mb-3">
+                        <label class="form-label small" for="agamaOrgAccessTier">Tier</label>
+                        <select class="form-select form-select-sm" id="agamaOrgAccessTier">
+                          <option value="business">Business</option>
+                          <option value="personal">Personal</option>
+                        </select>
+                      </div>
+                      <div class="mb-3">
+                        <label class="form-label small" for="agamaOrgAccessSeatLimit">Seat limit</label>
+                        <input
+                          class="form-control form-control-sm"
+                          id="agamaOrgAccessSeatLimit"
+                          type="number"
+                          min="1"
+                          step="1"
+                        />
+                        <div class="form-text small">Maximum number of active seats for this organisation.</div>
+                      </div>
+                      <button class="btn btn-primary btn-sm" type="button" id="agamaOrgAccessSave">
+                        Save access settings
+                      </button>
+                    </div>
+                  </div>
+                </div>
                 <div class="org-tab-panel d-none" data-org-tab-panel="sso" id="agamaOrgSsoPanel"></div>
                 <div class="org-tab-panel d-none" data-org-tab-panel="audit" id="agamaOrgAuditPanel"></div>
               </div>
