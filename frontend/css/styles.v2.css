@@ -174,6 +174,104 @@ a:hover{text-decoration:none;color:var(--accent);}
   border-radius: 1rem;
 }
 
+.glass-subtle {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, .02));
+  border: 1px solid rgba(255, 255, 255, .06);
+  border-radius: 1rem;
+  backdrop-filter: blur(6px);
+}
+
+.stat-card {
+  background: var(--bg-surface);
+  border: 1px solid rgba(255, 255, 255, .06);
+  border-radius: 1rem;
+  padding: 1rem 1.25rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
+}
+
+.stat-label {
+  font-size: .85rem;
+  color: var(--text-muted);
+  letter-spacing: .3px;
+  text-transform: uppercase;
+}
+
+.stat-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.stat-subtext {
+  color: var(--text-muted);
+  font-size: .9rem;
+}
+
+.action-tile {
+  display: flex;
+  gap: .75rem;
+  align-items: center;
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: .9rem;
+  padding: .85rem 1rem;
+  cursor: pointer;
+  transition: transform .2s ease, border-color .2s ease, background .2s ease;
+}
+
+.action-tile:hover,
+.action-tile:focus-visible {
+  transform: translateY(-1px);
+  border-color: var(--accent-soft);
+  background: rgba(255, 255, 255, .06);
+}
+
+.action-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: .75rem;
+  display: grid;
+  place-items: center;
+  font-size: 1.2rem;
+}
+
+.table-modern {
+  --table-border: rgba(255, 255, 255, .08);
+  color: var(--fg);
+  border-color: var(--table-border);
+}
+
+.table-modern thead {
+  background: linear-gradient(90deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .03));
+}
+
+.table-modern th {
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-color: var(--table-border);
+}
+
+.table-modern td {
+  border-color: var(--table-border);
+}
+
+.table-modern tbody tr:hover {
+  background: rgba(255, 255, 255, .03);
+}
+
+.table-row-link {
+  cursor: pointer;
+}
+
+.pill-soft {
+  display: inline-block;
+  padding: .15rem .55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .08);
+  color: var(--text-secondary);
+  font-size: .85rem;
+}
+
 .app-shell {
   display: flex;
   gap: 1.5rem;
