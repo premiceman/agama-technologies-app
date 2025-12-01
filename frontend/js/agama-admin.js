@@ -126,6 +126,9 @@ async function refreshAdminData() {
       await loadOrganizations(adminState.selectedOrg?.id || null);
       if (adminState.currentOrgId) {
         await loadOrgOverview(adminState.currentOrgId);
+        if (adminState.currentOrgTab === 'audit') {
+          await loadOrgAudit(adminState.currentOrgId);
+        }
       }
     } else if (adminState.currentView === 'audit') {
       await fetchAuditLog();
@@ -174,7 +177,7 @@ function formatActor(actor) {
   return actor.name || actor.email || 'Unknown';
 }
 
-function eventLabel(type) {
+function formatEventLabel(type) {
   const labels = {
     'org.member.added': 'Member invited',
     'org.member.updated': 'Member updated',
@@ -447,6 +450,65 @@ async function loadOrgOverview(orgId) {
   }
 }
 
+async function loadOrgAudit(orgId) {
+  const tbody = document.getElementById('agamaOrgAuditRows');
+  if (!tbody || !orgId) return;
+  tbody.innerHTML = '';
+
+  try {
+    const res = await fetch(`/api/agama-admin/audit?orgId=${encodeURIComponent(orgId)}`, {
+      credentials: 'include'
+    });
+    const json = await res.json();
+    if (!res.ok || !json.ok) {
+      throw new Error(json.error || 'Unable to load audit log');
+    }
+
+    const events = json.events || [];
+    if (events.length === 0) {
+      const row = document.createElement('tr');
+      const cell = document.createElement('td');
+      cell.colSpan = 4;
+      cell.className = 'text-fg-3';
+      cell.textContent = 'No recent events.';
+      row.appendChild(cell);
+      tbody.appendChild(row);
+      return;
+    }
+
+    events.forEach(event => {
+      const row = document.createElement('tr');
+
+      const whenCell = document.createElement('td');
+      whenCell.textContent = formatShortDate(event.createdAt);
+      row.appendChild(whenCell);
+
+      const typeCell = document.createElement('td');
+      typeCell.textContent = formatEventLabel(event.type);
+      row.appendChild(typeCell);
+
+      const actorCell = document.createElement('td');
+      actorCell.textContent = formatActor(event.actorUser);
+      row.appendChild(actorCell);
+
+      const summaryCell = document.createElement('td');
+      summaryCell.textContent = buildSummary(event);
+      row.appendChild(summaryCell);
+
+      tbody.appendChild(row);
+    });
+  } catch (err) {
+    console.error(err);
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = 4;
+    cell.className = 'text-fg-3';
+    cell.textContent = 'Unable to load audit events.';
+    row.appendChild(cell);
+    tbody.appendChild(row);
+  }
+}
+
 function renderOrgOverview() {
   const org = adminState.currentOrgOverview;
   const nameEl = document.getElementById('agamaOrgDetailName');
@@ -643,6 +705,8 @@ function setOrgTab(tab) {
     renderOrgAccessTab();
   } else if (tab === 'members') {
     renderOrgMembers();
+  } else if (tab === 'audit' && adminState.currentOrgId) {
+    loadOrgAudit(adminState.currentOrgId);
   }
 }
 
@@ -701,7 +765,7 @@ function renderAuditEvents() {
     row.innerHTML = `
       <td class="text-nowrap">${formatDate(event.createdAt)}</td>
       <td>${formatActor(event.actorUser)}</td>
-      <td>${eventLabel(event.type)}</td>
+      <td>${formatEventLabel(event.type)}</td>
       <td>${buildSummary(event)}</td>
     `;
     tbody.appendChild(row);

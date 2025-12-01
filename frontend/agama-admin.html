@@ -431,8 +431,55 @@
                     </div>
                   </div>
                 </div>
-                <div class="org-tab-panel d-none" data-org-tab-panel="sso" id="agamaOrgSsoPanel"></div>
-                <div class="org-tab-panel d-none" data-org-tab-panel="audit" id="agamaOrgAuditPanel"></div>
+                <div class="org-tab-panel d-none" data-org-tab-panel="sso" id="agamaOrgSsoPanel">
+                  <h3 class="h6 mb-2">SSO &amp; Groups</h3>
+                  <p class="text-fg-3 small mb-3">
+                    This tab will surface WorkOS SSO connections and directory groups for this organisation.
+                  </p>
+                  <div class="table-responsive">
+                    <table class="table align-middle text-sm mb-0">
+                      <thead>
+                        <tr>
+                          <th>Group</th>
+                          <th>WorkOS Group ID</th>
+                          <th>Members</th>
+                          <th>Mapped role</th>
+                          <th>Mapped suites</th>
+                        </tr>
+                      </thead>
+                      <tbody id="agamaOrgSsoGroupsRows">
+                        <tr>
+                          <td colspan="5" class="text-fg-3">
+                            Group mappings not yet configured. Future work: fetch SSO groups from WorkOS and allow admin mappings here.
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div class="org-tab-panel d-none" data-org-tab-panel="audit" id="agamaOrgAuditPanel">
+                  <h3 class="h6 mb-2">Audit &amp; activity</h3>
+                  <p class="text-fg-3 small mb-3">
+                    Recent actions related to this organisation (members, access, and console events).
+                  </p>
+                  <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>When</th>
+                          <th>Event</th>
+                          <th>Actor</th>
+                          <th>Details</th>
+                        </tr>
+                      </thead>
+                      <tbody id="agamaOrgAuditRows">
+                        <tr>
+                          <td colspan="4" class="text-fg-3">Loading events…</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             </section>
 
