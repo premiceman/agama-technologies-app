@@ -86,7 +86,13 @@
   }
 
   const state = loadState();
-  const accountContext = { user: null, usageLimits: {}, effectiveLicense: null, organizationContext: null };
+  const accountContext = {
+    user: null,
+    usageLimits: {},
+    effectiveLicense: null,
+    organizationContext: null,
+    suiteEntitlements: null
+  };
 
   const areaList = document.getElementById('areaList');
   const templateForm = document.getElementById('templateForm');
@@ -151,6 +157,7 @@
       accountContext.usageLimits = json.usageLimits || { valueAssessments: computeLocalAssessmentLimit(json.user) };
       accountContext.effectiveLicense = json.effectiveLicense || null;
       accountContext.organizationContext = json.organizationContext || null;
+      accountContext.suiteEntitlements = json.suiteEntitlements || null;
       return true;
     } catch (err) {
       console.error('Unable to load account context', err);
@@ -158,25 +165,31 @@
     }
   }
 
+  function getSuiteCapabilities() {
+    const suites = accountContext.suiteEntitlements || {};
+    const effective = suites.effective || {};
+    return {
+      canUseSellerSuite: Boolean(effective.sellerSuite),
+      canUseBuyerSuite: Boolean(effective.buyerSuite),
+      canUseRooms: Boolean(effective.engagementRooms)
+    };
+  }
+
   function computeInitialMode() {
+    const { canUseSellerSuite, canUseBuyerSuite } = getSuiteCapabilities();
     const userMode = accountContext.user?.valuesphereMode;
-    if (userMode === 'vendor' || userMode === 'buyer') return userMode;
 
-    const effectiveTier = accountContext.effectiveLicense?.tier;
-    if (effectiveTier === 'personal') return 'vendor';
-
-    const orgType = (accountContext.effectiveLicense?.homeOrg?.orgType || accountContext.organizationContext?.orgType || '')
-      .toLowerCase();
-    const productAccess = Array.isArray(accountContext.organizationContext?.productAccess)
-      ? accountContext.organizationContext.productAccess
-      : Array.isArray(accountContext.organizationContext?.platformAccess)
-        ? accountContext.organizationContext.platformAccess
-        : [];
-
-    if ((orgType === 'buyer' || orgType === 'both') && productAccess.includes('procurepath')) {
-      return 'buyer';
+    // If both suites are available, honour stored mode if valid.
+    if (canUseSellerSuite && canUseBuyerSuite) {
+      if (userMode === 'vendor' || userMode === 'buyer') return userMode;
+      return 'vendor';
     }
 
+    // If only one side is available, force that mode.
+    if (canUseSellerSuite) return 'vendor';
+    if (canUseBuyerSuite) return 'buyer';
+
+    // No suites available: default to vendor but we will show an error/empty state.
     return 'vendor';
   }
 
@@ -1162,8 +1175,26 @@
     const authed = await ensureAuthenticated();
     if (!authed) return;
     hydrateBuyerStateFromContext();
+    const { canUseSellerSuite, canUseBuyerSuite } = getSuiteCapabilities();
+
+    // Control visibility of mode toggle buttons based on provisioning
+    if (vsModeVendorBtn) {
+      vsModeVendorBtn.classList.toggle('d-none', !canUseSellerSuite);
+    }
+    if (vsModeBuyerBtn) {
+      vsModeBuyerBtn.classList.toggle('d-none', !canUseBuyerSuite);
+    }
+
     const initialMode = computeInitialMode();
-    setMode(initialMode, { persist: false });
+    setMode(initialMode, { persist: true });
+
+    if (!canUseSellerSuite && !canUseBuyerSuite) {
+      // Optionally, show some helper text indicating no access.
+      if (vsBuyerVendorHelper) {
+        vsBuyerVendorHelper.textContent =
+          'Your organisation has not provisioned you for the Seller or Buyer suites yet. Ask your admin to grant access.';
+      }
+    }
     bindAreaEvents();
     render();
     if (templateForm || areaList) {

@@ -460,6 +460,35 @@ function computeEffectiveLicense(user, organizationContext) {
   return { tier: 'personal', homeOrg: null };
 }
 
+function buildSuiteEntitlements(user, orgContext, membership) {
+  const isGuest = user?.licenseTier === 'guest';
+
+  const orgSuites = {
+    sellerSuiteEnabled: Boolean(orgContext?.sellerSuiteEnabled),
+    buyerSuiteEnabled: Boolean(orgContext?.buyerSuiteEnabled),
+    engagementRoomsEnabled: Boolean(orgContext?.engagementRoomsEnabled)
+  };
+
+  const membershipSuites = {
+    sellerSuiteProvisioned: Boolean(membership?.sellerSuiteProvisioned),
+    buyerSuiteProvisioned: Boolean(membership?.buyerSuiteProvisioned),
+    engagementRoomsProvisioned: Boolean(membership?.engagementRoomsProvisioned)
+  };
+
+  const effective = {
+    sellerSuite: orgSuites.sellerSuiteEnabled && membershipSuites.sellerSuiteProvisioned && !isGuest,
+    buyerSuite: orgSuites.buyerSuiteEnabled && membershipSuites.buyerSuiteProvisioned && !isGuest,
+    // Guests allowed for Rooms if org + membership allow it
+    engagementRooms: orgSuites.engagementRoomsEnabled && membershipSuites.engagementRoomsProvisioned
+  };
+
+  return {
+    org: orgSuites,
+    membership: membershipSuites,
+    effective
+  };
+}
+
 function recommendLicensePlan(persona, goals = []) {
   if (persona === 'consultant') return 'consulting-enterprise';
   if (persona === 'vendor' || persona === 'both') return 'vendor-enterprise';
@@ -625,6 +654,16 @@ async function buildOrganizationContext(user, orgId, { includeSeatDetails = fals
     tier: organization.tier,
     orgType: organization.orgType || 'both',
     role: membership.role
+  };
+
+  context.sellerSuiteEnabled = Boolean(organization.sellerSuiteEnabled);
+  context.buyerSuiteEnabled = Boolean(organization.buyerSuiteEnabled);
+  context.engagementRoomsEnabled = Boolean(organization.engagementRoomsEnabled);
+
+  context.membershipSuites = {
+    sellerSuiteProvisioned: Boolean(membership.sellerSuiteProvisioned),
+    buyerSuiteProvisioned: Boolean(membership.buyerSuiteProvisioned),
+    engagementRoomsProvisioned: Boolean(membership.engagementRoomsProvisioned)
   };
 
   if (includeSeatDetails) {
@@ -962,7 +1001,12 @@ function serializeMembership(membership) {
     status,
     licenseTier: user.licenseTier || null,
     lastLoginAt: user.lastLoginAt || null,
-    createdAt: membership.createdAt
+    createdAt: membership.createdAt,
+
+    // NEW: provisioning flags from membership
+    sellerSuiteProvisioned: Boolean(membership.sellerSuiteProvisioned),
+    buyerSuiteProvisioned: Boolean(membership.buyerSuiteProvisioned),
+    engagementRoomsProvisioned: Boolean(membership.engagementRoomsProvisioned)
   };
 }
 
@@ -1915,6 +1959,18 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
       organizationContext = await buildOrganizationContext(user, user.defaultOrganization, { includeSeatDetails: true });
     }
 
+    let suiteEntitlements = null;
+    if (organizationContext) {
+      // We need to find the membership tied to this org to compute suites.
+      const homeMembership = await OrganizationMembership.findOne({
+        user: user._id,
+        organization: organizationContext.id,
+        status: { $ne: 'removed' }
+      });
+
+      suiteEntitlements = buildSuiteEntitlements(user, organizationContext, homeMembership);
+    }
+
     const effectiveLicense = computeEffectiveLicense(user, organizationContext);
     const usageLimits = { valueAssessments: computeAssessmentLimit(user) };
 
@@ -1945,7 +2001,8 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
       organizationContext,
       memberships: membershipsPayload,
       effectiveLicense,
-      usageLimits
+      usageLimits,
+      suiteEntitlements
     });
   } catch (err) {
     console.error(err);
@@ -2584,7 +2641,11 @@ app.get('/api/org/current', requireAuth, async (req, res) => {
           id: organization._id.toString(),
           name: organization.name,
           orgType: organization.orgType || 'both',
-          productAccess
+          productAccess,
+          sellerSuiteEnabled: Boolean(organization.sellerSuiteEnabled),
+          buyerSuiteEnabled: Boolean(organization.buyerSuiteEnabled),
+          engagementRoomsEnabled: Boolean(organization.engagementRoomsEnabled),
+          seatLimits: organization.seatLimits || null
         };
 
         orgContext = {
@@ -2594,11 +2655,25 @@ app.get('/api/org/current', requireAuth, async (req, res) => {
           orgType: organization.orgType || 'both',
           role: membership.role
         };
+
+        orgContext.sellerSuiteEnabled = Boolean(organization.sellerSuiteEnabled);
+        orgContext.buyerSuiteEnabled = Boolean(organization.buyerSuiteEnabled);
+        orgContext.engagementRoomsEnabled = Boolean(organization.engagementRoomsEnabled);
       }
     }
 
     const licenseTier = user.licenseTier || 'personal';
     const effectiveLicense = computeEffectiveLicense(user, orgContext);
+
+    let suiteEntitlements = null;
+    if (orgContext) {
+      const membership = await OrganizationMembership.findOne({
+        organization: orgContext.id,
+        user: user._id,
+        status: 'active'
+      });
+      suiteEntitlements = buildSuiteEntitlements(user, orgContext, membership);
+    }
 
     res.json({
       ok: true,
@@ -2610,7 +2685,8 @@ app.get('/api/org/current', requireAuth, async (req, res) => {
         licenseTier
       },
       effectiveLicenseTier: effectiveLicense.tier,
-      homeOrganization: effectiveLicense.homeOrg
+      homeOrganization: effectiveLicense.homeOrg,
+      suiteEntitlements
     });
   } catch (err) {
     console.error('Org current error', err);
@@ -3161,6 +3237,15 @@ app.patch(
       if (payload.platformAccess) organization.platformAccess = payload.platformAccess;
       if (payload.seatLimit !== undefined) organization.seatLimit = payload.seatLimit;
       if (payload.domains !== undefined) organization.domains = payload.domains;
+      if (payload.sellerSuiteEnabled !== undefined) {
+        organization.sellerSuiteEnabled = Boolean(payload.sellerSuiteEnabled);
+      }
+      if (payload.buyerSuiteEnabled !== undefined) {
+        organization.buyerSuiteEnabled = Boolean(payload.buyerSuiteEnabled);
+      }
+      if (payload.engagementRoomsEnabled !== undefined) {
+        organization.engagementRoomsEnabled = Boolean(payload.engagementRoomsEnabled);
+      }
       if (payload.workosOrganizationId !== undefined) {
         organization.workosOrganizationId = payload.workosOrganizationId || undefined;
       }
@@ -3220,7 +3305,11 @@ app.patch(
           platformAccess: organization.platformAccess,
           seatLimit: organization.seatLimit,
           domains: organization.domains,
-          workosOrganizationId: organization.workosOrganizationId
+          workosOrganizationId: organization.workosOrganizationId,
+          sellerSuiteEnabled: organization.sellerSuiteEnabled,
+          buyerSuiteEnabled: organization.buyerSuiteEnabled,
+          engagementRoomsEnabled: organization.engagementRoomsEnabled,
+          seatLimits: organization.seatLimits
         }
       });
 

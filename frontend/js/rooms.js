@@ -11,7 +11,8 @@ const state = {
   deliverables: [],
   files: [],
   selectedFileId: null,
-  assignees: []
+  assignees: [],
+  suiteEntitlements: null
 };
 
 async function fetchJson(url, options = {}) {
@@ -46,13 +47,38 @@ function licenseLabel(tier) {
 }
 
 function roomsEntitlement() {
-  const tier = state.effectiveLicenseTier || state.orgContext?.tier || state.user?.licenseTier || 'personal';
-  if (state.isGuest) return { allowed: true };
-  if (tier === 'business') return { allowed: true };
+  const suites = state.suiteEntitlements || {};
+  const effective = suites.effective || {};
+  const org = suites.org || {};
+  const membership = suites.membership || {};
+  const isGuest = state.user?.licenseTier === 'guest';
+
+  if (effective.engagementRooms) {
+    return { allowed: true };
+  }
+
+  // More precise feedback:
+  if (!org.engagementRoomsEnabled) {
+    return {
+      allowed: false,
+      reason:
+        'Engagement Rooms are not enabled for this organisation yet. Talk to Agama to switch them on for your workspace.'
+    };
+  }
+
+  if (!membership.engagementRoomsProvisioned) {
+    return {
+      allowed: false,
+      reason:
+        'Engagement Rooms are enabled for your organisation, but your user is not provisioned for access yet. Ask your workspace admin to grant you access.'
+    };
+  }
+
+  // Fallback
   return {
     allowed: false,
     reason:
-      'Engagement Rooms are part of Agama Business workspaces. Talk to us to switch it on and unify every buyer conversation.'
+      'Engagement Rooms are part of advanced Agama workspaces. Talk to us to switch it on and unify every buyer conversation.'
   };
 }
 
@@ -131,6 +157,7 @@ async function initRoomsPage() {
     state.user = orgResp.user;
     state.effectiveLicenseTier = orgResp.effectiveLicenseTier || orgResp.effectiveLicense?.tier;
     state.isGuest = orgResp.user?.licenseTier === 'guest';
+    state.suiteEntitlements = orgResp.suiteEntitlements || null;
 
     const entitlement = roomsEntitlement();
     if (!entitlement.allowed) {
