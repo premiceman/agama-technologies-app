@@ -3,6 +3,7 @@ const adminState = {
   unlocked: false,
   organizations: [],
   selectedOrg: null,
+  currentView: 'overview',
   saving: false,
   auditEvents: [],
   auditFilters: {
@@ -47,6 +48,16 @@ function setDisplay(el, show) {
   el.hidden = !show;
 }
 
+function formatShortDate(value) {
+  if (!value) return 'Never';
+  const date = new Date(value);
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+}
+
 function showAccessDenied(message) {
   const denied = document.getElementById('adminAccessDenied');
   const lockedCard = document.getElementById('adminLockedCard');
@@ -75,6 +86,74 @@ function setUnlockedState() {
   setDisplay(denied, false);
   setDisplay(lockedCard, false);
   setDisplay(content, true);
+}
+
+function setAdminView(view) {
+  adminState.currentView = view;
+  const nav = document.getElementById('agamaAdminNav');
+  if (nav) {
+    const items = nav.querySelectorAll('.subnav-item');
+    items.forEach(btn => {
+      const btnView = btn.getAttribute('data-admin-view');
+      btn.classList.toggle('is-active', btnView === view);
+    });
+  }
+
+  // For now, we only have "overview" and "organizations" sharing the same UI.
+  // Both should load the organisations overview table.
+  if (view === 'overview' || view === 'organizations') {
+    loadOrganizations();
+  } else if (view === 'audit') {
+    fetchAuditLog();
+  } else {
+    loadOrganizations();
+  }
+}
+
+async function refreshAdminData() {
+  if (adminState.saving) return;
+  const btn = document.getElementById('adminRefreshBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.classList.add('is-loading');
+  }
+  try {
+    if (adminState.currentView === 'overview' || adminState.currentView === 'organizations') {
+      await loadOrganizations(adminState.selectedOrg?.id || null);
+    } else if (adminState.currentView === 'audit') {
+      await fetchAuditLog();
+    } else {
+      await loadOrganizations(adminState.selectedOrg?.id || null);
+    }
+  } catch (err) {
+    console.error('Admin refresh failed', err);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.classList.remove('is-loading');
+    }
+  }
+}
+
+function initAdminNav() {
+  const nav = document.getElementById('agamaAdminNav');
+  if (nav) {
+    const items = nav.querySelectorAll('.subnav-item');
+    items.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const view = btn.getAttribute('data-admin-view') || 'overview';
+        setAdminView(view);
+      });
+    });
+  }
+
+  const refreshBtn = document.getElementById('adminRefreshBtn');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', event => {
+      event.preventDefault();
+      refreshAdminData();
+    });
+  }
 }
 
 function formatDate(value) {
@@ -194,10 +273,31 @@ function renderOrganizations(list) {
   const tbody = document.getElementById('agamaOrgRows');
   if (!tbody) return;
   tbody.innerHTML = '';
-  if (!Array.isArray(list) || list.length === 0) {
+  const sortSelect = document.getElementById('agamaOrgSort');
+  const sortMode = sortSelect?.value || 'utilisation';
+
+  const sorted = Array.isArray(list) ? [...list] : [];
+  sorted.sort((a, b) => {
+    const utilA = a.seatLimit > 0 ? (a.seatsUsed || 0) / a.seatLimit : 0;
+    const utilB = b.seatLimit > 0 ? (b.seatsUsed || 0) / b.seatLimit : 0;
+
+    switch (sortMode) {
+      case 'name':
+        return (a.name || '').localeCompare(b.name || '');
+      case 'createdAt':
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      case 'lastActivity':
+        return new Date(b.lastActivityAt || 0) - new Date(a.lastActivityAt || 0);
+      case 'utilisation':
+      default:
+        return utilB - utilA;
+    }
+  });
+
+  if (!sorted.length) {
     const row = document.createElement('tr');
     const cell = document.createElement('td');
-    cell.colSpan = 7;
+    cell.colSpan = 10;
     cell.className = 'text-fg-3';
     cell.textContent = 'No organisations found.';
     row.appendChild(cell);
@@ -205,32 +305,66 @@ function renderOrganizations(list) {
     return;
   }
 
-  list.forEach(org => {
+  sorted.forEach(org => {
     const row = document.createElement('tr');
     const products = Array.isArray(org.productAccess) ? org.productAccess.join(', ') : '';
     const seatsLabel = `${org.seatsUsed ?? 0} / ${org.seatLimit ?? '—'}`;
-    const workosId = org.workosOrganizationId || '-';
     row.classList.toggle('table-active', adminState.selectedOrg?.id === org.id);
-    row.innerHTML = `
-      <td>${org.name || '-'}</td>
-      <td>${org.tier || '-'}</td>
-      <td>${org.orgType || '-'}</td>
-      <td>${products || '-'}</td>
-      <td>${seatsLabel}</td>
-      <td class="text-truncate" title="${workosId}">${workosId}</td>
-      <td class="text-end">
-        <button class="btn btn-outline-light btn-sm" data-org-id="${org.id}" type="button">Edit</button>
-      </td>
-    `;
+    const workosId = org.workosOrganizationId || '-';
+
+    const nameCell = document.createElement('td');
+    nameCell.textContent = org.name || '-';
+    row.appendChild(nameCell);
+
+    const tierCell = document.createElement('td');
+    tierCell.textContent = org.tier || '-';
+    row.appendChild(tierCell);
+
+    const typeCell = document.createElement('td');
+    typeCell.textContent = org.orgType || '-';
+    row.appendChild(typeCell);
+
+    const suitesCell = document.createElement('td');
+    suitesCell.textContent = products || '-';
+    row.appendChild(suitesCell);
+
+    const seatsCell = document.createElement('td');
+    seatsCell.textContent = seatsLabel;
+    row.appendChild(seatsCell);
+
+    const membersCell = document.createElement('td');
+    membersCell.textContent = typeof org.memberCount === 'number' ? org.memberCount : '-';
+    row.appendChild(membersCell);
+
+    const lastActivityCell = document.createElement('td');
+    lastActivityCell.textContent = formatShortDate(org.lastActivityAt);
+    row.appendChild(lastActivityCell);
+
+    const ssoCell = document.createElement('td');
+    ssoCell.textContent = org.ssoEnabled ? 'Enabled' : 'None';
+    row.appendChild(ssoCell);
+
+    const workosCell = document.createElement('td');
+    workosCell.className = 'text-truncate';
+    workosCell.title = workosId;
+    workosCell.textContent = workosId;
+    row.appendChild(workosCell);
+
+    const actionsCell = document.createElement('td');
+    actionsCell.className = 'text-end';
+    const editBtn = document.createElement('button');
+    editBtn.className = 'btn btn-outline-light btn-sm';
+    editBtn.type = 'button';
+    editBtn.dataset.orgId = org.id;
+    editBtn.textContent = 'Edit';
+    actionsCell.appendChild(editBtn);
+    row.appendChild(actionsCell);
 
     row.addEventListener('click', () => populateOrgEditor(org));
-    const editBtn = row.querySelector('button[data-org-id]');
-    if (editBtn) {
-      editBtn.addEventListener('click', event => {
-        event.stopPropagation();
-        populateOrgEditor(org);
-      });
-    }
+    editBtn.addEventListener('click', event => {
+      event.stopPropagation();
+      populateOrgEditor(org);
+    });
     tbody.appendChild(row);
   });
 }
@@ -306,7 +440,7 @@ async function loadStatus() {
     adminState.unlocked = json.unlocked === true;
     if (adminState.unlocked) {
       setUnlockedState();
-      await loadOrganizations();
+      setAdminView('overview');
     } else {
       setLockedState();
     }
@@ -428,7 +562,7 @@ async function unlockConsole(secret) {
 
     adminState.unlocked = true;
     setUnlockedState();
-    await loadOrganizations();
+    setAdminView('overview');
   } catch (err) {
     console.error(err);
     if (errorEl) errorEl.textContent = 'Unable to unlock admin console. Please retry.';
@@ -495,6 +629,13 @@ function initHandlers() {
     });
   }
 
+  const sortSelect = document.getElementById('agamaOrgSort');
+  if (sortSelect) {
+    sortSelect.addEventListener('change', () => {
+      renderOrganizations(adminState.organizations || []);
+    });
+  }
+
   const auditForm = document.getElementById('auditFilters');
   if (auditForm) {
     auditForm.addEventListener('submit', event => {
@@ -529,5 +670,6 @@ function initHandlers() {
 
 document.addEventListener('DOMContentLoaded', () => {
   initHandlers();
+  initAdminNav();
   initAdminConsole();
 });

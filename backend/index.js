@@ -2156,22 +2156,45 @@ app.get(
       const organizations = await Organization.find({}).sort({ createdAt: -1 });
       const payload = await Promise.all(
         organizations.map(async org => {
-          const seatsUsed = await OrganizationMembership.countActiveSeats(org._id);
+          const memberships = await OrganizationMembership.find({
+            organization: org._id,
+            status: { $ne: 'removed' }
+          }).populate({
+            path: 'user',
+            select: 'lastLoginAt'
+          });
+
+          const memberCount = memberships.length;
+          const seatsUsed = memberships.filter(m => m.status === 'active').length;
+
+          let lastActivityAt = null;
+          for (const m of memberships) {
+            const ts = m.user?.lastLoginAt;
+            if (ts && (!lastActivityAt || ts > lastActivityAt)) {
+              lastActivityAt = ts;
+            }
+          }
+
+          const productAccess = Array.isArray(org.productAccess)
+            ? org.productAccess
+            : Array.isArray(org.platformAccess)
+              ? org.platformAccess
+              : [];
+
           return {
             id: org._id.toString(),
             name: org.name,
             slug: org.slug,
             tier: org.tier,
             orgType: org.orgType || 'both',
-            productAccess: Array.isArray(org.productAccess)
-              ? org.productAccess
-              : Array.isArray(org.platformAccess)
-                ? org.platformAccess
-                : [],
+            productAccess,
             domains: Array.isArray(org.domains) ? org.domains : [],
             seatLimit: org.seatLimit,
             seatsUsed,
-            workosOrganizationId: org.workosOrganizationId,
+            memberCount,
+            lastActivityAt,
+            workosOrganizationId: org.workosOrganizationId || null,
+            ssoEnabled: Boolean(org.workosOrganizationId),
             createdAt: org.createdAt
           };
         })
