@@ -3,6 +3,7 @@ const adminState = {
   unlocked: false,
   organizations: [],
   selectedOrg: null,
+  currentView: 'overview',
   saving: false,
   auditEvents: [],
   auditFilters: {
@@ -75,6 +76,70 @@ function setUnlockedState() {
   setDisplay(denied, false);
   setDisplay(lockedCard, false);
   setDisplay(content, true);
+}
+
+function setAdminView(view) {
+  adminState.currentView = view;
+  const nav = document.getElementById('agamaAdminNav');
+  if (nav) {
+    const items = nav.querySelectorAll('.subnav-item');
+    items.forEach(btn => {
+      const btnView = btn.getAttribute('data-admin-view');
+      btn.classList.toggle('is-active', btnView === view);
+    });
+  }
+
+  // For now, we only have "overview" and "organizations" sharing the same UI.
+  // Both should load the organisations overview table.
+  if (view === 'overview' || view === 'organizations') {
+    loadOrganizations();
+  }
+}
+
+async function refreshAdminData() {
+  if (adminState.saving) return;
+  const btn = document.getElementById('adminRefreshBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.classList.add('is-loading');
+  }
+  try {
+    if (adminState.currentView === 'overview' || adminState.currentView === 'organizations') {
+      await loadOrganizations(adminState.selectedOrg?.id || null);
+    } else if (adminState.currentView === 'audit') {
+      await fetchAuditLog();
+    } else {
+      await loadOrganizations(adminState.selectedOrg?.id || null);
+    }
+  } catch (err) {
+    console.error('Admin refresh failed', err);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.classList.remove('is-loading');
+    }
+  }
+}
+
+function initAdminNav() {
+  const nav = document.getElementById('agamaAdminNav');
+  if (nav) {
+    const items = nav.querySelectorAll('.subnav-item');
+    items.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const view = btn.getAttribute('data-admin-view') || 'overview';
+        setAdminView(view);
+      });
+    });
+  }
+
+  const refreshBtn = document.getElementById('adminRefreshBtn');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', event => {
+      event.preventDefault();
+      refreshAdminData();
+    });
+  }
 }
 
 function formatDate(value) {
@@ -306,7 +371,7 @@ async function loadStatus() {
     adminState.unlocked = json.unlocked === true;
     if (adminState.unlocked) {
       setUnlockedState();
-      await loadOrganizations();
+      setAdminView('overview');
     } else {
       setLockedState();
     }
@@ -428,7 +493,7 @@ async function unlockConsole(secret) {
 
     adminState.unlocked = true;
     setUnlockedState();
-    await loadOrganizations();
+    setAdminView('overview');
   } catch (err) {
     console.error(err);
     if (errorEl) errorEl.textContent = 'Unable to unlock admin console. Please retry.';
@@ -529,5 +594,6 @@ function initHandlers() {
 
 document.addEventListener('DOMContentLoaded', () => {
   initHandlers();
+  initAdminNav();
   initAdminConsole();
 });
