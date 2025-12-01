@@ -167,7 +167,7 @@
           </div>
 
           <div class="card glass p-4 d-none" id="adminContent">
-            <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
               <div>
                 <h1 class="h5 mb-0">Agama Admin Console</h1>
                 <div class="text-fg-3 small">Internal tools for Agama staff. Configure organisations and access controls.</div>
@@ -180,134 +180,222 @@
               </div>
             </div>
 
-            <div class="row g-3">
-              <div class="col-lg-7">
-                <div class="card glass p-3 h-100">
-                  <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h2 class="h6 mb-0">Organisations</h2>
-                    <div class="d-flex align-items-center gap-2 small">
-                      <span class="text-fg-3">Sort by</span>
-                      <select class="form-select form-select-sm w-auto" id="agamaOrgSort">
-                        <option value="utilisation">Seat utilisation</option>
-                        <option value="name">Name</option>
-                        <option value="createdAt">Created date</option>
-                        <option value="lastActivity">Last activity</option>
-                      </select>
-                    </div>
+            <div class="admin-view is-active" data-admin-view-panel="overview">
+              <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                  <div class="stat-card">
+                    <div class="stat-label">Total organisations</div>
+                    <div class="stat-value" id="overviewOrgCount">—</div>
+                    <div class="stat-subtext">Across all suites</div>
                   </div>
-                  <div class="table-responsive">
-                    <table class="table table-sm align-middle mb-0" id="agamaOrgTable">
-                      <thead>
-                        <tr>
-                          <th>Name</th>
-                          <th>Tier</th>
-                          <th>Type</th>
-                          <th>Suites</th>
-                          <th>Seats</th>
-                          <th>Members</th>
-                          <th>Last activity</th>
-                          <th>SSO</th>
-                          <th>WorkOS Org ID</th>
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody id="agamaOrgRows"></tbody>
-                    </table>
+                </div>
+                <div class="col-md-4">
+                  <div class="stat-card">
+                    <div class="stat-label">Seat utilisation</div>
+                    <div class="stat-value" id="overviewSeatUtilisation">—</div>
+                    <div class="stat-subtext" id="overviewSeatBreakdown">—</div>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="stat-card">
+                    <div class="stat-label">Active suites</div>
+                    <div class="stat-value" id="overviewSuiteCount">—</div>
+                    <div class="stat-subtext">Unique suites enabled</div>
                   </div>
                 </div>
               </div>
 
-              <div class="col-lg-5">
-                <div class="card glass p-3 h-100" id="agamaOrgEditor">
-                  <h2 class="h6 mb-2" id="agamaOrgEditorTitle">New organisation</h2>
-                  <div class="mb-2 small text-fg-3" id="agamaOrgEditorHint">
-                    Use this form to configure Agama's view of a customer organisation. WorkOS orgs are created separately in WorkOS.
+              <div class="card glass-subtle p-3 mb-3">
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
+                  <div>
+                    <h2 class="h6 mb-1">Recent organisations</h2>
+                    <div class="text-fg-3 small">Sorted by latest activity to keep the overview focused.</div>
                   </div>
-                  <form id="agamaOrgForm">
-                    <input type="hidden" id="agamaOrgId" value="">
-                    <div class="mb-2">
-                      <label class="form-label small" for="agamaOrgName">Name</label>
-                      <input class="form-control form-control-sm" id="agamaOrgName" type="text" placeholder="Acme Corp">
-                    </div>
-                    <div class="mb-2">
-                      <label class="form-label small" for="agamaOrgType">Organisation type</label>
-                      <select class="form-select form-select-sm" id="agamaOrgType">
-                        <option value="vendor">Vendor</option>
-                        <option value="buyer">Buyer</option>
-                        <option value="both">Both</option>
-                      </select>
-                    </div>
-                    <div class="mb-2">
-                      <label class="form-label small" for="agamaOrgTier">Tier</label>
-                      <select class="form-select form-select-sm" id="agamaOrgTier">
-                        <option value="business">Business</option>
-                        <option value="personal">Personal</option>
-                      </select>
-                    </div>
-                    <div class="mb-2">
-                      <label class="form-label small d-block">Suites</label>
-                      <div class="suite-tile-grid" id="agamaOrgSuites">
-                        <button
-                          type="button"
-                          class="suite-tile"
-                          data-suite-id="valuesphere"
-                          aria-pressed="false"
-                        >
-                          <div class="suite-tile-title">ValueSphere</div>
-                          <div class="suite-tile-desc small text-fg-3">
-                            Value storytelling, assessments, and ROI cases.
-                          </div>
-                        </button>
+                  <button class="btn btn-outline-light btn-sm" type="button" data-admin-view="organizations">Manage all</button>
+                </div>
+                <div class="table-responsive">
+                  <table class="table table-modern align-middle mb-0" id="overviewOrgTable">
+                    <thead>
+                      <tr>
+                        <th>Organisation</th>
+                        <th>Suites</th>
+                        <th>Seats</th>
+                        <th>Activity</th>
+                      </tr>
+                    </thead>
+                    <tbody id="overviewOrgRows"></tbody>
+                  </table>
+                </div>
+              </div>
 
-                        <button
-                          type="button"
-                          class="suite-tile"
-                          data-suite-id="revenueforge"
-                          aria-pressed="false"
-                        >
-                          <div class="suite-tile-title">RevenueForge</div>
-                          <div class="suite-tile-desc small text-fg-3">
-                            Sales pipeline and engagement rooms.
-                          </div>
-                        </button>
-
-                        <button
-                          type="button"
-                          class="suite-tile"
-                          data-suite-id="procurepath"
-                          aria-pressed="false"
-                        >
-                          <div class="suite-tile-title">ProcurePath</div>
-                          <div class="suite-tile-desc small text-fg-3">
-                            Buyer workflows and mutual action plans.
-                          </div>
-                        </button>
+              <div class="card glass-subtle p-3">
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
+                  <div>
+                    <h2 class="h6 mb-1">Quick actions</h2>
+                    <div class="text-fg-3 small">Jump into the tools you need most often.</div>
+                  </div>
+                </div>
+                <div class="row g-3">
+                  <div class="col-md-4">
+                    <div class="action-tile" data-admin-view="organizations">
+                      <div class="action-icon bg-primary-subtle text-primary"><i class="bi bi-building"></i></div>
+                      <div>
+                        <div class="fw-semibold">Organisations</div>
+                        <div class="text-fg-3 small">Create, edit, and review access.</div>
                       </div>
                     </div>
-                    <div class="mb-2">
-                      <label class="form-label small" for="agamaOrgDomains">Domains</label>
-                      <input class="form-control form-control-sm" id="agamaOrgDomains" type="text" placeholder="acme.com, acme.org">
-                      <div class="form-text small">Comma-separated email domains used by this organisation.</div>
+                  </div>
+                  <div class="col-md-4">
+                    <div class="action-tile" data-admin-view="audit">
+                      <div class="action-icon bg-info-subtle text-info"><i class="bi bi-activity"></i></div>
+                      <div>
+                        <div class="fw-semibold">Audit log</div>
+                        <div class="text-fg-3 small">Monitor recent staff actions.</div>
+                      </div>
                     </div>
-                    <div class="mb-2">
-                      <label class="form-label small" for="agamaOrgSeatLimit">Seat limit</label>
-                      <input class="form-control form-control-sm" id="agamaOrgSeatLimit" type="number" min="1" step="1" placeholder="10">
+                  </div>
+                  <div class="col-md-4">
+                    <div class="action-tile" data-admin-view="settings">
+                      <div class="action-icon bg-warning-subtle text-warning"><i class="bi bi-gear"></i></div>
+                      <div>
+                        <div class="fw-semibold">Console settings</div>
+                        <div class="text-fg-3 small">Secrets, defaults, and guardrails.</div>
+                      </div>
                     </div>
-                    <div class="mb-2">
-                      <label class="form-label small" for="agamaOrgWorkosId">WorkOS Org ID</label>
-                      <input class="form-control form-control-sm" id="agamaOrgWorkosId" type="text" placeholder="org_01H...">
-                      <div class="form-text small">Paste the WorkOS Organisation ID from the WorkOS dashboard to link SSO users.</div>
-                    </div>
-                    <div class="mt-3 d-flex justify-content-between align-items-center">
-                      <div class="small text-fg-3" id="agamaOrgFormFeedback"></div>
-                      <button class="btn btn-primary btn-sm" type="submit" id="agamaOrgSaveBtn">Save organisation</button>
-                    </div>
-                  </form>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <section class="card glass p-4 mt-3 d-none" id="agamaOrgDetail">
+            <div class="admin-view d-none" data-admin-view-panel="organizations">
+              <div class="row g-3">
+                <div class="col-lg-7">
+                  <div class="card glass p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <h2 class="h6 mb-0">Organisations</h2>
+                      <div class="d-flex align-items-center gap-2 small">
+                        <span class="text-fg-3">Sort by</span>
+                        <select class="form-select form-select-sm w-auto" id="agamaOrgSort">
+                          <option value="utilisation">Seat utilisation</option>
+                          <option value="name">Name</option>
+                          <option value="createdAt">Created date</option>
+                          <option value="lastActivity">Last activity</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="table-responsive">
+                      <table class="table table-modern align-middle mb-0" id="agamaOrgTable">
+                        <thead>
+                          <tr>
+                            <th>Name</th>
+                            <th>Tier</th>
+                            <th>Type</th>
+                            <th>Suites</th>
+                            <th>Seats</th>
+                            <th>Members</th>
+                            <th>Last activity</th>
+                            <th>SSO</th>
+                            <th>WorkOS Org ID</th>
+                            <th></th>
+                          </tr>
+                        </thead>
+                        <tbody id="agamaOrgRows"></tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-lg-5">
+                  <div class="card glass p-3 h-100" id="agamaOrgEditor">
+                    <h2 class="h6 mb-2" id="agamaOrgEditorTitle">New organisation</h2>
+                    <div class="mb-2 small text-fg-3" id="agamaOrgEditorHint">
+                      Use this form to configure Agama's view of a customer organisation. WorkOS orgs are created separately in WorkOS.
+                    </div>
+                    <form id="agamaOrgForm">
+                      <input type="hidden" id="agamaOrgId" value="">
+                      <div class="mb-2">
+                        <label class="form-label small" for="agamaOrgName">Name</label>
+                        <input class="form-control form-control-sm" id="agamaOrgName" type="text" placeholder="Acme Corp">
+                      </div>
+                      <div class="mb-2">
+                        <label class="form-label small" for="agamaOrgType">Organisation type</label>
+                        <select class="form-select form-select-sm" id="agamaOrgType">
+                          <option value="vendor">Vendor</option>
+                          <option value="buyer">Buyer</option>
+                          <option value="both">Both</option>
+                        </select>
+                      </div>
+                      <div class="mb-2">
+                        <label class="form-label small" for="agamaOrgTier">Tier</label>
+                        <select class="form-select form-select-sm" id="agamaOrgTier">
+                          <option value="business">Business</option>
+                          <option value="personal">Personal</option>
+                        </select>
+                      </div>
+                      <div class="mb-2">
+                        <label class="form-label small d-block">Suites</label>
+                        <div class="suite-tile-grid" id="agamaOrgSuites">
+                          <button
+                            type="button"
+                            class="suite-tile"
+                            data-suite-id="valuesphere"
+                            aria-pressed="false"
+                          >
+                            <div class="suite-tile-title">ValueSphere</div>
+                            <div class="suite-tile-desc small text-fg-3">
+                              Value storytelling, assessments, and ROI cases.
+                            </div>
+                          </button>
+
+                          <button
+                            type="button"
+                            class="suite-tile"
+                            data-suite-id="revenueforge"
+                            aria-pressed="false"
+                          >
+                            <div class="suite-tile-title">RevenueForge</div>
+                            <div class="suite-tile-desc small text-fg-3">
+                              Sales pipeline and engagement rooms.
+                            </div>
+                          </button>
+
+                          <button
+                            type="button"
+                            class="suite-tile"
+                            data-suite-id="procurepath"
+                            aria-pressed="false"
+                          >
+                            <div class="suite-tile-title">ProcurePath</div>
+                            <div class="suite-tile-desc small text-fg-3">
+                              Buyer workflows and mutual action plans.
+                            </div>
+                          </button>
+                        </div>
+                      </div>
+                      <div class="mb-2">
+                        <label class="form-label small" for="agamaOrgDomains">Domains</label>
+                        <input class="form-control form-control-sm" id="agamaOrgDomains" type="text" placeholder="acme.com, acme.org">
+                        <div class="form-text small">Comma-separated email domains used by this organisation.</div>
+                      </div>
+                      <div class="mb-2">
+                        <label class="form-label small" for="agamaOrgSeatLimit">Seat limit</label>
+                        <input class="form-control form-control-sm" id="agamaOrgSeatLimit" type="number" min="1" step="1" placeholder="10">
+                      </div>
+                      <div class="mb-2">
+                        <label class="form-label small" for="agamaOrgWorkosId">WorkOS Org ID</label>
+                        <input class="form-control form-control-sm" id="agamaOrgWorkosId" type="text" placeholder="org_01H...">
+                        <div class="form-text small">Paste the WorkOS Organisation ID from the WorkOS dashboard to link SSO users.</div>
+                      </div>
+                      <div class="mt-3 d-flex justify-content-between align-items-center">
+                        <div class="small text-fg-3" id="agamaOrgFormFeedback"></div>
+                        <button class="btn btn-primary btn-sm" type="submit" id="agamaOrgSaveBtn">Save organisation</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+
+              <section class="card glass p-4 mt-3 d-none" id="agamaOrgDetail">
               <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                 <div>
                   <span class="eyebrow d-block mb-1">Organisation</span>
@@ -483,46 +571,88 @@
               </div>
             </section>
 
-            <div class="border-top pt-4">
-              <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
-                <div>
-                  <h3 class="h6 mb-1">Audit</h3>
-                  <p class="text-fg-3 small mb-0">Recent activity across organisations. Filter by org or user as needed.</p>
-                </div>
-                <div class="d-flex gap-2">
-                  <button class="btn btn-outline-light btn-sm" type="button" id="refreshAudit">Refresh</button>
-                </div>
+            </div>
+
+            <div class="admin-view d-none" data-admin-view-panel="users">
+              <div class="card glass-subtle p-4 text-center">
+                <h2 class="h5 mb-2">Users</h2>
+                <p class="text-fg-3 mb-3">User provisioning and directory sync will live here. For now, use WorkOS directly.</p>
+                <button class="btn btn-outline-light" type="button" data-admin-view="organizations">Open organisations</button>
               </div>
-              <form class="row g-3 mb-3" id="auditFilters">
-                <div class="col-md-4">
-                  <label class="form-label" for="auditOrgFilter">Organisation</label>
-                  <select class="form-select" id="auditOrgFilter" name="orgId">
-                    <option value="">All organisations</option>
-                  </select>
+            </div>
+
+            <div class="admin-view d-none" data-admin-view-panel="sso">
+              <div class="card glass-subtle p-4">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                  <div>
+                    <h2 class="h5 mb-1">SSO &amp; Groups</h2>
+                    <p class="text-fg-3 mb-0">Surface WorkOS connections and map directory groups to Agama roles.</p>
+                  </div>
+                  <span class="badge-soft">Coming soon</span>
                 </div>
-                <div class="col-md-4">
-                  <label class="form-label" for="auditUserFilter">User ID or email</label>
-                  <input class="form-control" type="text" id="auditUserFilter" name="userId" placeholder="user id or email (optional)">
-                </div>
-                <div class="col-md-4 d-flex align-items-end gap-2">
-                  <button class="btn btn-primary" type="submit">Apply filters</button>
-                  <button class="btn btn-outline-light" type="button" id="clearAuditFilters">Clear</button>
-                </div>
-              </form>
-              <div class="table-responsive">
-                <table class="table table-sm align-middle" aria-label="Audit log">
-                  <thead>
-                    <tr>
-                      <th scope="col">Date</th>
-                      <th scope="col">Actor</th>
-                      <th scope="col">Event</th>
-                      <th scope="col">Summary</th>
-                    </tr>
-                  </thead>
-                  <tbody id="auditTableBody"></tbody>
-                </table>
+                <ul class="list-unstyled mb-0 text-fg-3 small">
+                  <li class="mb-2">• View SSO connections per organisation</li>
+                  <li class="mb-2">• Map IdP groups to platform roles</li>
+                  <li>• Sync membership changes automatically</li>
+                </ul>
               </div>
-              <div class="text-fg-3 small" id="auditEmpty" style="display:none;">No audit events found.</div>
+            </div>
+
+            <div class="admin-view d-none" data-admin-view-panel="audit">
+              <div class="card glass-subtle p-4">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+                  <div>
+                    <h3 class="h6 mb-1">Audit</h3>
+                    <p class="text-fg-3 small mb-0">Recent activity across organisations. Filter by org or user as needed.</p>
+                  </div>
+                  <div class="d-flex gap-2">
+                    <button class="btn btn-outline-light btn-sm" type="button" id="refreshAudit">Refresh</button>
+                  </div>
+                </div>
+                <form class="row g-3 mb-3" id="auditFilters">
+                  <div class="col-md-4">
+                    <label class="form-label" for="auditOrgFilter">Organisation</label>
+                    <select class="form-select" id="auditOrgFilter" name="orgId">
+                      <option value="">All organisations</option>
+                    </select>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label" for="auditUserFilter">User ID or email</label>
+                    <input class="form-control" type="text" id="auditUserFilter" name="userId" placeholder="user id or email (optional)">
+                  </div>
+                  <div class="col-md-4 d-flex align-items-end gap-2">
+                    <button class="btn btn-primary" type="submit">Apply filters</button>
+                    <button class="btn btn-outline-light" type="button" id="clearAuditFilters">Clear</button>
+                  </div>
+                </form>
+                <div class="table-responsive">
+                  <table class="table table-modern align-middle" aria-label="Audit log">
+                    <thead>
+                      <tr>
+                        <th scope="col">Date</th>
+                        <th scope="col">Actor</th>
+                        <th scope="col">Event</th>
+                        <th scope="col">Summary</th>
+                      </tr>
+                    </thead>
+                    <tbody id="auditTableBody"></tbody>
+                  </table>
+                </div>
+                <div class="text-fg-3 small" id="auditEmpty" style="display:none;">No audit events found.</div>
+              </div>
+            </div>
+
+            <div class="admin-view d-none" data-admin-view-panel="settings">
+              <div class="card glass-subtle p-4">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                  <div>
+                    <h2 class="h5 mb-1">Console settings</h2>
+                    <p class="text-fg-3 mb-0">Manage unlock secrets, session timeouts, and other safety rails.</p>
+                  </div>
+                  <span class="badge-soft">Planned</span>
+                </div>
+                <p class="text-fg-3 small mb-0">Use this area to centralise staff-only controls as they roll out.</p>
+              </div>
             </div>
           </div>
         </div>

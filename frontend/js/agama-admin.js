@@ -103,6 +103,14 @@ function setAdminView(view) {
     });
   }
 
+  const panels = document.querySelectorAll('[data-admin-view-panel]');
+  panels.forEach(panel => {
+    const target = panel.getAttribute('data-admin-view-panel');
+    const isActive = target === view;
+    panel.classList.toggle('d-none', !isActive);
+    panel.classList.toggle('is-active', isActive);
+  });
+
   // For now, we only have "overview" and "organizations" sharing the same UI.
   // Both should load the organisations overview table.
   if (view === 'overview' || view === 'organizations') {
@@ -146,16 +154,14 @@ async function refreshAdminData() {
 }
 
 function initAdminNav() {
-  const nav = document.getElementById('agamaAdminNav');
-  if (nav) {
-    const items = nav.querySelectorAll('.subnav-item');
-    items.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const view = btn.getAttribute('data-admin-view') || 'overview';
-        setAdminView(view);
-      });
+  const triggers = document.querySelectorAll('[data-admin-view]');
+  triggers.forEach(trigger => {
+    trigger.addEventListener('click', event => {
+      event.preventDefault();
+      const view = trigger.getAttribute('data-admin-view') || 'overview';
+      setAdminView(view);
     });
-  }
+  });
 
   const refreshBtn = document.getElementById('adminRefreshBtn');
   if (refreshBtn) {
@@ -323,10 +329,13 @@ function renderOrganizations(list) {
       case 'lastActivity':
         return new Date(b.lastActivityAt || 0) - new Date(a.lastActivityAt || 0);
       case 'utilisation':
-      default:
-        return utilB - utilA;
+    default:
+      return utilB - utilA;
     }
   });
+
+  renderOverviewOrganizations(sorted);
+  updateOverviewSummary(sorted);
 
   if (!sorted.length) {
     const row = document.createElement('tr');
@@ -404,6 +413,96 @@ function renderOrganizations(list) {
     });
     tbody.appendChild(row);
   });
+}
+
+function renderOverviewOrganizations(list) {
+  const tbody = document.getElementById('overviewOrgRows');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const recent = (Array.isArray(list) ? [...list] : [])
+    .sort((a, b) => new Date(b.lastActivityAt || 0) - new Date(a.lastActivityAt || 0))
+    .slice(0, 5);
+
+  if (!recent.length) {
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = 4;
+    cell.className = 'text-fg-3';
+    cell.textContent = 'No organisations yet. Create your first to unlock insights here.';
+    row.appendChild(cell);
+    tbody.appendChild(row);
+    return;
+  }
+
+  recent.forEach(org => {
+    const row = document.createElement('tr');
+    row.className = 'table-row-link';
+
+    const nameCell = document.createElement('td');
+    const nameLabel = document.createElement('div');
+    nameLabel.className = 'fw-semibold';
+    nameLabel.textContent = org.name || '-';
+    const tierLabel = document.createElement('div');
+    tierLabel.className = 'text-fg-3 small';
+    tierLabel.textContent = `${org.tier || '—'} • ${org.orgType || '—'}`;
+    nameCell.appendChild(nameLabel);
+    nameCell.appendChild(tierLabel);
+
+    const suitesCell = document.createElement('td');
+    const suites = Array.isArray(org.productAccess) ? org.productAccess : [];
+    if (!suites.length) {
+      suitesCell.textContent = '—';
+    } else {
+      suites.forEach(suite => {
+        const pill = document.createElement('span');
+        pill.className = 'pill-soft me-1 mb-1';
+        pill.textContent = suite;
+        suitesCell.appendChild(pill);
+      });
+    }
+
+    const seatsCell = document.createElement('td');
+    seatsCell.textContent = `${org.seatsUsed ?? 0} / ${org.seatLimit ?? '—'}`;
+
+    const activityCell = document.createElement('td');
+    activityCell.textContent = formatShortDate(org.lastActivityAt);
+
+    row.appendChild(nameCell);
+    row.appendChild(suitesCell);
+    row.appendChild(seatsCell);
+    row.appendChild(activityCell);
+
+    row.addEventListener('click', () => setAdminView('organizations'));
+
+    tbody.appendChild(row);
+  });
+}
+
+function updateOverviewSummary(list) {
+  const orgs = Array.isArray(list) ? list : [];
+  const orgCount = orgs.length;
+  const seatsUsed = orgs.reduce((sum, org) => sum + (org.seatsUsed || 0), 0);
+  const seatLimit = orgs.reduce((sum, org) => sum + (org.seatLimit || 0), 0);
+  const utilisation = seatLimit > 0 ? Math.round((seatsUsed / seatLimit) * 100) : 0;
+  const suiteSet = new Set();
+  orgs.forEach(org => {
+    (org.productAccess || org.platformAccess || []).forEach(suite => suiteSet.add(suite));
+  });
+
+  const orgCountEl = document.getElementById('overviewOrgCount');
+  const utilEl = document.getElementById('overviewSeatUtilisation');
+  const seatBreakdownEl = document.getElementById('overviewSeatBreakdown');
+  const suiteCountEl = document.getElementById('overviewSuiteCount');
+
+  if (orgCountEl) orgCountEl.textContent = orgCount ? orgCount.toLocaleString() : '—';
+  if (utilEl) utilEl.textContent = seatLimit ? `${utilisation}%` : '—';
+  if (seatBreakdownEl) {
+    seatBreakdownEl.textContent = seatLimit
+      ? `${seatsUsed.toLocaleString()} of ${seatLimit.toLocaleString()} seats in use`
+      : 'Set seat limits to track utilisation';
+  }
+  if (suiteCountEl) suiteCountEl.textContent = suiteSet.size ? suiteSet.size.toString() : '—';
 }
 
 async function openOrgDetail(org) {
