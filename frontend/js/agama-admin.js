@@ -211,6 +211,37 @@ function buildSummary(event) {
   }
 }
 
+function getSelectedSuitesFromTiles(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return [];
+  const tiles = Array.from(container.querySelectorAll('.suite-tile[aria-pressed="true"]'));
+  return tiles.map(btn => btn.getAttribute('data-suite-id')).filter(Boolean);
+}
+
+function setSelectedSuitesOnTiles(containerId, suites) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const target = new Set(Array.isArray(suites) ? suites : []);
+  const tiles = container.querySelectorAll('.suite-tile');
+  tiles.forEach(btn => {
+    const id = btn.getAttribute('data-suite-id');
+    const isSelected = id && target.has(id);
+    btn.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+  });
+}
+
+function initSuiteTiles(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const tiles = container.querySelectorAll('.suite-tile');
+  tiles.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const current = btn.getAttribute('aria-pressed') === 'true';
+      btn.setAttribute('aria-pressed', current ? 'false' : 'true');
+    });
+  });
+}
+
 function resetOrgEditor() {
   adminState.selectedOrg = null;
   const idInput = document.getElementById('agamaOrgId');
@@ -222,7 +253,6 @@ function resetOrgEditor() {
   const workosInput = document.getElementById('agamaOrgWorkosId');
   const feedback = document.getElementById('agamaOrgFormFeedback');
   const title = document.getElementById('agamaOrgEditorTitle');
-  const suiteChecks = document.querySelectorAll('#agamaOrgForm input[type="checkbox"]');
 
   if (idInput) idInput.value = '';
   if (nameInput) nameInput.value = '';
@@ -231,9 +261,7 @@ function resetOrgEditor() {
   if (domainsInput) domainsInput.value = '';
   if (seatInput) seatInput.value = '';
   if (workosInput) workosInput.value = '';
-  suiteChecks.forEach(box => {
-    box.checked = false;
-  });
+  setSelectedSuitesOnTiles('agamaOrgSuites', []);
   if (feedback) feedback.textContent = '';
   if (title) title.textContent = 'New organisation';
 }
@@ -254,9 +282,7 @@ function populateOrgEditor(org) {
   const workosInput = document.getElementById('agamaOrgWorkosId');
   const feedback = document.getElementById('agamaOrgFormFeedback');
   const title = document.getElementById('agamaOrgEditorTitle');
-  const suiteChecks = document.querySelectorAll('#agamaOrgForm input[type="checkbox"]');
 
-  const products = Array.isArray(org.productAccess) ? org.productAccess : [];
   const domains = Array.isArray(org.domains) ? org.domains : [];
 
   if (idInput) idInput.value = org.id || '';
@@ -267,9 +293,7 @@ function populateOrgEditor(org) {
   if (seatInput) seatInput.value = org.seatLimit ?? '';
   if (workosInput) workosInput.value = org.workosOrganizationId || '';
 
-  suiteChecks.forEach(box => {
-    box.checked = products.includes(box.value);
-  });
+  setSelectedSuitesOnTiles('agamaOrgSuites', org?.productAccess || org?.platformAccess || []);
 
   if (feedback) feedback.textContent = '';
   if (title) title.textContent = 'Edit organisation';
@@ -683,14 +707,13 @@ async function saveOrganization(event) {
   const domainsRaw = document.getElementById('agamaOrgDomains')?.value || '';
   const seatLimitInput = document.getElementById('agamaOrgSeatLimit')?.value;
   const workosId = document.getElementById('agamaOrgWorkosId')?.value?.trim();
-  const suiteChecks = document.querySelectorAll('#agamaOrgForm input[type="checkbox"]:checked');
 
   if (!name) {
     if (feedback) feedback.textContent = 'Name is required to save the organisation.';
     return;
   }
 
-  const productAccess = Array.from(suiteChecks).map(el => el.value);
+  const productAccess = getSelectedSuitesFromTiles('agamaOrgSuites');
   const domains = domainsRaw
     .split(',')
     .map(value => value.trim())
@@ -809,6 +832,7 @@ function initHandlers() {
   if (orgForm) {
     orgForm.addEventListener('submit', saveOrganization);
   }
+  initSuiteTiles('agamaOrgSuites');
 
   const createOrgBtn = document.getElementById('agamaCreateOrgBtn');
   if (createOrgBtn) {

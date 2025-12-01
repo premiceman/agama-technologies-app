@@ -974,3 +974,42 @@ small.text-fg { color: var(--fg) !important; }
   .project-launcher .project-actions .form-select{width:100%;}
   .tile-option{min-width:unset;width:100%;}
 }
+
+.suite-tile-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+.suite-tile {
+  position: relative;
+  flex: 1 1 180px;
+  padding: .6rem .8rem;
+  border-radius: .75rem;
+  border: 1px solid rgba(148, 163, 184, .6);
+  background: rgba(15, 23, 42, .8);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .18s ease, background .18s ease, box-shadow .18s ease, transform .12s ease;
+}
+
+.suite-tile-title {
+  font-size: .85rem;
+  font-weight: 600;
+}
+
+.suite-tile-desc {
+  font-size: .75rem;
+}
+
+.suite-tile:hover {
+  border-color: rgba(148, 163, 184, .9);
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, .9);
+  transform: translateY(-1px);
+}
+
+.suite-tile[aria-pressed="true"] {
+  border-color: rgba(94, 234, 212, .9);
+  background: linear-gradient(135deg, rgba(96, 165, 250, .4), rgba(236, 72, 153, .7));
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, .9);
+}
