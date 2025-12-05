@@ -1264,3 +1264,48 @@ small.text-fg { color: var(--fg) !important; }
   color: var(--fg-strong);
 }
 
+/* --- Admin org tables contrast tweak --- */
+
+#overviewOrgTable,
+#overviewOrgTable th,
+#overviewOrgTable td,
+#agamaOrgTable,
+#agamaOrgTable th,
+#agamaOrgTable td {
+  color: var(--fg-strong); /* strong light text for dark background */
+}
+
+/* Make those table rows sit on a darker surface so the text pops */
+#overviewOrgTable tbody tr,
+#agamaOrgTable tbody tr {
+  background-color: rgba(5, 10, 20, 0.95);
+}
+
+#overviewOrgTable tbody tr + tr,
+#agamaOrgTable tbody tr + tr {
+  border-top: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+/* --- Suite picker contrast tweak (ValueSphere / RevenueForge / ProcurePath) --- */
+
+#agamaOrgSuites .suite-tile {
+  color: var(--fg); /* default light text on dark tile */
+}
+
+/* Selected tiles: keep the gradient but force strong text */
+#agamaOrgSuites .suite-tile[aria-pressed="true"] {
+  color: var(--fg-strong);
+}
+
+/* Make titles stand out clearly on both normal + selected tiles */
+#agamaOrgSuites .suite-tile-title {
+  color: var(--fg-strong);
+  font-weight: 600;
+}
+
+/* Descriptions slightly muted but still readable */
+#agamaOrgSuites .suite-tile-desc {
+  color: var(--fg-2);
+}
+
+
