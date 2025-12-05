@@ -1308,4 +1308,17 @@ small.text-fg { color: var(--fg) !important; }
   color: var(--fg-2);
 }
 
+/* --- Agama Admin Console: table contrast fix --- */
+/* Only affects tables inside the admin console main area */
+
+.admin-main .table-modern tbody tr {
+  /* give rows a dark background so the existing light text is readable */
+  background-color: rgba(15, 23, 42, 0.96);
+}
+
+.admin-main .table-modern tbody tr:nth-child(even) {
+  /* very subtle striping, still dark */
+  background-color: rgba(15, 23, 42, 0.9);
+}
+
 
