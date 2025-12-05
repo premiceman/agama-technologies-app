@@ -24,6 +24,7 @@ const OrganizationSchema = new Schema(
       buyerSuite: { type: Number, default: 0 },
       engagementRooms: { type: Number, default: 0 }
     },
+    billingProfile: { type: Schema.Types.Mixed, default: {} },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
   },
   { timestamps: true }

@@ -1,48 +1,27 @@
-const steps = ['persona', 'intent', 'usage', 'license'];
+const steps = ['seller', 'buyer', 'plan'];
+const PRICING = { seller: 240, buyer: 180 };
+
 const onboardingState = {
   currentStep: 0,
   user: null,
-  answers: {
-    persona: null,
-    goals: [],
-    intent: '',
-    usage: [],
-    useCases: '',
-    licenseSelection: null,
-    billingDetails: {}
-  },
-  recommendation: 'free-personal',
-  status: 'pending',
-  orgManagedLicense: false
-};
-
-function personaLabel(key) {
-  switch (key) {
-    case 'vendor':
-      return 'Vendor';
-    case 'buyer':
-      return 'Buyer';
-    case 'consultant':
-      return 'Consultant';
-    case 'both':
-      return 'Vendor & buyer';
-    case 'explorer':
-      return 'Exploring';
-    default:
-      return 'Unknown';
+  organization: null,
+  orgManaged: false,
+  suites: { seller: false, buyer: false },
+  billing: {},
+  orgDraft: {
+    seats: 10,
+    domain: ''
   }
-}
+};
 
 function stepName(id) {
   switch (id) {
-    case 'persona':
-      return 'About you';
-    case 'intent':
-      return 'Outcomes';
-    case 'usage':
-      return 'How you will use Agama';
-    case 'license':
-      return 'License';
+    case 'seller':
+      return 'Seller Suite';
+    case 'buyer':
+      return 'Buyer Suite';
+    case 'plan':
+      return 'Licensing';
     default:
       return id;
   }
@@ -71,36 +50,68 @@ function setSectionVisibility() {
   const backBtn = document.getElementById('backStep');
   const nextBtn = document.getElementById('nextStep');
   if (backBtn) backBtn.disabled = onboardingState.currentStep === 0;
-  if (nextBtn) nextBtn.textContent = onboardingState.currentStep === steps.length - 1 ? 'Finish onboarding' : 'Continue';
+  if (nextBtn) nextBtn.textContent = onboardingState.currentStep === steps.length - 1 ? 'Finish' : 'Continue';
 }
 
-function toggleButtons(selector, activeKeys) {
-  document.querySelectorAll(selector).forEach(btn => {
-    const key = btn.getAttribute('data-goal') || btn.getAttribute('data-usage');
-    if (!key) return;
-    btn.classList.toggle('btn-primary', activeKeys.includes(key));
-    btn.classList.toggle('btn-outline-light', !activeKeys.includes(key));
+function formatPrice(amount) {
+  return `$${amount.toLocaleString()}/mo`;
+}
+
+function updatePriceSummary() {
+  const summary = document.getElementById('priceSummary');
+  const helper = document.getElementById('suiteSelectionHelper');
+  const sellerActive = onboardingState.suites.seller;
+  const buyerActive = onboardingState.suites.buyer;
+  const total = (sellerActive ? PRICING.seller : 0) + (buyerActive ? PRICING.buyer : 0);
+  if (summary) summary.textContent = formatPrice(total);
+  if (helper) {
+    helper.textContent = total > 0
+      ? 'Monthly billing preview (cards accepted later).'
+      : 'Select at least one suite to enable billing.';
+  }
+}
+
+function updateSuiteButtons() {
+  document.querySelectorAll('[data-suite-toggle]').forEach(btn => {
+    const suite = btn.getAttribute('data-suite-toggle');
+    const active = onboardingState.suites[suite];
+    btn.classList.toggle('btn-primary', active);
+    btn.classList.toggle('btn-outline-light', !active);
+    btn.textContent = active ? 'Selected' : `Add ${suite === 'seller' ? 'Seller' : 'Buyer'} Suite`;
   });
-}
 
-function togglePersonaButtons(activeKey) {
-  document.querySelectorAll('[data-persona]').forEach(btn => {
-    const key = btn.getAttribute('data-persona');
-    btn.classList.toggle('btn-primary', key === activeKey);
-    btn.classList.toggle('btn-outline-light', key !== activeKey);
-  });
-  const statusBadge = document.getElementById('onboardingStatusBadge');
-  if (statusBadge && activeKey) statusBadge.textContent = `${personaLabel(activeKey)} onboarding`;
-}
-
-function selectLicenseCard(license) {
-  onboardingState.answers.licenseSelection = license;
-  document.querySelectorAll('[data-license]').forEach(card => {
-    const isActive = card.getAttribute('data-license') === license;
+  document.querySelectorAll('.selectable-card').forEach(card => {
+    const suite = card.getAttribute('data-suite');
+    const active = onboardingState.suites[suite];
     card.classList.toggle('border', true);
-    card.classList.toggle('border-success', isActive);
-    card.classList.toggle('shadow', isActive);
+    card.classList.toggle('border-success', active);
+    card.classList.toggle('shadow', active);
+    card.classList.toggle('opacity-50', onboardingState.orgManaged);
   });
+
+  updatePriceSummary();
+}
+
+function collectBillingDetails() {
+  return {
+    billingName: document.getElementById('billingName')?.value?.trim(),
+    email: document.getElementById('billingEmail')?.value?.trim(),
+    cardNumber: document.getElementById('cardNumber')?.value?.trim(),
+    cardExpiry: document.getElementById('cardExpiry')?.value?.trim(),
+    cardCvc: document.getElementById('cardCvc')?.value?.trim(),
+    billingAddress: document.getElementById('billingAddress')?.value?.trim(),
+    notes: document.getElementById('billingNotes')?.value?.trim()
+  };
+}
+
+function collectOrgDraft() {
+  return {
+    name: document.getElementById('orgNameInput')?.value?.trim(),
+    seatLimit: Number(document.getElementById('orgSeatsInput')?.value || 10),
+    domains: document.getElementById('orgDomainInput')?.value?.trim()
+      ? [document.getElementById('orgDomainInput').value.trim()]
+      : []
+  };
 }
 
 async function persistProgress(payload) {
@@ -112,68 +123,115 @@ async function persistProgress(payload) {
       body: JSON.stringify(payload)
     });
     if (!res.ok) throw new Error('Unable to save onboarding');
-    const json = await res.json();
-    onboardingState.user = json.user;
-    onboardingState.status = json.onboarding?.status || onboardingState.status;
-    onboardingState.recommendation = json.onboarding?.recommendation || onboardingState.recommendation;
-    return json;
+    return res.json();
   } catch (err) {
     console.error(err);
-    const feedback = document.getElementById('personaFeedback');
-    if (feedback) feedback.textContent = 'We could not save your answers. Please try again.';
+    const feedback = document.getElementById('orgLicenseFeedback');
+    if (feedback) feedback.textContent = 'We could not save your choices. Please try again.';
     return null;
   }
 }
 
-function recommendedLabel(plan) {
-  switch (plan) {
-    case 'vendor-enterprise':
-      return 'Recommended for vendors';
-    case 'procurement-enterprise':
-      return 'Recommended for buyers';
-    case 'consulting-enterprise':
-      return 'Recommended for consulting';
-    default:
-      return 'You can change this later';
-  }
-}
+function setOrgManagedUI(managed, organization) {
+  onboardingState.orgManaged = managed;
+  const alertEl = document.getElementById('orgManagedAlert');
+  const suitePanel = document.getElementById('suiteSelectionPanel');
+  const statusText = document.getElementById('orgStatusText');
+  const badge = document.getElementById('orgBadge');
+  const feedback = document.getElementById('orgLicenseFeedback');
 
-function buildBillingDetails() {
-  const billingName = document.getElementById('billingName')?.value?.trim();
-  const billingEmail = document.getElementById('billingEmail')?.value?.trim();
-  const details = {};
-  if (billingName) details.billingName = billingName;
-  if (billingEmail) details.email = billingEmail;
-  return Object.keys(details).length ? details : null;
-}
+  if (alertEl) alertEl.classList.toggle('d-none', !managed);
+  if (suitePanel) suitePanel.classList.toggle('opacity-50', managed);
 
-function setOrgManagedState(isManaged) {
-  onboardingState.orgManagedLicense = isManaged;
-  if (isManaged) {
-    onboardingState.answers.licenseSelection = null;
-    document.querySelectorAll('[data-license]').forEach(card => {
-      card.classList.remove('border-success', 'shadow');
-    });
+  if (statusText) {
+    statusText.textContent = managed
+      ? 'Your licence is already managed by your organisation admin.'
+      : 'Create an organisation to manage billing and seats.';
   }
 
-  document.querySelectorAll('.license-card').forEach(card => {
-    card.classList.toggle('opacity-50', isManaged);
+  if (badge) badge.textContent = managed ? 'Org managed' : 'Org setup';
+  if (feedback && managed) {
+    feedback.textContent = `Managed by ${organization?.name || 'your organisation'}. Finish to continue.`;
+  }
+
+  document.querySelectorAll('[data-suite-toggle]').forEach(btn => {
+    btn.disabled = managed;
+    btn.setAttribute('aria-disabled', managed ? 'true' : 'false');
   });
 
-  document.querySelectorAll('.license-card [data-license-select]').forEach(button => {
-    button.classList.toggle('disabled', isManaged);
-    if (isManaged) {
-      button.setAttribute('aria-disabled', 'true');
-      button.disabled = true;
-    } else {
-      button.removeAttribute('aria-disabled');
-      button.disabled = false;
+  updateSuiteButtons();
+}
+
+function hydrateForms() {
+  const orgName = document.getElementById('orgNameInput');
+  if (orgName && onboardingState.orgDraft.name) orgName.value = onboardingState.orgDraft.name;
+  const orgSeats = document.getElementById('orgSeatsInput');
+  if (orgSeats && onboardingState.orgDraft.seatLimit) orgSeats.value = onboardingState.orgDraft.seatLimit;
+  const orgDomain = document.getElementById('orgDomainInput');
+  if (orgDomain && onboardingState.orgDraft.domains?.length) orgDomain.value = onboardingState.orgDraft.domains[0];
+
+  const billing = onboardingState.billing || {};
+  const setVal = (id, value) => {
+    const el = document.getElementById(id);
+    if (el && value) el.value = value;
+  };
+  setVal('billingName', billing.billingName);
+  setVal('billingEmail', billing.email);
+  setVal('cardNumber', billing.cardNumber || billing.rawInput);
+  setVal('cardExpiry', billing.cardExpiry);
+  setVal('cardCvc', billing.cardCvc);
+  setVal('billingAddress', billing.billingAddress);
+  setVal('billingNotes', billing.notes);
+}
+
+async function loadContext() {
+  try {
+    const onboardingRes = await fetch('/api/onboarding', { credentials: 'include' });
+    if (onboardingRes.status === 401) {
+      window.location.href = '/api/auth/workos/login';
+      return;
     }
-  });
+    const onboardingJson = await onboardingRes.json();
+    onboardingState.user = onboardingJson.user;
+    onboardingState.suites = {
+      seller: Boolean(onboardingJson.onboarding?.responses?.suiteSelection?.sellerSuite),
+      buyer: Boolean(onboardingJson.onboarding?.responses?.suiteSelection?.buyerSuite)
+    };
+    onboardingState.billing = onboardingJson.user?.billingProfile || {};
+    onboardingState.orgDraft = onboardingJson.onboarding?.responses?.organizationDraft || onboardingState.orgDraft;
+
+    const orgRes = await fetch('/api/org/current', { credentials: 'include' });
+    if (orgRes.ok) {
+      const orgJson = await orgRes.json();
+      onboardingState.organization = orgJson.organization;
+      const managed = orgJson.organization && orgJson.organization.tier === 'business';
+      setOrgManagedUI(managed, orgJson.organization);
+    } else {
+      setOrgManagedUI(false, null);
+    }
+
+    if (onboardingJson.onboarding?.status === 'completed' && !new URLSearchParams(window.location.search).has('force')) {
+      window.location.href = '/workspace.html';
+      return;
+    }
+
+    hydrateForms();
+    updateSuiteButtons();
+    updateProgress();
+    setSectionVisibility();
+  } catch (err) {
+    console.error('Unable to load onboarding', err);
+  }
+}
+
+function recommendedLicense() {
+  if (onboardingState.suites.seller && onboardingState.suites.buyer) return 'vendor-enterprise';
+  if (onboardingState.suites.seller) return 'vendor-enterprise';
+  if (onboardingState.suites.buyer) return 'procurement-enterprise';
+  return 'free-personal';
 }
 
 async function handleNextStep() {
-  if (!(await validateCurrentStep())) return;
   if (onboardingState.currentStep < steps.length - 1) {
     onboardingState.currentStep += 1;
     updateProgress();
@@ -181,74 +239,38 @@ async function handleNextStep() {
     return;
   }
 
-  let payload;
+  if (!onboardingState.orgManaged) {
+    const hasSuite = onboardingState.suites.seller || onboardingState.suites.buyer;
+    if (!hasSuite) {
+      alert('Select at least one suite to continue.');
+      return;
+    }
+  }
 
-  if (onboardingState.orgManagedLicense) {
-    const { licenseSelection, billingDetails, ...restAnswers } = onboardingState.answers;
-    payload = {
-      ...restAnswers,
-      useCases: onboardingState.answers.useCases ? [onboardingState.answers.useCases] : [],
-      status: 'completed'
+  const payload = {
+    finalize: true,
+    status: 'completed'
+  };
+
+  if (!onboardingState.orgManaged) {
+    payload.suiteSelection = {
+      sellerSuite: onboardingState.suites.seller,
+      buyerSuite: onboardingState.suites.buyer
     };
-  } else {
-    const licenseSelection = onboardingState.answers.licenseSelection || 'free-personal';
-    onboardingState.answers.licenseSelection = licenseSelection;
-    const billingDetails = buildBillingDetails();
-    payload = {
-      ...onboardingState.answers,
-      licenseSelection,
-      useCases: onboardingState.answers.useCases ? [onboardingState.answers.useCases] : [],
-      ...(billingDetails ? { billingDetails } : {}),
-      status: 'completed'
+    payload.licenseSelection = recommendedLicense();
+    payload.organizationDraft = collectOrgDraft();
+    payload.billingDetails = collectBillingDetails();
+  } else if (onboardingState.organization) {
+    payload.suiteSelection = {
+      sellerSuite: Boolean(onboardingState.organization.sellerSuiteEnabled),
+      buyerSuite: Boolean(onboardingState.organization.buyerSuiteEnabled)
     };
   }
+
   const saved = await persistProgress(payload);
   if (saved) {
     window.location.href = '/workspace.html';
   }
-}
-
-async function validateCurrentStep() {
-  const current = steps[onboardingState.currentStep];
-  if (current === 'persona' && !onboardingState.answers.persona) {
-    const feedback = document.getElementById('personaFeedback');
-    if (feedback) feedback.textContent = 'Select the option closest to your role.';
-    return false;
-  }
-
-  if (current === 'intent') {
-    if (!onboardingState.answers.goals.length) {
-      alert('Pick at least one outcome so we can tailor Agama.');
-      return false;
-    }
-    await persistProgress({
-      persona: onboardingState.answers.persona,
-      goals: onboardingState.answers.goals,
-      intent: onboardingState.answers.intent,
-      status: 'in-progress'
-    });
-  }
-
-  if (current === 'usage') {
-    await persistProgress({
-      useCases: onboardingState.answers.useCases ? [onboardingState.answers.useCases] : [],
-      usage: onboardingState.answers.usage,
-      status: 'in-progress'
-    });
-  }
-
-  if (current === 'license') {
-    if (onboardingState.orgManagedLicense) {
-      return true;
-    }
-
-    if (!onboardingState.answers.licenseSelection) {
-      onboardingState.answers.licenseSelection = 'free-personal';
-      selectLicenseCard('free-personal');
-    }
-  }
-
-  return true;
 }
 
 function bindNavigation() {
@@ -263,205 +285,48 @@ function bindNavigation() {
   });
 }
 
-function bindPersonaSelection() {
-  document.querySelectorAll('[data-persona]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      onboardingState.answers.persona = btn.getAttribute('data-persona');
-      togglePersonaButtons(onboardingState.answers.persona);
-      onboardingState.recommendation = recommendPlan(onboardingState.answers.persona);
-      await persistProgress({ persona: onboardingState.answers.persona, recommendation: onboardingState.recommendation, status: 'in-progress' });
-      renderRecommendation();
-    });
-  });
-}
-
-function bindGoals() {
-  document.querySelectorAll('[data-goal]').forEach(btn => {
+function bindSuiteSelection() {
+  document.querySelectorAll('[data-suite-toggle]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const goal = btn.getAttribute('data-goal');
-      const hasGoal = onboardingState.answers.goals.includes(goal);
-      onboardingState.answers.goals = hasGoal
-        ? onboardingState.answers.goals.filter(g => g !== goal)
-        : [...onboardingState.answers.goals, goal];
-      toggleButtons('[data-goal]', onboardingState.answers.goals);
+      if (onboardingState.orgManaged) return;
+      const suite = btn.getAttribute('data-suite-toggle');
+      onboardingState.suites[suite] = !onboardingState.suites[suite];
+      updateSuiteButtons();
     });
   });
-
-  const intentInput = document.getElementById('intentInput');
-  if (intentInput) {
-    intentInput.addEventListener('input', () => {
-      onboardingState.answers.intent = intentInput.value.trim();
-    });
-  }
 }
 
-function bindUsage() {
-  document.querySelectorAll('[data-usage]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const usage = btn.getAttribute('data-usage');
-      const selected = onboardingState.answers.usage.includes(usage);
-      onboardingState.answers.usage = selected
-        ? onboardingState.answers.usage.filter(item => item !== usage)
-        : [...onboardingState.answers.usage, usage];
-      toggleButtons('[data-usage]', onboardingState.answers.usage);
-    });
-  });
-
-  const useCaseInput = document.getElementById('useCaseInput');
-  if (useCaseInput) {
-    useCaseInput.addEventListener('input', () => {
-      onboardingState.answers.useCases = useCaseInput.value.trim();
-    });
-  }
-}
-
-function bindLicenseSelection() {
-  document.querySelectorAll('[data-license-select]').forEach(btn => {
-    btn.addEventListener('click', async event => {
-      if (onboardingState.orgManagedLicense) return;
-
-      const license = btn.getAttribute('data-license-select');
-      selectLicenseCard(license);
-      onboardingState.answers.licenseSelection = license;
-      const billingDetails = buildBillingDetails();
-      await persistProgress({
-        licenseSelection: license,
-        ...(billingDetails ? { billingDetails } : {}),
-        status: 'in-progress'
-      });
-      if (license === 'vendor-enterprise' || license === 'procurement-enterprise') {
-        window.open('mailto:sales@agamatechnologies.com?subject=Agama%20Enterprise%20Workspace', '_blank');
-      }
-    });
-  });
-
-  const salesBtn = document.getElementById('consultingOrgContact');
-  if (salesBtn) {
-    salesBtn.addEventListener('click', () => {
-      window.open('mailto:sales@agamatechnologies.com?subject=Consulting%20Enterprise%20License', '_blank');
-    });
-  }
-}
-
-function bindOrgLicenseCheck() {
+function bindOrgRefresh() {
   const btn = document.getElementById('checkOrgLicense');
-  if (!btn) return;
   const feedback = document.getElementById('orgLicenseFeedback');
-
+  if (!btn) return;
   btn.addEventListener('click', async () => {
-    if (feedback) feedback.textContent = 'Checking your organisation...';
-
+    if (feedback) feedback.textContent = 'Checking organisation membership...';
     try {
       const res = await fetch('/api/org/current', { credentials: 'include' });
       if (!res.ok) {
-        if (feedback) feedback.textContent = 'Could not verify organisation. Please try again.';
+        if (feedback) feedback.textContent = 'Could not verify organisation. Try again later.';
         return;
       }
       const json = await res.json();
-      const org = json.organization || null;
-
-      if (org) {
-        setOrgManagedState(true);
-
-        if (feedback) {
-          feedback.textContent =
-            'We found your organisation (' + (org.name || 'Your organisation') + '). Your licence is managed by your admin. You can continue without selecting a plan.';
-        }
-      } else {
-        setOrgManagedState(false);
-
-        if (feedback) {
-          feedback.textContent =
-            'We did not find a business organisation linked to this account. Use the options above to choose a plan or stay on free.';
-        }
+      onboardingState.organization = json.organization;
+      const managed = json.organization && json.organization.tier === 'business';
+      setOrgManagedUI(managed, json.organization);
+      if (feedback) {
+        feedback.textContent = managed
+          ? 'Organisation detected. Licensing is managed by your admin.'
+          : 'No managed organisation found. We will create one with your purchase.';
       }
     } catch (err) {
-      console.error('Org licence check failed', err);
+      console.error('Org check failed', err);
       if (feedback) feedback.textContent = 'Unable to check organisation right now.';
     }
   });
 }
 
-function recommendPlan(persona) {
-  if (persona === 'vendor' || persona === 'both') return 'vendor-enterprise';
-  if (persona === 'buyer') return 'procurement-enterprise';
-  if (persona === 'consultant') return 'consulting-enterprise';
-  return 'free-personal';
-}
-
-function renderRecommendation() {
-  const badge = document.getElementById('licenseRecommendation');
-  if (badge) badge.textContent = recommendedLabel(onboardingState.recommendation);
-  document.querySelectorAll('.license-card').forEach(card => {
-    const license = card.getAttribute('data-license');
-    const recommended = license === onboardingState.recommendation;
-    card.classList.toggle('border-info', recommended);
-    card.classList.toggle('shadow', card.classList.contains('border-success') || recommended);
-  });
-}
-
-async function loadOnboarding() {
-  try {
-    const res = await fetch('/api/onboarding', { credentials: 'include' });
-    if (res.status === 401) {
-      window.location.href = '/api/auth/workos/login';
-      return;
-    }
-    const json = await res.json();
-    onboardingState.user = json.user;
-    onboardingState.status = json.onboarding?.status || 'pending';
-    onboardingState.recommendation = json.onboarding?.recommendation || recommendPlan(json.user?.persona);
-    onboardingState.answers.persona = json.user?.persona && json.user.persona !== 'unknown' ? json.user.persona : null;
-    onboardingState.answers.goals = json.onboarding?.responses?.goals || [];
-    onboardingState.answers.intent = json.onboarding?.responses?.intent || '';
-    onboardingState.answers.useCases = (json.onboarding?.responses?.useCases || [])[0] || '';
-    onboardingState.answers.usage = json.onboarding?.responses?.usage || [];
-    onboardingState.answers.licenseSelection = json.onboarding?.responses?.licenseSelection || null;
-
-    const orgFeedback = document.getElementById('orgLicenseFeedback');
-    const isOrgManagedUser = json.user?.licenseTier === 'business' || !!json.user?.defaultOrganizationId;
-    if (isOrgManagedUser) {
-      setOrgManagedState(true);
-      if (orgFeedback) {
-        orgFeedback.textContent = 'Your licence is managed by your organisation. You can continue without selecting a plan.';
-      }
-    }
-
-    if (onboardingState.status === 'completed' && !new URLSearchParams(window.location.search).has('force')) {
-      window.location.href = '/workspace.html';
-      return;
-    }
-
-    hydrateForm();
-    updateProgress();
-    setSectionVisibility();
-    renderRecommendation();
-  } catch (err) {
-    console.error('Unable to load onboarding', err);
-  }
-}
-
-function hydrateForm() {
-  if (onboardingState.answers.persona) {
-    togglePersonaButtons(onboardingState.answers.persona);
-  }
-  toggleButtons('[data-goal]', onboardingState.answers.goals);
-  toggleButtons('[data-usage]', onboardingState.answers.usage);
-  const intentInput = document.getElementById('intentInput');
-  if (intentInput) intentInput.value = onboardingState.answers.intent || '';
-  const useCaseInput = document.getElementById('useCaseInput');
-  if (useCaseInput) useCaseInput.value = onboardingState.answers.useCases || '';
-  if (onboardingState.answers.licenseSelection) {
-    selectLicenseCard(onboardingState.answers.licenseSelection);
-  }
-}
-
 document.addEventListener('DOMContentLoaded', () => {
   bindNavigation();
-  bindPersonaSelection();
-  bindGoals();
-  bindUsage();
-  bindLicenseSelection();
-  bindOrgLicenseCheck();
-  loadOnboarding();
+  bindSuiteSelection();
+  bindOrgRefresh();
+  loadContext();
 });

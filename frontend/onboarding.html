@@ -22,7 +22,7 @@
       <div class="onboarding-header">
         <div>
           <span class="eyebrow d-block">Welcome to Agama</span>
-          <h3 class="mb-0" id="onboardingTitle">Let's tailor your workspace</h3>
+          <h3 class="mb-0" id="onboardingTitle">Enable your suites</h3>
         </div>
         <span class="badge-soft" id="onboardingStatusBadge">Required</span>
       </div>
@@ -30,178 +30,197 @@
       <div class="onboarding-body">
         <div class="onboarding-progress" id="onboardingProgress"></div>
 
-        <section class="onboarding-section active" data-step="persona">
-          <h4 class="h5 mb-2">Who are you and what brought you here?</h4>
-          <p class="text-fg-3 small mb-3">We use this to prioritise the right playbooks, templates, and rooms.</p>
-          <div class="row g-2" id="personaOptions">
-            <div class="col-sm-6 col-lg-3">
-              <button class="btn btn-outline-light w-100 text-start" data-persona="vendor">
-                <strong>Vendor</strong>
-                <div class="small text-fg-3">We sell software or services</div>
-              </button>
-            </div>
-            <div class="col-sm-6 col-lg-3">
-              <button class="btn btn-outline-light w-100 text-start" data-persona="buyer">
-                <strong>Buyer</strong>
-                <div class="small text-fg-3">We procure software or services</div>
-              </button>
-            </div>
-            <div class="col-sm-6 col-lg-3">
-              <button class="btn btn-outline-light w-100 text-start" data-persona="consultant">
-                <strong>Consultant</strong>
-                <div class="small text-fg-3">Advising or delivering for customers</div>
-              </button>
-            </div>
-            <div class="col-sm-6 col-lg-3">
-              <button class="btn btn-outline-light w-100 text-start" data-persona="both">
-                <strong>Both sides</strong>
-                <div class="small text-fg-3">We sell and buy or partner</div>
-              </button>
-            </div>
-            <div class="col-sm-6 col-lg-3">
-              <button class="btn btn-outline-light w-100 text-start" data-persona="explorer">
-                <strong>Exploring</strong>
-                <div class="small text-fg-3">Just evaluating the platform</div>
-              </button>
-            </div>
-          </div>
-          <div class="form-text" id="personaFeedback"></div>
-        </section>
-
-        <section class="onboarding-section" data-step="intent">
-          <h4 class="h5 mb-2">What are you trying to accomplish first?</h4>
-          <p class="text-fg-3 small mb-3">Pick the outcomes that best describe why you're here.</p>
-          <div class="d-flex flex-wrap gap-2" id="goalOptions">
-            <button class="btn btn-outline-light" type="button" data-goal="value-sales">Run value assessments for prospects</button>
-            <button class="btn btn-outline-light" type="button" data-goal="procurement-clarity">Structure procurement &amp; vendor reviews</button>
-            <button class="btn btn-outline-light" type="button" data-goal="consulting">Deliver consulting playbooks to clients</button>
-            <button class="btn btn-outline-light" type="button" data-goal="room-collab">Collaborate with buyers &amp; partners in rooms</button>
-            <button class="btn btn-outline-light" type="button" data-goal="explore">Explore capabilities</button>
-          </div>
-          <div class="mt-3">
-            <label class="form-label" for="intentInput">What do you want Agama to solve?</label>
-            <textarea class="form-control" id="intentInput" rows="3" placeholder="e.g., Standardise value assessments and share outputs with customers"></textarea>
-          </div>
-        </section>
-
-        <section class="onboarding-section" data-step="usage">
-          <h4 class="h5 mb-2">How do you want to use Agama?</h4>
-          <p class="text-fg-3 small mb-3">We will tailor templates, rooms, and governance around your answer.</p>
-          <div class="row g-2 mb-3" id="usageOptions">
-            <div class="col-md-4">
-              <button class="btn btn-outline-light w-100 text-start" data-usage="assessments">
-                <strong>ValueSphere assessments</strong>
-                <div class="small text-fg-3">Guided discovery, maturity models, and value maps.</div>
-              </button>
-            </div>
-            <div class="col-md-4">
-              <button class="btn btn-outline-light w-100 text-start" data-usage="procurement">
-                <strong>ProcurePath</strong>
-                <div class="small text-fg-3">Vendor governance, RFx control tower, and AI guardrails.</div>
-              </button>
-            </div>
-            <div class="col-md-4">
-              <button class="btn btn-outline-light w-100 text-start" data-usage="gtm">
-                <strong>RevenueForge</strong>
-                <div class="small text-fg-3">Wire GTM plays and AI follow-through after assessments.</div>
-              </button>
-            </div>
-          </div>
-          <label class="form-label" for="useCaseInput">Anything specific we should know?</label>
-          <textarea class="form-control" id="useCaseInput" rows="3" placeholder="e.g., I need to trial assessments with three strategic accounts."></textarea>
-        </section>
-
-        <section class="onboarding-section" data-step="license">
-          <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+        <section class="onboarding-section active" data-step="seller">
+          <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
             <div>
-              <h4 class="h5 mb-1">Choose your license</h4>
-              <p class="text-fg-3 small mb-0">We recommend the best fit based on your answers. Billing is collected later.</p>
+              <h4 class="h5 mb-2">Seller Suite: win with buyers in one workspace</h4>
+              <p class="text-fg-3 small mb-0">Orchestrate value rooms, RevenueForge follow-through, and shared governance for sellers.</p>
             </div>
-            <span class="badge-soft" id="licenseRecommendation">Recommended</span>
+            <span class="badge-soft">Suite overview</span>
           </div>
-          <div class="row g-3" id="licenseOptions">
+          <div class="row g-3">
             <div class="col-md-6">
-              <div class="card glass h-100 p-3 license-card" data-license="vendor-enterprise">
-                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                  <div>
-                    <h5 class="h6 mb-1">Vendor Enterprise</h5>
-                    <p class="small text-fg-3 mb-0">Purpose-built for vendors running enterprise pursuits.</p>
-                  </div>
-                  <span class="badge-soft">Contact sales</span>
-                </div>
-                <ul class="small text-fg-2 mb-3">
-                  <li>Enterprise room orchestration with buyer collaboration.</li>
-                  <li>ValueSphere and RevenueForge aligned to complex deals.</li>
-                  <li>Security, SSO, and shared governance handled by Agama.</li>
+              <div class="glass p-3 rounded-3 h-100">
+                <h5 class="h6 mb-2">What you get</h5>
+                <ul class="text-fg-2 small mb-0 ps-3">
+                  <li>Engagement Rooms with shared artifacts and approvals.</li>
+                  <li>ValueSphere assessments aligned to enterprise pursuits.</li>
+                  <li>RevenueForge automation to keep pursuits on track.</li>
                 </ul>
-                <button class="btn btn-outline-light w-100" data-license-select="vendor-enterprise">Contact sales</button>
               </div>
             </div>
             <div class="col-md-6">
-              <div class="card glass h-100 p-3 license-card" data-license="procurement-enterprise">
-                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                  <div>
-                    <h5 class="h6 mb-1">Procurement Enterprise</h5>
-                    <p class="small text-fg-3 mb-0">Control tower for procurement and vendor lifecycle teams.</p>
-                  </div>
-                  <span class="badge-soft">Contact sales</span>
-                </div>
-                <ul class="small text-fg-2 mb-3">
-                  <li>Vendor intake, RFx, and contract guardrails in one place.</li>
-                  <li>Engagement rooms for suppliers and internal approvers.</li>
-                  <li>Business license with enterprise SSO and controls.</li>
+              <div class="glass p-3 rounded-3 h-100">
+                <h5 class="h6 mb-2">Why teams use it</h5>
+                <ul class="text-fg-2 small mb-0 ps-3">
+                  <li>Keep buyers, partners, and sellers in sync.</li>
+                  <li>Standardise discovery, value proof, and governance.</li>
+                  <li>Provision Engagement Rooms automatically with Seller suite.</li>
                 </ul>
-                <button class="btn btn-outline-light w-100" data-license-select="procurement-enterprise">Contact sales</button>
-              </div>
-            </div>
-            <div class="col-md-6">
-              <div class="card glass h-100 p-3 license-card" data-license="consulting-enterprise">
-                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                  <div>
-                    <h5 class="h6 mb-1">Consulting Enterprise</h5>
-                    <p class="small text-fg-3 mb-0">For consultants delivering more than three assessments.</p>
-                  </div>
-                  <span class="badge-soft">$250/mo personal</span>
-                </div>
-                <ul class="small text-fg-2 mb-3">
-                  <li>Unlimited Navigator assessments and room-sharing.</li>
-                  <li>Template libraries, playbooks, and GTM handoffs.</li>
-                  <li>Personal billing now; organisational licenses via sales.</li>
-                </ul>
-                <div class="mb-2">
-                  <label class="form-label small" for="billingName">Billing contact (personal)</label>
-                  <input class="form-control form-control-sm" id="billingName" placeholder="Your name" />
-                  <input class="form-control form-control-sm mt-2" id="billingEmail" type="email" placeholder="you@example.com" />
-                </div>
-                <div class="d-grid gap-2">
-                  <button class="btn btn-primary" data-license-select="consulting-enterprise">Start $250/mo personal</button>
-                  <button class="btn btn-outline-light" type="button" id="consultingOrgContact">Contact sales for org</button>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-6">
-              <div class="card glass h-100 p-3 license-card" data-license="free-personal">
-                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                  <div>
-                    <h5 class="h6 mb-1">Free personal</h5>
-                    <p class="small text-fg-3 mb-0">Trial Agama with limited assessments before upgrading.</p>
-                  </div>
-                  <span class="badge-soft">3 assessments</span>
-                </div>
-                <ul class="small text-fg-2 mb-3">
-                  <li>Up to 3 ValueSphere assessments.</li>
-                  <li>Sample templates and single-player rooms.</li>
-                  <li>Upgrade anytime for enterprise governance.</li>
-                </ul>
-                <button class="btn btn-outline-light w-100" data-license-select="free-personal">Stay on free</button>
               </div>
             </div>
           </div>
+        </section>
+
+        <section class="onboarding-section" data-step="buyer">
+          <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+            <div>
+              <h4 class="h5 mb-2">Buyer Suite: control vendor intake and decisions</h4>
+              <p class="text-fg-3 small mb-0">ProcurePath workflows, RFx controls, and buyer guardrails to run procurement with confidence.</p>
+            </div>
+            <span class="badge-soft">Suite overview</span>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="glass p-3 rounded-3 h-100">
+                <h5 class="h6 mb-2">What you get</h5>
+                <ul class="text-fg-2 small mb-0 ps-3">
+                  <li>Vendor intake and RFx control tower with approvals.</li>
+                  <li>AI guardrails for policy, security, and legal reviews.</li>
+                  <li>Shared Engagement Rooms for suppliers and approvers.</li>
+                </ul>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="glass p-3 rounded-3 h-100">
+                <h5 class="h6 mb-2">Why teams use it</h5>
+                <ul class="text-fg-2 small mb-0 ps-3">
+                  <li>One place to coordinate stakeholders and suppliers.</li>
+                  <li>Consistent governance without slowing decisions.</li>
+                  <li>Suite-level billing and seats for procurement teams.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="onboarding-section" data-step="plan">
+          <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+            <div>
+              <h4 class="h5 mb-1">Choose suites and set up your organisation</h4>
+              <p class="text-fg-3 small mb-0" id="orgStatusText">We’ll check if your access is already managed.</p>
+            </div>
+            <span class="badge-soft" id="orgBadge">Org check</span>
+          </div>
+
+          <div class="alert alert-warning d-none" id="orgManagedAlert">
+            You’re already part of an organisation with managed licensing. Suite choices are locked by your admin—click Finish to continue.
+          </div>
+
+          <div id="suiteSelectionPanel">
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <div class="card glass h-100 p-3 selectable-card" data-suite="seller">
+                  <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                    <div>
+                      <h5 class="h6 mb-1">Seller Suite</h5>
+                      <p class="small text-fg-3 mb-0">Includes Engagement Rooms</p>
+                    </div>
+                    <span class="badge-soft" id="sellerPriceLabel">$240/mo</span>
+                  </div>
+                  <ul class="small text-fg-2 mb-3 ps-3">
+                    <li>Rooms, ValueSphere, and RevenueForge automation.</li>
+                    <li>Suite billing with monthly seats.</li>
+                  </ul>
+                  <button class="btn btn-outline-light w-100" type="button" data-suite-toggle="seller">Add Seller Suite</button>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="card glass h-100 p-3 selectable-card" data-suite="buyer">
+                  <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                    <div>
+                      <h5 class="h6 mb-1">Buyer Suite</h5>
+                      <p class="small text-fg-3 mb-0">ProcurePath controls</p>
+                    </div>
+                    <span class="badge-soft" id="buyerPriceLabel">$180/mo</span>
+                  </div>
+                  <ul class="small text-fg-2 mb-3 ps-3">
+                    <li>Vendor intake, RFx guardrails, and approvals.</li>
+                    <li>Monthly billing for buyer teams.</li>
+                  </ul>
+                  <button class="btn btn-outline-light w-100" type="button" data-suite-toggle="buyer">Add Buyer Suite</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="glass p-3 rounded-3 mb-3">
+              <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                  <i class="bi bi-calculator text-brand"></i>
+                  <div>
+                    <div class="small text-fg-3">Monthly total (billed monthly)</div>
+                    <strong id="priceSummary">$0/mo</strong>
+                  </div>
+                </div>
+                <div class="small text-fg-3" id="suiteSelectionHelper">Select at least one suite to enable billing.</div>
+              </div>
+            </div>
+
+            <div class="row g-3">
+              <div class="col-lg-6">
+                <div class="card glass p-3 h-100">
+                  <h5 class="h6 mb-2">Organisation details</h5>
+                  <div class="mb-2">
+                    <label class="form-label" for="orgNameInput">Organisation name</label>
+                    <input class="form-control" id="orgNameInput" placeholder="e.g., Apex Labs" />
+                  </div>
+                  <div class="row g-2">
+                    <div class="col-6">
+                      <label class="form-label" for="orgSeatsInput">Seats needed</label>
+                      <input class="form-control" id="orgSeatsInput" type="number" min="1" value="10" />
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label" for="orgDomainInput">Primary domain</label>
+                      <input class="form-control" id="orgDomainInput" placeholder="example.com" />
+                    </div>
+                  </div>
+                  <div class="mt-2">
+                    <small class="text-fg-3">We’ll create the org in WorkOS and MongoDB and make you the admin.</small>
+                  </div>
+                </div>
+              </div>
+              <div class="col-lg-6">
+                <div class="card glass p-3 h-100">
+                  <h5 class="h6 mb-2">Billing preview</h5>
+                  <p class="text-fg-3 small">Enter details now (any values accepted). Stripe will be added later.</p>
+                  <div class="mb-2">
+                    <label class="form-label" for="billingName">Billing contact</label>
+                    <input class="form-control" id="billingName" placeholder="Name" />
+                  </div>
+                  <div class="mb-2">
+                    <label class="form-label" for="billingEmail">Billing email</label>
+                    <input class="form-control" id="billingEmail" type="email" placeholder="finance@example.com" />
+                  </div>
+                  <div class="row g-2 mb-2">
+                    <div class="col-8">
+                      <label class="form-label" for="cardNumber">Card number</label>
+                      <input class="form-control" id="cardNumber" placeholder="0000 0000 0000 0000" />
+                    </div>
+                    <div class="col-2">
+                      <label class="form-label" for="cardExpiry">Expiry</label>
+                      <input class="form-control" id="cardExpiry" placeholder="MM/YY" />
+                    </div>
+                    <div class="col-2">
+                      <label class="form-label" for="cardCvc">CVC</label>
+                      <input class="form-control" id="cardCvc" placeholder="000" />
+                    </div>
+                  </div>
+                  <div class="mb-2">
+                    <label class="form-label" for="billingAddress">Billing address</label>
+                    <input class="form-control" id="billingAddress" placeholder="Address" />
+                  </div>
+                  <div class="mb-0">
+                    <label class="form-label" for="billingNotes">Notes</label>
+                    <textarea class="form-control" id="billingNotes" rows="2" placeholder="Purchase order, tax details, etc."></textarea>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="mt-3 d-flex justify-content-between align-items-center">
-            <button class="btn btn-outline-light btn-sm" type="button" id="checkOrgLicense">
-              Check if my account belongs to an organisation
-            </button>
-            <div class="small text-fg-3" id="orgLicenseFeedback"></div>
+            <div class="small text-fg-3" id="orgLicenseFeedback">We’ll ask you to confirm org details before billing.</div>
+            <button class="btn btn-outline-light btn-sm" type="button" id="checkOrgLicense">Refresh org status</button>
           </div>
         </section>
       </div>
@@ -209,7 +228,7 @@
       <div class="onboarding-actions">
         <button class="btn btn-outline-light" type="button" id="backStep">Back</button>
         <div class="d-flex align-items-center gap-2">
-          <div class="small text-fg-3" id="stepHint">Step 1 of 4</div>
+          <div class="small text-fg-3" id="stepHint">Step 1 of 3</div>
           <button class="btn btn-primary" type="button" id="nextStep">Continue</button>
         </div>
       </div>
