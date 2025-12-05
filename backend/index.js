@@ -475,11 +475,27 @@ function buildSuiteEntitlements(user, orgContext, membership) {
     engagementRoomsProvisioned: Boolean(membership?.engagementRoomsProvisioned)
   };
 
+  const effectiveSeller =
+    orgSuites.sellerSuiteEnabled &&
+    membershipSuites.sellerSuiteProvisioned &&
+    !isGuest;
+
+  const effectiveBuyer =
+    orgSuites.buyerSuiteEnabled &&
+    membershipSuites.buyerSuiteProvisioned &&
+    !isGuest;
+
+  // IMPORTANT:
+  // Engagement Rooms is part of the Seller suite.
+  // There is no separate "rooms" license at the entitlement level anymore.
+  // For backwards compatibility, we still compute an "engagementRooms"
+  // effective flag, but it is derived from the Seller suite entitlement.
+  const effectiveRooms = effectiveSeller;
+
   const effective = {
-    sellerSuite: orgSuites.sellerSuiteEnabled && membershipSuites.sellerSuiteProvisioned && !isGuest,
-    buyerSuite: orgSuites.buyerSuiteEnabled && membershipSuites.buyerSuiteProvisioned && !isGuest,
-    // Guests allowed for Rooms if org + membership allow it
-    engagementRooms: orgSuites.engagementRoomsEnabled && membershipSuites.engagementRoomsProvisioned
+    sellerSuite: effectiveSeller,
+    buyerSuite: effectiveBuyer,
+    engagementRooms: effectiveRooms
   };
 
   return {
@@ -935,7 +951,9 @@ const adminOrganizationCreateSchema = z
     productAccess: z.array(z.string()).default([]),
     seatLimit: z.number().int().positive().max(100000).default(10),
     domains: z.array(z.string().trim()).default([]),
-    workosOrganizationId: z.string().trim().optional()
+    workosOrganizationId: z.string().trim().optional(),
+    sellerSuiteEnabled: z.boolean().optional(),
+    buyerSuiteEnabled: z.boolean().optional()
   })
   .refine(payload => payload.productAccess.every(id => PLATFORM_IDS.has(id)), {
     message: 'Invalid product access selection',
@@ -950,7 +968,9 @@ const adminOrganizationUpdateSchema = z
     productAccess: z.array(z.string()).optional(),
     seatLimit: z.number().int().positive().max(100000).optional(),
     domains: z.array(z.string().trim()).optional(),
-    workosOrganizationId: z.string().trim().optional()
+    workosOrganizationId: z.string().trim().optional(),
+    sellerSuiteEnabled: z.boolean().optional(),
+    buyerSuiteEnabled: z.boolean().optional()
   })
   .refine(payload => !payload.productAccess || payload.productAccess.every(id => PLATFORM_IDS.has(id)), {
     message: 'Invalid product access selection',
@@ -964,8 +984,7 @@ const membershipUpdateSchema = z.object({
 
 const adminMembershipSuitesUpdateSchema = z.object({
   sellerSuiteProvisioned: z.boolean().optional(),
-  buyerSuiteProvisioned: z.boolean().optional(),
-  engagementRoomsProvisioned: z.boolean().optional()
+  buyerSuiteProvisioned: z.boolean().optional()
 });
 
 const membershipCreateSchema = z.object({
@@ -2251,6 +2270,9 @@ app.get(
             tier: org.tier,
             orgType: org.orgType || 'both',
             productAccess,
+            sellerSuiteEnabled: Boolean(org.sellerSuiteEnabled),
+            buyerSuiteEnabled: Boolean(org.buyerSuiteEnabled),
+            engagementRoomsEnabled: Boolean(org.engagementRoomsEnabled),
             domains: Array.isArray(org.domains) ? org.domains : [],
             seatLimit: org.seatLimit,
             seatsUsed,
@@ -2373,7 +2395,11 @@ app.patch(
         if (!orgSuites.sellerSuiteEnabled && payload.sellerSuiteProvisioned) {
           return res.status(400).json({ error: 'Seller suite is not enabled for this organization.' });
         }
-        membership.sellerSuiteProvisioned = Boolean(payload.sellerSuiteProvisioned);
+        const value = Boolean(payload.sellerSuiteProvisioned);
+        membership.sellerSuiteProvisioned = value;
+
+        // Engagement Rooms provisioning mirrors Seller suite provisioning.
+        membership.engagementRoomsProvisioned = value;
       }
 
       if (payload.buyerSuiteProvisioned !== undefined) {
@@ -2381,13 +2407,6 @@ app.patch(
           return res.status(400).json({ error: 'Buyer suite is not enabled for this organization.' });
         }
         membership.buyerSuiteProvisioned = Boolean(payload.buyerSuiteProvisioned);
-      }
-
-      if (payload.engagementRoomsProvisioned !== undefined) {
-        if (!orgSuites.engagementRoomsEnabled && payload.engagementRoomsProvisioned) {
-          return res.status(400).json({ error: 'Engagement Rooms are not enabled for this organization.' });
-        }
-        membership.engagementRoomsProvisioned = Boolean(payload.engagementRoomsProvisioned);
       }
 
       await membership.save();
@@ -3205,6 +3224,8 @@ app.post(
   async (req, res) => {
     try {
       const { name, orgType, tier, productAccess, seatLimit, domains, workosOrganizationId } = req.validatedBody;
+      const sellerSuiteEnabled = req.validatedBody.sellerSuiteEnabled ?? false;
+      const buyerSuiteEnabled = req.validatedBody.buyerSuiteEnabled ?? false;
       const slug = await generateUniqueOrgSlug(name);
       const normalizedProductAccess = normaliseProductAccess(productAccess);
 
@@ -3231,7 +3252,11 @@ app.post(
         seatLimit: seatLimit ?? 10,
         domains: domains || [],
         workosOrganizationId: resolvedWorkOSId,
-        createdBy: req.auth.uid
+        createdBy: req.auth.uid,
+        sellerSuiteEnabled,
+        buyerSuiteEnabled,
+        // Engagement Rooms is a part of the Seller suite
+        engagementRoomsEnabled: sellerSuiteEnabled
       });
 
       res.status(201).json({
@@ -3320,8 +3345,9 @@ app.patch(
       if (payload.buyerSuiteEnabled !== undefined) {
         organization.buyerSuiteEnabled = Boolean(payload.buyerSuiteEnabled);
       }
-      if (payload.engagementRoomsEnabled !== undefined) {
-        organization.engagementRoomsEnabled = Boolean(payload.engagementRoomsEnabled);
+      // ALWAYS mirror engagementRoomsEnabled to sellerSuiteEnabled
+      if (payload.sellerSuiteEnabled !== undefined) {
+        organization.engagementRoomsEnabled = organization.sellerSuiteEnabled;
       }
       if (payload.workosOrganizationId !== undefined) {
         organization.workosOrganizationId = payload.workosOrganizationId || undefined;
@@ -3436,7 +3462,11 @@ app.patch(
           platformAccess: organization.platformAccess,
           seatLimit: organization.seatLimit,
           domains: organization.domains,
-          workosOrganizationId: organization.workosOrganizationId
+          workosOrganizationId: organization.workosOrganizationId,
+          sellerSuiteEnabled: organization.sellerSuiteEnabled,
+          buyerSuiteEnabled: organization.buyerSuiteEnabled,
+          engagementRoomsEnabled: organization.engagementRoomsEnabled,
+          seatLimits: organization.seatLimits
         }
       });
     } catch (err) {

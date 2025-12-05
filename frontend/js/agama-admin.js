@@ -302,7 +302,10 @@ function populateOrgEditor(org) {
   if (seatInput) seatInput.value = org.seatLimit ?? '';
   if (workosInput) workosInput.value = org.workosOrganizationId || '';
 
-  setSelectedSuitesOnTiles('agamaOrgSuites', org?.productAccess || org?.platformAccess || []);
+  const suites = [];
+  if (org.sellerSuiteEnabled) suites.push('seller');
+  if (org.buyerSuiteEnabled) suites.push('buyer');
+  setSelectedSuitesOnTiles('agamaOrgSuites', suites);
 
   if (feedback) feedback.textContent = '';
   if (title) title.textContent = 'Edit organisation';
@@ -726,7 +729,6 @@ function renderOrgMembers() {
     const org = adminState.currentOrgOverview || {};
     const canSeller = !!org.sellerSuiteEnabled;
     const canBuyer = !!org.buyerSuiteEnabled;
-    const canRooms = !!org.engagementRoomsEnabled;
 
     function buildSuiteCheckbox(label, key, enabledForOrg) {
       const wrapper = document.createElement('label');
@@ -755,8 +757,7 @@ function renderOrgMembers() {
 
     suiteControls.push(
       buildSuiteCheckbox('Vendor', 'sellerSuiteProvisioned', canSeller),
-      buildSuiteCheckbox('Buyer', 'buyerSuiteProvisioned', canBuyer),
-      buildSuiteCheckbox('Rooms', 'engagementRoomsProvisioned', canRooms)
+      buildSuiteCheckbox('Buyer', 'buyerSuiteProvisioned', canBuyer)
     );
 
     suiteControls.forEach(ctrl => {
@@ -844,7 +845,6 @@ function renderOrgAccessTab() {
   const suites = [];
   if (org.sellerSuiteEnabled) suites.push('seller');
   if (org.buyerSuiteEnabled) suites.push('buyer');
-  if (org.engagementRoomsEnabled) suites.push('rooms');
 
   setSelectedSuitesOnTiles('agamaOrgAccessSuites', suites);
 
@@ -871,9 +871,20 @@ async function saveOrgAccessSettings() {
   const payload = {
     tier,
     sellerSuiteEnabled: selectedSuites.includes('seller'),
-    buyerSuiteEnabled: selectedSuites.includes('buyer'),
-    engagementRoomsEnabled: selectedSuites.includes('rooms')
+    buyerSuiteEnabled: selectedSuites.includes('buyer')
   };
+
+  // Derive productAccess for legacy consumers
+  const products = new Set();
+  if (payload.sellerSuiteEnabled) {
+    products.add('valuesphere');
+    products.add('revenueforge');
+  }
+  if (payload.buyerSuiteEnabled) {
+    products.add('valuesphere');
+    products.add('procurepath');
+  }
+  payload.productAccess = Array.from(products);
   if (!Number.isNaN(seatLimit)) {
     payload.seatLimit = seatLimit;
   }
@@ -1143,14 +1154,33 @@ async function saveOrganization(event) {
     return;
   }
 
-  const productAccess = getSelectedSuitesFromTiles('agamaOrgSuites');
+  const selectedSuites = getSelectedSuitesFromTiles('agamaOrgSuites');
   const domains = domainsRaw
     .split(',')
     .map(value => value.trim())
     .filter(Boolean);
   const seatLimit = seatLimitInput ? parseInt(seatLimitInput, 10) : undefined;
 
-  const payload = { name, orgType, tier, productAccess, domains };
+  const payload = {
+    name,
+    orgType,
+    tier,
+    domains,
+    sellerSuiteEnabled: selectedSuites.includes('seller'),
+    buyerSuiteEnabled: selectedSuites.includes('buyer')
+  };
+
+  // Derive productAccess for legacy parts of the app
+  const products = new Set();
+  if (payload.sellerSuiteEnabled) {
+    products.add('valuesphere');
+    products.add('revenueforge');
+  }
+  if (payload.buyerSuiteEnabled) {
+    products.add('valuesphere');
+    products.add('procurepath');
+  }
+  payload.productAccess = Array.from(products);
   if (!Number.isNaN(seatLimit)) payload.seatLimit = seatLimit;
   payload.workosOrganizationId = workosId || '';
 

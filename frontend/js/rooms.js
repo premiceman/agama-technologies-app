@@ -53,32 +53,31 @@ function roomsEntitlement() {
   const membership = suites.membership || {};
   const isGuest = state.user?.licenseTier === 'guest';
 
-  if (effective.engagementRooms) {
+  // Engagement Rooms are now part of the Seller suite.
+  if (effective.sellerSuite) {
     return { allowed: true };
   }
 
-  // More precise feedback:
-  if (!org.engagementRoomsEnabled) {
+  if (!org.sellerSuiteEnabled) {
     return {
       allowed: false,
       reason:
-        'Engagement Rooms are not enabled for this organisation yet. Talk to Agama to switch them on for your workspace.'
+        'Engagement Rooms are part of the Seller suite. This organisation has not enabled the Seller suite yet.'
     };
   }
 
-  if (!membership.engagementRoomsProvisioned) {
+  if (!membership.sellerSuiteProvisioned || isGuest) {
     return {
       allowed: false,
       reason:
-        'Engagement Rooms are enabled for your organisation, but your user is not provisioned for access yet. Ask your workspace admin to grant you access.'
+        'Engagement Rooms are part of the Seller suite, but your user is not provisioned for Seller access. Ask your workspace admin to grant you the Seller suite.'
     };
   }
 
-  // Fallback
   return {
     allowed: false,
     reason:
-      'Engagement Rooms are part of advanced Agama workspaces. Talk to us to switch it on and unify every buyer conversation.'
+      'Engagement Rooms are part of advanced Agama workspaces. Talk to us to switch on the Seller suite and unify every buyer conversation.'
   };
 }
 
