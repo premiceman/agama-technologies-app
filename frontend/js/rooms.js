@@ -131,23 +131,29 @@ function resolveOrgName(orgId) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Engagement Rooms index page: use the container that actually exists in rooms.html
+  const path = (window.location && window.location.pathname) || '';
+
+  // Engagement Rooms index page – detect via URL first
+  const isRoomsIndex =
+    path === '/rooms' ||
+    path === '/rooms.html' ||
+    path.endsWith('/rooms');
+
+  // Fallback: if the roomsExperience container exists, also treat it as the index page
   const roomsExperience = document.getElementById('roomsExperience');
 
-  // Room detail page
-  const roomTitle = document.getElementById('roomTitle');
-
-  // Invite status page
-  const inviteStatus = document.getElementById('roomInviteStatus');
-
-  if (roomsExperience) {
+  if (isRoomsIndex || roomsExperience) {
     initRoomsPage();
   }
 
+  // Room detail page
+  const roomTitle = document.getElementById('roomTitle');
   if (roomTitle) {
     initRoomDetailPage();
   }
 
+  // Invite status page
+  const inviteStatus = document.getElementById('roomInviteStatus');
   if (inviteStatus) {
     initRoomInvitePage();
   }
