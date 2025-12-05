@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Organisation Admin — Agama Workspace</title>
+  <title>Org Billing — Agama Workspace</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
@@ -50,20 +50,13 @@
             <span class="sidebar-label">ProcurePath</span>
           </a>
         </div>
-        <div class="sidebar-section-label">Docs</div>
-        <div class="sidebar-section">
-          <a class="sidebar-link" href="/docs.html">
-            <i class="bi bi-journal-text"></i>
-            <span class="sidebar-label">Docs</span>
-          </a>
-        </div>
         <div class="sidebar-section-label" id="orgAdminLabel" style="display:none;">Organisation</div>
         <div class="sidebar-section" id="orgAdminSection" style="display:none;">
-          <a class="sidebar-link active" href="/admin-org.html" id="orgAdminLink">
+          <a class="sidebar-link" href="/admin-org.html" id="orgAdminLink">
             <i class="bi bi-building-gear"></i>
             <span class="sidebar-label">Org &amp; Members</span>
           </a>
-          <a class="sidebar-link" href="/org-billing.html" id="orgBillingLink">
+          <a class="sidebar-link active" href="/org-billing.html" id="orgBillingLink">
             <i class="bi bi-credit-card"></i>
             <span class="sidebar-label">Usage &amp; Billing</span>
           </a>
@@ -87,7 +80,7 @@
           </a>
           <a class="sidebar-link" href="/billing.html">
             <i class="bi bi-credit-card"></i>
-            <span class="sidebar-label">Billing</span>
+            <span class="sidebar-label">Personal Billing</span>
           </a>
         </div>
       </nav>
@@ -107,11 +100,11 @@
         </div>
       </nav>
 
-      <main class="container py-5" style="max-width: 1080px;">
+      <main class="container py-5" style="max-width: 1100px;">
         <header class="card glass p-4 mb-4">
           <span class="eyebrow">Organisation</span>
-          <h1 class="h4 mb-2">Org &amp; members</h1>
-          <p class="text-fg-3 mb-0">Manage your business workspace members and access without touching billing.</p>
+          <h1 class="h4 mb-2">Usage &amp; billing</h1>
+          <p class="text-fg-3 mb-0">Review seats, suite provisioning, and billing details. Monthly billing only.</p>
         </header>
 
         <div id="adminAccess" class="card glass p-4 mb-3 d-none">
@@ -119,122 +112,99 @@
           <p class="text-fg-3 mb-0">You need a business organisation admin or owner role to view this page.</p>
         </div>
 
-        <section class="row g-3" id="adminContent" style="display:none;">
-          <div class="col-lg-4">
+        <section id="billingContent" style="display:none;" class="row g-3">
+          <div class="col-lg-5">
             <div class="card glass p-4 h-100">
               <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
                 <div>
-                  <span class="eyebrow">Organisation overview</span>
+                  <span class="eyebrow">Organisation</span>
                   <h2 class="h5 mb-1" id="orgName">Loading...</h2>
                 </div>
                 <span class="badge-soft" id="orgTier">Tier</span>
               </div>
               <dl class="mb-3 small text-fg-2">
                 <div class="d-flex justify-content-between mb-1">
-                  <dt class="mb-0">Org type</dt>
-                  <dd class="mb-0" id="orgType">-</dd>
+                  <dt class="mb-0">Suite access</dt>
+                  <dd class="mb-0" id="suiteStatus">-</dd>
                 </div>
                 <div class="d-flex justify-content-between mb-1">
-                  <dt class="mb-0">Products</dt>
-                  <dd class="mb-0" id="productAccess">-</dd>
+                  <dt class="mb-0">Seats</dt>
+                  <dd class="mb-0" id="seatUsage">-</dd>
                 </div>
                 <div class="d-flex justify-content-between mb-1">
-                  <dt class="mb-0">Created</dt>
-                  <dd class="mb-0" id="orgCreated">-</dd>
+                  <dt class="mb-0">Billing cadence</dt>
+                  <dd class="mb-0">Monthly</dd>
                 </div>
               </dl>
-              <div class="glass p-3 rounded-3">
+              <div class="glass p-3 rounded-3" id="billingCard">
                 <div class="d-flex justify-content-between align-items-center">
                   <div class="d-flex align-items-center gap-2">
-                    <i class="bi bi-people-fill text-brand"></i>
-                    <span class="small">Members</span>
+                    <i class="bi bi-credit-card-2-front text-brand"></i>
+                    <div>
+                      <strong id="cardPreview">No payment method</strong>
+                      <div class="text-fg-3 small" id="billingContact">Enter billing details to save.</div>
+                    </div>
                   </div>
-                  <strong id="seatUsage">-</strong>
+                  <span class="badge-soft" id="billingCadence">Monthly</span>
                 </div>
-                <div class="text-fg-3 small" id="seatHint">Seat usage</div>
               </div>
             </div>
           </div>
-          <div class="col-lg-8">
-            <div class="card glass p-4 mb-3">
-              <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+          <div class="col-lg-7">
+            <div class="card glass p-4 h-100">
+              <div class="d-flex justify-content-between align-items-center mb-3">
                 <div>
-                  <h2 class="h5 mb-1">Members &amp; access</h2>
-                  <p class="text-fg-3 small mb-1">Invite teammates, adjust roles, and deactivate access.</p>
-                  <p class="text-fg-3 small mb-0" id="inviteHelper">Invited users will be onboarded via SSO or by Agama. If they have trouble accessing, contact support.</p>
+                  <h2 class="h5 mb-1">Update usage &amp; billing</h2>
+                  <p class="text-fg-3 small mb-0">Adjust seat limits and capture billing info. Cards are stored for preview only.</p>
                 </div>
-                <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-                  <button class="btn btn-outline-light btn-sm" type="button" id="memberFilterToggle">Show only active</button>
-                  <span class="badge-soft" id="memberCount">0 members</span>
-                </div>
+                <span class="badge-soft" id="suiteBadge">Suites</span>
               </div>
-              <div class="table-responsive">
-                <table class="table align-middle text-sm">
-                  <thead>
-                    <tr>
-                      <th scope="col">Name</th>
-                      <th scope="col">Email</th>
-                      <th scope="col">Role</th>
-                      <th scope="col">Status</th>
-                      <th scope="col">Last login</th>
-                      <th scope="col" class="text-end">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="memberRows"></tbody>
-                </table>
-              </div>
-              <div class="form-text" id="memberFeedback"></div>
-            </div>
-
-            <div class="card glass p-4">
-              <h3 class="h6 mb-3">Invite member</h3>
-              <form id="inviteForm" class="row g-3">
-                <div class="col-md-7">
-                  <label class="form-label" for="inviteEmail">Email</label>
-                  <input class="form-control" type="email" id="inviteEmail" name="email" required placeholder="teammate@example.com">
+              <form id="billingForm" class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label" for="seatLimitInput">Total seats</label>
+                  <input class="form-control" type="number" min="1" id="seatLimitInput" />
                 </div>
-                <div class="col-md-3">
-                  <label class="form-label" for="inviteRole">Role</label>
-                  <select class="form-select" id="inviteRole" name="role">
-                    <option value="member">Member</option>
-                    <option value="admin">Admin</option>
-                    <option value="owner">Owner</option>
-                    <option value="viewer">Viewer</option>
-                  </select>
+                <div class="col-md-4">
+                  <label class="form-label" for="sellerSeatInput">Seller seats</label>
+                  <input class="form-control" type="number" min="0" id="sellerSeatInput" />
                 </div>
-                <div class="col-md-2 d-flex align-items-end">
-                  <button class="btn btn-primary w-100" type="submit">Invite</button>
+                <div class="col-md-4">
+                  <label class="form-label" for="buyerSeatInput">Buyer seats</label>
+                  <input class="form-control" type="number" min="0" id="buyerSeatInput" />
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label" for="billingNameInput">Billing contact</label>
+                  <input class="form-control" id="billingNameInput" placeholder="Name" />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" for="billingEmailInput">Billing email</label>
+                  <input class="form-control" id="billingEmailInput" type="email" placeholder="finance@example.com" />
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label" for="cardNumberInput">Card number</label>
+                  <input class="form-control" id="cardNumberInput" placeholder="0000 0000 0000 0000" />
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label" for="cardExpiryInput">Expiry</label>
+                  <input class="form-control" id="cardExpiryInput" placeholder="MM/YY" />
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label" for="cardCvcInput">CVC</label>
+                  <input class="form-control" id="cardCvcInput" placeholder="000" />
                 </div>
                 <div class="col-12">
-                  <div class="form-text" id="inviteFeedback"></div>
+                  <label class="form-label" for="billingAddressInput">Billing address</label>
+                  <input class="form-control" id="billingAddressInput" placeholder="Address" />
+                </div>
+                <div class="col-12">
+                  <label class="form-label" for="billingNotesInput">Notes</label>
+                  <textarea class="form-control" id="billingNotesInput" rows="2" placeholder="PO number, tax details, etc."></textarea>
+                </div>
+                <div class="col-12 d-flex justify-content-between align-items-center">
+                  <div class="small text-fg-3" id="billingFeedback">Monthly billing is applied to all suites.</div>
+                  <button class="btn btn-primary" type="submit">Save</button>
                 </div>
               </form>
-            </div>
-
-            <div class="card glass p-4 mt-3">
-              <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
-                <div>
-                  <h3 class="h6 mb-1">Activity / Audit log</h3>
-                  <p class="text-fg-3 small mb-0">Recent membership and workspace changes in your organisation.</p>
-                </div>
-                <div class="d-flex gap-2">
-                  <button class="btn btn-outline-light btn-sm" type="button" id="refreshAudit">Refresh</button>
-                </div>
-              </div>
-              <div class="table-responsive">
-                <table class="table table-sm align-middle" aria-label="Audit log">
-                  <thead>
-                    <tr>
-                      <th scope="col">Date</th>
-                      <th scope="col">Actor</th>
-                      <th scope="col">Event</th>
-                      <th scope="col">Summary</th>
-                    </tr>
-                  </thead>
-                  <tbody id="auditRows"></tbody>
-                </table>
-              </div>
-              <div class="text-fg-3 small" id="auditEmpty" style="display:none;">No recent audit events for this organisation.</div>
             </div>
           </div>
         </section>
@@ -243,6 +213,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="/js/admin-org.js"></script>
+  <script src="/js/org-billing.js"></script>
 </body>
 </html>

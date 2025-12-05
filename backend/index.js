@@ -530,6 +530,141 @@ function applyLicenseSelection(user, selection) {
   user.platformAccess = normalised.error ? Array.from(PLATFORM_IDS) : normalised.platformAccess;
 }
 
+function suitePlanFromSelection(selection = {}) {
+  if (selection.sellerSuite && selection.buyerSuite) return 'vendor-enterprise';
+  if (selection.sellerSuite) return 'vendor-enterprise';
+  if (selection.buyerSuite) return 'procurement-enterprise';
+  return 'free-personal';
+}
+
+function normalizeBillingDetails(raw = {}) {
+  if (!raw || typeof raw !== 'object') return {};
+  const billingName = typeof raw.billingName === 'string' ? raw.billingName.trim() : undefined;
+  const email = typeof raw.email === 'string' ? raw.email.trim() : undefined;
+  const billingAddress = typeof raw.billingAddress === 'string' ? raw.billingAddress.trim() : undefined;
+  const notes = typeof raw.notes === 'string' ? raw.notes.trim() : undefined;
+  const rawCardNumber = typeof raw.cardNumber === 'string' ? raw.cardNumber : raw.card;
+  const cardNumber = rawCardNumber ? rawCardNumber.replace(/\s+/g, '') : '';
+  const last4 = cardNumber ? cardNumber.slice(-4) : null;
+  const brand = raw.cardBrand || (cardNumber && cardNumber.startsWith('4') ? 'Visa' : 'Card');
+
+  return {
+    billingName: billingName || undefined,
+    email: email || undefined,
+    billingAddress: billingAddress || undefined,
+    notes: notes || undefined,
+    billingCadence: 'monthly',
+    card: {
+      brand,
+      last4: last4 || undefined,
+      expiry: typeof raw.cardExpiry === 'string' ? raw.cardExpiry.trim() : raw.expiry,
+      rawInput: rawCardNumber || undefined
+    }
+  };
+}
+
+function sanitizeBillingProfile(profile) {
+  if (!profile || typeof profile !== 'object') return null;
+  const card = profile.card || {};
+  return {
+    billingName: profile.billingName || null,
+    email: profile.email || null,
+    billingAddress: profile.billingAddress || null,
+    notes: profile.notes || null,
+    billingCadence: profile.billingCadence || 'monthly',
+    cardPreview: card.last4 ? `${card.brand || 'Card'} •••• ${card.last4}` : null,
+    cardExpiry: card.expiry || null
+  };
+}
+
+function slugifyValue(value) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)+/g, '')
+    .slice(0, 60);
+}
+
+async function generateUniqueOrgSlug(baseValue) {
+  const base = slugifyValue(baseValue || `org-${Date.now()}`);
+  let slug = base || `org-${Date.now()}`;
+  let suffix = 1;
+  while (await Organization.findOne({ slug })) {
+    slug = `${base}-${suffix++}`;
+  }
+  return slug;
+}
+
+function deriveOrgTypeFromSuites(selection = {}) {
+  if (selection.sellerSuite && selection.buyerSuite) return 'both';
+  if (selection.sellerSuite) return 'vendor';
+  if (selection.buyerSuite) return 'buyer';
+  return 'both';
+}
+
+async function createOrgForOnboarding({ user, suiteSelection = {}, orgDraft = {}, billingDetails = null }) {
+  const name = typeof orgDraft.name === 'string' ? orgDraft.name.trim() : '';
+  if (!name) {
+    throw new Error('ORG_NAME_REQUIRED');
+  }
+
+  const slugSource = orgDraft.slug || name;
+  const slug = await generateUniqueOrgSlug(slugSource);
+  const domains = Array.isArray(orgDraft.domains) ? orgDraft.domains : [];
+  const seatLimit = orgDraft.seatLimit || orgDraft.seatRequest || 10;
+  const sellerSeatLimit = orgDraft.sellerSeatLimit || orgDraft.sellerSeats || seatLimit;
+  const buyerSeatLimit = orgDraft.buyerSeatLimit || orgDraft.buyerSeats || seatLimit;
+  const roomsSeatLimit = orgDraft.roomsSeatLimit || sellerSeatLimit;
+
+  let workosOrganizationId = orgDraft.workosOrganizationId || null;
+  if (!workosOrganizationId) {
+    try {
+      workosOrganizationId = await ensureWorkOSOrganization({ name, domains });
+    } catch (err) {
+      console.error('Failed to create WorkOS organization during onboarding', err);
+    }
+  }
+
+  const organization = await Organization.create({
+    name,
+    slug,
+    domains,
+    seatLimit,
+    seatLimits: {
+      sellerSuite: sellerSeatLimit,
+      buyerSuite: buyerSeatLimit,
+      engagementRooms: roomsSeatLimit
+    },
+    tier: 'business',
+    platformAccess: Array.from(PLATFORM_IDS),
+    productAccess: Array.from(PLATFORM_IDS),
+    orgType: deriveOrgTypeFromSuites(suiteSelection),
+    workosOrganizationId,
+    sellerSuiteEnabled: Boolean(suiteSelection.sellerSuite),
+    buyerSuiteEnabled: Boolean(suiteSelection.buyerSuite),
+    engagementRoomsEnabled: Boolean(suiteSelection.sellerSuite),
+    billingProfile: billingDetails ? normalizeBillingDetails(billingDetails) : {},
+    createdBy: user._id
+  });
+
+  const membership = await OrganizationMembership.create({
+    organization: organization._id,
+    user: user._id,
+    role: 'owner',
+    status: 'active',
+    roleOrigin: 'app',
+    sellerSuiteProvisioned: Boolean(suiteSelection.sellerSuite),
+    buyerSuiteProvisioned: Boolean(suiteSelection.buyerSuite),
+    engagementRoomsProvisioned: Boolean(suiteSelection.sellerSuite)
+  });
+
+  if (!user.defaultOrganization) {
+    user.defaultOrganization = organization._id;
+  }
+
+  return { organization, membership };
+}
+
 const AGAMA_ADMIN_UNLOCK_COOKIE = 'agama_admin_unlocked';
 const AGAMA_ADMIN_UNLOCK_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours per session
 
@@ -897,7 +1032,6 @@ const onboardingSchema = z.object({
         val => (typeof val === 'string' && val.trim() === '' ? undefined : val),
         z.string().trim().max(200).optional()
       ),
-      company: z.string().trim().max(200).optional(),
       email: z.preprocess(
         val => (typeof val === 'string' && val.trim() === '' ? undefined : val),
         z.string().email().optional()
@@ -905,9 +1039,42 @@ const onboardingSchema = z.object({
       notes: z.preprocess(
         val => (typeof val === 'string' && val.trim() === '' ? undefined : val),
         z.string().trim().max(400).optional()
-      )
+      ),
+      billingAddress: z.preprocess(
+        val => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+        z.string().trim().max(400).optional()
+      ),
+      cardNumber: z.preprocess(
+        val => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+        z.string().trim().max(120).optional()
+      ),
+      cardExpiry: z.preprocess(
+        val => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+        z.string().trim().max(64).optional()
+      ),
+      cardCvc: z.preprocess(val => (typeof val === 'string' && val.trim() === '' ? undefined : val), z.string().trim().max(10).optional())
     })
     .optional(),
+  suiteSelection: z
+    .object({
+      sellerSuite: z.boolean().optional(),
+      buyerSuite: z.boolean().optional()
+    })
+    .optional(),
+  organizationDraft: z
+    .object({
+      name: z.string().trim().min(2),
+      slug: z.string().trim().min(2).optional(),
+      domains: z.array(z.string().trim()).optional(),
+      seatLimit: z.number().int().positive().max(100000).optional(),
+      seatRequest: z.number().int().positive().max(100000).optional(),
+      sellerSeatLimit: z.number().int().positive().max(100000).optional(),
+      buyerSeatLimit: z.number().int().positive().max(100000).optional(),
+      roomsSeatLimit: z.number().int().positive().max(100000).optional()
+    })
+    .partial()
+    .optional(),
+  finalize: z.boolean().optional(),
   status: z.enum(['pending', 'in-progress', 'completed']).optional()
 });
 
@@ -985,6 +1152,24 @@ const membershipUpdateSchema = z.object({
 const adminMembershipSuitesUpdateSchema = z.object({
   sellerSuiteProvisioned: z.boolean().optional(),
   buyerSuiteProvisioned: z.boolean().optional()
+});
+
+const orgBillingUpdateSchema = z.object({
+  seatLimit: z.number().int().positive().max(100000).optional(),
+  sellerSeatLimit: z.number().int().positive().max(100000).optional(),
+  buyerSeatLimit: z.number().int().positive().max(100000).optional(),
+  roomsSeatLimit: z.number().int().positive().max(100000).optional(),
+  billingDetails: z
+    .object({
+      billingName: z.string().trim().max(200).optional(),
+      email: z.string().email().optional(),
+      billingAddress: z.string().trim().max(400).optional(),
+      notes: z.string().trim().max(400).optional(),
+      cardNumber: z.string().trim().max(120).optional(),
+      cardExpiry: z.string().trim().max(64).optional(),
+      cardCvc: z.string().trim().max(10).optional()
+    })
+    .optional()
 });
 
 const membershipCreateSchema = z.object({
@@ -2097,7 +2282,19 @@ app.post('/api/onboarding', requireAuth, validateBody(onboardingSchema), async (
 
     const payload = req.validatedBody;
     const nextResponses = { ...(user.onboardingResponses || {}) };
-    ['persona', 'usage', 'goals', 'intent', 'useCases', 'organizationType', 'recommendation', 'licenseSelection', 'billingDetails'].forEach(
+    [
+      'persona',
+      'usage',
+      'goals',
+      'intent',
+      'useCases',
+      'organizationType',
+      'recommendation',
+      'licenseSelection',
+      'billingDetails',
+      'suiteSelection',
+      'organizationDraft'
+    ].forEach(
       key => {
         if (payload[key] !== undefined) {
           nextResponses[key] = payload[key];
@@ -2109,29 +2306,79 @@ app.post('/api/onboarding', requireAuth, validateBody(onboardingSchema), async (
       user.persona = payload.persona;
     }
 
-    user.onboardingResponses = nextResponses;
-    user.onboardingStatus = payload.status || user.onboardingStatus || 'in-progress';
+    const suiteSelection = payload.suiteSelection || nextResponses.suiteSelection || {};
+    const finalize = payload.finalize === true || payload.status === 'completed';
 
-    const selection = payload.licenseSelection || nextResponses.licenseSelection;
     let isOrgManaged = user.licenseTier === 'business';
-    if (!isOrgManaged && user.defaultOrganization) {
+    if (user.defaultOrganization) {
       const defaultOrg = await Organization.findById(user.defaultOrganization);
-      if (defaultOrg && defaultOrg.tier === 'business') {
-        isOrgManaged = true;
+      const membership = defaultOrg
+        ? await OrganizationMembership.findOne({ organization: defaultOrg._id, user: user._id, status: 'active' })
+        : null;
+      if (defaultOrg && membership) {
+        if (defaultOrg.tier === 'business') {
+          isOrgManaged = true;
+        }
       }
     }
 
-    if (selection) {
-      if (!isOrgManaged) {
-        applyLicenseSelection(user, selection);
+    let createdOrg = null;
+
+    if (
+      finalize &&
+      !isOrgManaged &&
+      (suiteSelection.sellerSuite || suiteSelection.buyerSuite) &&
+      payload.organizationDraft &&
+      payload.organizationDraft.name
+    ) {
+      try {
+        const { organization } = await createOrgForOnboarding({
+          user,
+          suiteSelection,
+          orgDraft: payload.organizationDraft,
+          billingDetails: payload.billingDetails
+        });
+        createdOrg = organization;
+        isOrgManaged = true;
+      } catch (err) {
+        console.error('Onboarding org creation failed', err);
       }
+    }
+
+    user.onboardingResponses = nextResponses;
+    user.onboardingStatus = payload.status || user.onboardingStatus || 'in-progress';
+
+    const selection =
+      payload.licenseSelection || nextResponses.licenseSelection || suitePlanFromSelection(nextResponses.suiteSelection);
+
+    if (selection && finalize) {
+      if (!isOrgManaged || createdOrg) {
+        applyLicenseSelection(user, selection);
+      } else if (selection !== 'free-personal') {
+        user.licensePlan = selection;
+        user.licenseTier = 'business';
+        user.valueAssessmentLimit = null;
+        user.platformAccess = Array.from(PLATFORM_IDS);
+      }
+      user.onboardingStatus = 'completed';
+    }
+
+    if (finalize && user.onboardingStatus !== 'completed') {
       user.onboardingStatus = 'completed';
     }
 
     const recommendation = payload.recommendation || recommendLicensePlan(user.persona, nextResponses.goals);
     user.onboardingResponses.recommendation = recommendation;
     if (payload.billingDetails) {
-      user.billingProfile = { ...(user.billingProfile || {}), ...payload.billingDetails };
+      user.billingProfile = { ...(user.billingProfile || {}), ...normalizeBillingDetails(payload.billingDetails) };
+    }
+    if (createdOrg && payload.billingDetails) {
+      createdOrg.billingProfile = normalizeBillingDetails(payload.billingDetails);
+      await createdOrg.save();
+    }
+    if (createdOrg) {
+      user.onboardingResponses.organizationId = createdOrg._id.toString();
+      user.onboardingResponses.suiteSelection = suiteSelection;
     }
 
     await user.save();
@@ -2916,13 +3163,70 @@ app.get('/api/org/admin/overview', requireAuth, requireOrgAdmin, async (req, res
         productAccess,
         seatLimit: organization.seatLimit,
         seatsUsed,
-        createdAt: organization.createdAt
+        createdAt: organization.createdAt,
+        sellerSuiteEnabled: Boolean(organization.sellerSuiteEnabled),
+        buyerSuiteEnabled: Boolean(organization.buyerSuiteEnabled),
+        engagementRoomsEnabled: Boolean(organization.engagementRoomsEnabled),
+        seatLimits: organization.seatLimits || {},
+        billing: sanitizeBillingProfile(organization.billingProfile || {})
       },
       members: members.map(serializeMembership)
     });
   } catch (err) {
     console.error('Org admin overview error', err);
     res.status(500).json({ error: 'Unable to load organization overview' });
+  }
+});
+
+app.post('/api/org/admin/billing', requireAuth, requireOrgAdmin, validateBody(orgBillingUpdateSchema), async (req, res) => {
+  try {
+    const payload = req.validatedBody;
+
+    if (payload.seatLimit !== undefined) req.organization.seatLimit = payload.seatLimit;
+
+    req.organization.seatLimits = req.organization.seatLimits || {};
+    if (payload.sellerSeatLimit !== undefined) req.organization.seatLimits.sellerSuite = payload.sellerSeatLimit;
+    if (payload.buyerSeatLimit !== undefined) req.organization.seatLimits.buyerSuite = payload.buyerSeatLimit;
+    if (payload.roomsSeatLimit !== undefined) req.organization.seatLimits.engagementRooms = payload.roomsSeatLimit;
+
+    if (payload.billingDetails) {
+      req.organization.billingProfile = normalizeBillingDetails(payload.billingDetails);
+    }
+
+    await req.organization.save();
+
+    await recordAuditEvent({
+      type: 'org.billing.updated',
+      actorUser: req.requestingUser?._id || req.auth.uid,
+      actorOrganization: req.organization._id,
+      targetOrganization: req.organization._id,
+      metadata: {
+        seatLimit: req.organization.seatLimit,
+        seatLimits: req.organization.seatLimits,
+        billing: sanitizeBillingProfile(req.organization.billingProfile)
+      }
+    });
+
+    const seatsUsed = await OrganizationMembership.countActiveSeats(req.organization._id);
+
+    res.json({
+      ok: true,
+      organization: {
+        id: req.organization._id.toString(),
+        name: req.organization.name,
+        tier: req.organization.tier,
+        seatLimit: req.organization.seatLimit,
+        seatsUsed,
+        sellerSuiteEnabled: Boolean(req.organization.sellerSuiteEnabled),
+        buyerSuiteEnabled: Boolean(req.organization.buyerSuiteEnabled),
+        engagementRoomsEnabled: Boolean(req.organization.engagementRoomsEnabled),
+        seatLimits: req.organization.seatLimits || {},
+        billing: sanitizeBillingProfile(req.organization.billingProfile || {})
+      }
+    });
+  } catch (err) {
+    console.error('Org billing update error', err);
+    res.status(500).json({ error: 'Unable to update billing profile' });
   }
 });
 
@@ -3515,17 +3819,7 @@ app.post('/api/orgs', requireAuth, validateBody(organizationCreateSchema), async
     const productAccess = personalProductAccess.length > 0 ? personalProductAccess : ['valuesphere'];
     const orgType =
       payload.orgType && ['vendor', 'buyer', 'both'].includes(payload.orgType) ? payload.orgType : 'both';
-    const baseSlug = payload.slug
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)+/g, '')
-      .slice(0, 60);
-
-    let slug = baseSlug || `org-${Date.now()}`;
-    let suffix = 1;
-    while (await Organization.findOne({ slug })) {
-      slug = `${baseSlug}-${suffix++}`;
-    }
+    const slug = await generateUniqueOrgSlug(payload.slug || payload.name || '');
 
     const creator = req.requestingUser || (await User.findById(req.auth.uid));
     const tier = creator && creator.licenseTier === 'business' ? 'business' : 'personal';
@@ -3548,10 +3842,18 @@ app.post('/api/orgs', requireAuth, validateBody(organizationCreateSchema), async
       slug,
       domains: payload.domains || [],
       seatLimit: payload.seatLimit || 10,
+      seatLimits: {
+        sellerSuite: payload.seatLimit || 10,
+        buyerSuite: payload.seatLimit || 10,
+        engagementRooms: payload.seatLimit || 10
+      },
       tier,
       platformAccess: productAccess,
       productAccess,
       orgType,
+      sellerSuiteEnabled: tier === 'business',
+      buyerSuiteEnabled: tier === 'business',
+      engagementRoomsEnabled: tier === 'business',
       workosOrganizationId,
       createdBy: req.auth.uid
     });
