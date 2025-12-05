@@ -1344,4 +1344,19 @@ small.text-fg { color: var(--fg) !important; }
   background-color: #f1f5f9 !important; /* light grey */
 }
 
+/* --- Admin audit log table: match other darker text style --- */
+
+.admin-main table[aria-label="Audit log"],
+.admin-main table[aria-label="Audit log"] th,
+.admin-main table[aria-label="Audit log"] td {
+  color: #020617 !important; /* same dark text as other org tables */
+}
+
+.admin-main table[aria-label="Audit log"] tbody tr:nth-child(odd) {
+  background-color: #ffffff !important;
+}
+
+.admin-main table[aria-label="Audit log"] tbody tr:nth-child(even) {
+  background-color: #f1f5f9 !important;
+}
 
