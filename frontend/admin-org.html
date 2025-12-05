@@ -85,10 +85,6 @@
             <i class="bi bi-gear"></i>
             <span class="sidebar-label">Settings</span>
           </a>
-          <a class="sidebar-link" href="/billing.html">
-            <i class="bi bi-credit-card"></i>
-            <span class="sidebar-label">Billing</span>
-          </a>
         </div>
       </nav>
     </aside>
@@ -139,6 +135,10 @@
                   <dd class="mb-0" id="productAccess">-</dd>
                 </div>
                 <div class="d-flex justify-content-between mb-1">
+                  <dt class="mb-0">Seat mix</dt>
+                  <dd class="mb-0" id="seatMix">-</dd>
+                </div>
+                <div class="d-flex justify-content-between mb-1">
                   <dt class="mb-0">Created</dt>
                   <dd class="mb-0" id="orgCreated">-</dd>
                 </div>
@@ -156,6 +156,36 @@
             </div>
           </div>
           <div class="col-lg-8">
+            <div class="row g-3 mb-3" id="orgAnalytics">
+              <div class="col-md-3">
+                <div class="stat-card h-100">
+                  <div class="stat-label">Seats used</div>
+                  <div class="stat-value" id="statSeats">—</div>
+                  <div class="stat-subtext" id="statSeatSub">Seat utilisation</div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="stat-card h-100">
+                  <div class="stat-label">Product access</div>
+                  <div class="stat-value" id="statProducts">—</div>
+                  <div class="stat-subtext" id="statProductsSub">Suites enabled</div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="stat-card h-100">
+                  <div class="stat-label">Sellers</div>
+                  <div class="stat-value" id="statSellers">—</div>
+                  <div class="stat-subtext" id="statSellersSub">Provisioned seller seats</div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="stat-card h-100">
+                  <div class="stat-label">Buyers</div>
+                  <div class="stat-value" id="statBuyers">—</div>
+                  <div class="stat-subtext" id="statBuyersSub">Provisioned buyer seats</div>
+                </div>
+              </div>
+            </div>
             <div class="card glass p-4 mb-3">
               <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
                 <div>
@@ -169,13 +199,14 @@
                 </div>
               </div>
               <div class="table-responsive">
-                <table class="table align-middle text-sm">
+                <table class="table table-modern align-middle">
                   <thead>
                     <tr>
                       <th scope="col">Name</th>
                       <th scope="col">Email</th>
                       <th scope="col">Role</th>
                       <th scope="col">Status</th>
+                      <th scope="col">Access</th>
                       <th scope="col">Last login</th>
                       <th scope="col" class="text-end">Actions</th>
                     </tr>

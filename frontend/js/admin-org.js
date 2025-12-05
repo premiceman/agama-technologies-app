@@ -58,8 +58,38 @@ function renderOverview() {
   setText('orgType', org.orgType || 'both');
   setText('productAccess', formatList(org.productAccess));
   setText('seatUsage', `${org.seatsUsed || 0} / ${org.seatLimit || 0}`);
+  const sellerLimit = org.seatLimits?.sellerSuite ?? org.seatLimit ?? 0;
+  const buyerLimit = org.seatLimits?.buyerSuite ?? org.seatLimit ?? 0;
+  const seatMixLabel = sellerLimit || buyerLimit ? `${sellerLimit} seller • ${buyerLimit} buyer` : 'Not configured';
+  setText('seatMix', seatMixLabel);
   setText('seatHint', 'Active seats vs. limit');
   setText('orgCreated', org.createdAt ? new Date(org.createdAt).toLocaleDateString() : 'Unknown');
+}
+
+function renderAnalytics() {
+  const org = adminState.organization || {};
+  const members = Array.isArray(adminState.members) ? adminState.members : [];
+  const activeMembers = members.filter(member => member.status !== 'removed');
+  const seatsUsed = org.seatsUsed || 0;
+  const seatLimit = org.seatLimit || 0;
+  const utilisation = seatLimit ? Math.round((seatsUsed / seatLimit) * 100) : 0;
+  setText('statSeats', seatLimit ? `${seatsUsed} / ${seatLimit}` : `${seatsUsed}`);
+  setText('statSeatSub', seatLimit ? `${utilisation}% utilisation` : 'Seat utilisation');
+
+  const products = Array.isArray(org.productAccess) ? org.productAccess : [];
+  setText('statProducts', products.length ? products.length : '0');
+  setText('statProductsSub', products.length ? products.join(', ') : 'Products not configured');
+
+  const sellerCount = activeMembers.filter(member => member.sellerSuiteProvisioned).length;
+  const buyerCount = activeMembers.filter(member => member.buyerSuiteProvisioned).length;
+  const dualCount = activeMembers.filter(
+    member => member.sellerSuiteProvisioned && member.buyerSuiteProvisioned
+  ).length;
+
+  setText('statSellers', sellerCount.toString());
+  setText('statBuyers', buyerCount.toString());
+  setText('statSellersSub', dualCount ? `${dualCount} with both suites` : 'Seller provisioned');
+  setText('statBuyersSub', dualCount ? `${dualCount} with both suites` : 'Buyer provisioned');
 }
 
 function renderMembers() {
@@ -73,7 +103,7 @@ function renderMembers() {
   if (count) count.textContent = `${members.length} members`;
   if (!members.length) {
     const row = document.createElement('tr');
-    row.innerHTML = '<td colspan="6" class="text-fg-3 small">No members yet.</td>';
+    row.innerHTML = '<td colspan="7" class="text-fg-3 small">No members yet.</td>';
     tbody.appendChild(row);
     return;
   }
@@ -92,7 +122,7 @@ function renderMembers() {
     roleSelect.addEventListener('change', () => updateMember(member.id, { role: roleSelect.value }));
 
     const statusBadge = document.createElement('span');
-    statusBadge.className = 'badge-soft';
+    statusBadge.className = 'pill-soft';
     statusBadge.textContent = member.status === 'invited' ? 'Pending invite' : member.status;
 
     let inviteBadge = null;
@@ -122,9 +152,31 @@ function renderMembers() {
     });
     actionGroup.appendChild(deactivateBtn);
 
+    const accessCell = document.createElement('div');
+    const accessBadges = [];
+    if (member.sellerSuiteProvisioned) accessBadges.push('Seller');
+    if (member.buyerSuiteProvisioned) accessBadges.push('Buyer');
+    if (accessBadges.length) {
+      accessBadges.forEach(label => {
+        const pill = document.createElement('span');
+        pill.className = 'pill-soft me-1';
+        pill.textContent = label;
+        accessCell.appendChild(pill);
+      });
+    } else {
+      const muted = document.createElement('div');
+      muted.className = 'text-fg-3 small';
+      muted.textContent = 'No suites provisioned';
+      accessCell.appendChild(muted);
+    }
+
     row.innerHTML = `
-      <td>${member.name || '-'}</td>
+      <td>
+        <div class="fw-semibold">${member.name || '-'}</div>
+        <div class="text-fg-3 small">${member.role || 'member'} role</div>
+      </td>
       <td>${member.email || '-'}</td>
+      <td></td>
       <td></td>
       <td></td>
       <td>${formatDate(member.lastLoginAt)}</td>
@@ -133,7 +185,8 @@ function renderMembers() {
     row.children[2].appendChild(roleSelect);
     row.children[3].appendChild(statusBadge);
     if (inviteBadge) row.children[3].appendChild(inviteBadge);
-    row.children[5].appendChild(actionGroup);
+    row.children[4].appendChild(accessCell);
+    row.children[6].appendChild(actionGroup);
     tbody.appendChild(row);
   });
 }
@@ -259,6 +312,7 @@ async function fetchOverview() {
     adminState.members = json.members || [];
     renderOverview();
     renderMembers();
+    renderAnalytics();
     fetchAuditLog();
   } catch (err) {
     setText('orgName', 'Unable to load organisation');
