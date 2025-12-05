@@ -48,17 +48,24 @@ function licenseLabel(tier) {
 
 function roomsEntitlement() {
   const suites = state.suiteEntitlements || {};
+  const orgContext = state.orgContext || {};
   const effective = suites.effective || {};
-  const org = suites.org || {};
-  const membership = suites.membership || {};
+  const orgSuites = suites.org || {};
+  const membershipSuites = suites.membership || {};
+
+  const sellerSuiteEnabled =
+    orgSuites.sellerSuiteEnabled ?? orgContext.sellerSuiteEnabled ?? false;
+  const sellerSuiteProvisioned =
+    membershipSuites.sellerSuiteProvisioned ?? orgContext.membershipSuites?.sellerSuiteProvisioned ?? false;
+  const effectiveSellerSuite = effective.sellerSuite ?? (sellerSuiteEnabled && sellerSuiteProvisioned);
   const isGuest = state.user?.licenseTier === 'guest';
 
   // Engagement Rooms are now part of the Seller suite.
-  if (effective.sellerSuite) {
+  if (effectiveSellerSuite && !isGuest) {
     return { allowed: true };
   }
 
-  if (!org.sellerSuiteEnabled) {
+  if (!sellerSuiteEnabled) {
     return {
       allowed: false,
       reason:
@@ -66,7 +73,7 @@ function roomsEntitlement() {
     };
   }
 
-  if (!membership.sellerSuiteProvisioned || isGuest) {
+  if (!sellerSuiteProvisioned || isGuest) {
     return {
       allowed: false,
       reason:
@@ -164,10 +171,11 @@ async function initRoomsPage() {
       return;
     }
 
-    const orgsResp = await fetchJson('/api/orgs');
-    state.organizations = orgsResp.organizations || [];
     const licenseTier = state.effectiveLicenseTier || orgResp.user?.licenseTier || 'personal';
     setText('licenseBadge', licenseLabel(licenseTier));
+
+    const orgsResp = await fetchJson('/api/orgs');
+    state.organizations = orgsResp.organizations || [];
     setText(
       'roomsOrgContext',
       state.orgContext ? `${state.orgContext.name} • ${state.orgContext.orgType || 'multi-org'}` : 'No organization selected'
