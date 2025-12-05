@@ -131,11 +131,16 @@ function resolveOrgName(orgId) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  const roomsList = document.getElementById('roomsList');
+  // Engagement Rooms index page: use the container that actually exists in rooms.html
+  const roomsExperience = document.getElementById('roomsExperience');
+
+  // Room detail page
   const roomTitle = document.getElementById('roomTitle');
+
+  // Invite status page
   const inviteStatus = document.getElementById('roomInviteStatus');
 
-  if (roomsList) {
+  if (roomsExperience) {
     initRoomsPage();
   }
 
