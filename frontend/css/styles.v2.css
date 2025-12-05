@@ -1321,4 +1321,27 @@ small.text-fg { color: var(--fg) !important; }
   background-color: rgba(15, 23, 42, 0.9);
 }
 
+/* --- Admin org tables: fix contrast ONLY on these two tables --- */
+
+#overviewOrgTable,
+#overviewOrgTable th,
+#overviewOrgTable td,
+#agamaOrgTable,
+#agamaOrgTable th,
+#agamaOrgTable td {
+  /* Dark ink on light table background */
+  color: #020617 !important; /* nearly-black slate */
+}
+
+/* Optional: light striping so rows are still visible but not blinding */
+#overviewOrgTable tbody tr:nth-child(odd),
+#agamaOrgTable tbody tr:nth-child(odd) {
+  background-color: #ffffff !important;
+}
+
+#overviewOrgTable tbody tr:nth-child(even),
+#agamaOrgTable tbody tr:nth-child(even) {
+  background-color: #f1f5f9 !important; /* light grey */
+}
+
 
