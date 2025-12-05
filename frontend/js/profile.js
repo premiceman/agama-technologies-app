@@ -102,6 +102,7 @@ function renderProfile() {
   setFieldValue('profileEmail', user.email);
   setFieldValue('profileCompany', user.company);
   setFieldValue('profileRole', user.role);
+  setFieldValue('profileIndustry', user.industry);
   setText('profileLicense', `${licenseLabel(effectiveLicense?.tier || user.licenseTier)} licence`);
 
   const homeOrgContainer = document.getElementById('homeOrg');
@@ -121,8 +122,48 @@ function renderProfile() {
   }
 
   renderMemberships();
+  renderAccessOverview();
   renderBusinessRequestCta();
   renderDangerZone();
+}
+
+function renderAccessOverview() {
+  const { user, platforms, organizationContext, effectiveLicense, memberships } = profileState;
+  const license = licenseLabel(effectiveLicense?.tier || user?.licenseTier);
+  setText('accessLicenseBadge', `${license} licence`);
+
+  const suites = Array.isArray(organizationContext?.productAccess)
+    ? organizationContext.productAccess
+    : [];
+  setText('accessSuites', suites.length ? suites.join(', ') : 'No suites enabled');
+  setText(
+    'accessSuitesHint',
+    organizationContext?.name
+      ? `Provisioned by ${organizationContext.name}`
+      : 'Join a business org to unlock suites'
+  );
+
+  const platformIds = Array.isArray(user?.platformAccess) ? user.platformAccess : [];
+  const platformNames = platforms
+    .filter(platform => platformIds.includes(platform.id))
+    .map(platform => platform.name);
+  setText('accessPlatforms', platformNames.length ? platformNames.join(', ') : 'No platforms enabled');
+  setText(
+    'accessPlatformsHint',
+    platformNames.length ? 'Provisioned via your organisation' : 'Request platform access from your admin'
+  );
+
+  const roleLabels = (memberships || [])
+    .filter(membership => membership.status !== 'removed')
+    .map(
+      membership =>
+        `${membership.organizationName} (${membership.role})${membership.isHome ? ' • Home' : ''}`
+    );
+  setText('accessRoles', roleLabels.length ? roleLabels.join('; ') : 'No organisation roles yet.');
+  setText(
+    'accessRolesHint',
+    roleLabels.length ? 'Managed by your workspace admins' : 'Org admins assign seats and roles'
+  );
 }
 
 function renderBusinessRequestCta() {
@@ -265,7 +306,8 @@ function bindSaveProfile() {
     const payload = {
       name: document.getElementById('profileName').value || undefined,
       company: document.getElementById('profileCompany').value || undefined,
-      role: document.getElementById('profileRole').value || undefined
+      role: document.getElementById('profileRole').value || undefined,
+      industry: document.getElementById('profileIndustry').value || undefined
     };
     try {
       const res = await fetch('/api/auth/me', {

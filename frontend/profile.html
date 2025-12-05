@@ -33,6 +33,10 @@
         </a>
         <div class="sidebar-section-label">Applications</div>
         <div class="sidebar-section">
+          <a class="sidebar-link" href="/rooms.html">
+            <i class="bi bi-people"></i>
+            <span class="sidebar-label">Engagement Rooms</span>
+          </a>
           <a class="sidebar-link" href="/revenueforge-tool.html">
             <i class="bi bi-lightning-charge"></i>
             <span class="sidebar-label">RevenueForge</span>
@@ -70,10 +74,6 @@
             <i class="bi bi-gear"></i>
             <span class="sidebar-label">Settings</span>
           </a>
-          <a class="sidebar-link" href="/billing.html">
-            <i class="bi bi-credit-card"></i>
-            <span class="sidebar-label">Billing</span>
-          </a>
         </div>
       </nav>
     </aside>
@@ -103,7 +103,7 @@
           <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
             <div>
               <h2 class="h5 mb-1">Profile details</h2>
-              <p class="text-fg-3 small mb-0">Update your name, organisation, and role.</p>
+              <p class="text-fg-3 small mb-0">Update your name, organisation, and how you show up to teammates.</p>
             </div>
             <div class="d-flex flex-column align-items-end gap-2">
               <span class="badge-soft" id="profileLicense">Loading...</span>
@@ -127,9 +127,46 @@
               <label class="form-label" for="profileRole">Role</label>
               <input class="form-control" id="profileRole" type="text" placeholder="Title" />
             </div>
+            <div class="col-md-6">
+              <label class="form-label" for="profileIndustry">Industry</label>
+              <input class="form-control" id="profileIndustry" type="text" placeholder="Industry focus" />
+            </div>
             <div class="col-12">
               <button class="btn btn-primary" type="button" id="saveProfile">Save profile</button>
               <div class="form-text" id="profileFeedback"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card glass p-4 mb-3">
+          <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <h2 class="h6 mb-1">Provisioned access</h2>
+              <p class="text-fg-3 small mb-0">See what your organisation has enabled for you.</p>
+            </div>
+            <span class="badge-soft" id="accessLicenseBadge">-</span>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <div class="glass p-3 rounded-3 h-100">
+                <div class="text-fg-3 small mb-1">Organisation suites</div>
+                <div class="fw-semibold" id="accessSuites">Loading...</div>
+                <div class="text-fg-3 small" id="accessSuitesHint">Provisioned by your admin</div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="glass p-3 rounded-3 h-100">
+                <div class="text-fg-3 small mb-1">Platform access</div>
+                <div class="fw-semibold" id="accessPlatforms">Loading...</div>
+                <div class="text-fg-3 small" id="accessPlatformsHint">License controls apply</div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="glass p-3 rounded-3 h-100">
+                <div class="text-fg-3 small mb-1">Org roles</div>
+                <div class="fw-semibold" id="accessRoles">Loading...</div>
+                <div class="text-fg-3 small" id="accessRolesHint">Home org role + memberships</div>
+              </div>
             </div>
           </div>
         </section>

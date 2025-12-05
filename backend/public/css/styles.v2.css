@@ -1111,3 +1111,252 @@ small.text-fg { color: var(--fg) !important; }
   background: linear-gradient(135deg, rgba(96, 165, 250, .4), rgba(236, 72, 153, .7));
   box-shadow: 0 0 0 1px rgba(15, 23, 42, .9);
 }
+
+/* Modernised admin tables */
+
+.table-modern {
+  --table-border: var(--border-soft);
+  --table-header-bg: linear-gradient(
+    90deg,
+    rgba(148, 163, 255, 0.20),
+    rgba(244, 114, 182, 0.04)
+  );
+  --table-row-bg: rgba(10, 20, 40, 0.7);
+  --table-row-alt-bg: rgba(10, 20, 40, 0.4);
+  --table-row-hover-bg: radial-gradient(
+    circle at top left,
+    rgba(56, 189, 248, 0.20),
+    rgba(10, 20, 40, 0.95)
+  );
+
+  width: 100%;
+  margin-bottom: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: transparent;
+  color: var(--fg-2);
+  font-size: 0.9rem;
+}
+
+/* Header */
+
+.table-modern thead {
+  background: var(--table-header-bg);
+}
+
+.table-modern thead tr {
+  position: sticky;    /* nice when table is scrollable */
+  top: 0;
+  z-index: 2;
+}
+
+.table-modern thead th {
+  padding: 0.6rem 0.9rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-3);
+  border-bottom: 1px solid var(--table-border);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Round top corners of the header */
+
+.table-modern thead th:first-child {
+  border-top-left-radius: 0.75rem;
+}
+
+.table-modern thead th:last-child {
+  border-top-right-radius: 0.75rem;
+}
+
+/* Body */
+
+.table-modern tbody {
+  background: rgba(5, 10, 20, 0.7);
+  backdrop-filter: blur(18px);
+}
+
+.table-modern tbody tr {
+  transition:
+    background 130ms ease-out,
+    transform 130ms ease-out,
+    box-shadow 130ms ease-out;
+}
+
+.table-modern tbody tr:nth-child(odd) {
+  background: var(--table-row-bg);
+}
+
+.table-modern tbody tr:nth-child(even) {
+  background: var(--table-row-alt-bg);
+}
+
+.table-modern td {
+  padding: 0.55rem 0.9rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.45);
+  color: var(--fg-2);
+  vertical-align: middle;
+}
+
+/* So last row visually "lands" on the card */
+
+.table-modern tbody tr:last-child td {
+  border-bottom-color: var(--table-border);
+}
+
+.table-modern tbody tr:last-child td:first-child {
+  border-bottom-left-radius: 0.75rem;
+}
+
+.table-modern tbody tr:last-child td:last-child {
+  border-bottom-right-radius: 0.75rem;
+}
+
+/* Hover state – used with .table-row-link rows especially */
+
+.table-modern tbody tr:hover {
+  background: var(--table-row-hover-bg);
+  transform: translateY(-1px);
+  box-shadow: 0 14px 40px rgba(9, 17, 35, 0.55);
+}
+
+.table-modern tbody tr:hover td {
+  border-top-color: rgba(148, 163, 255, 0.32);
+}
+
+/* Cells that act like links (you already use .table-row-link) */
+
+.table-row-link {
+  cursor: pointer;
+}
+
+.table-row-link td:first-child {
+  color: var(--fg-strong);
+}
+
+/* Make numeric / right-aligned columns look nicer */
+
+.table-modern td.text-end,
+.table-modern th.text-end {
+  text-align: right;
+}
+
+/* Optional: subtle status pill styling if you reuse inside cells */
+
+.pill-soft {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.16rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 255, 0.4);
+  color: var(--fg-2);
+}
+
+.pill-soft--accent {
+  background: var(--accent-soft);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--fg-strong);
+}
+
+/* --- Admin org tables contrast tweak --- */
+
+#overviewOrgTable,
+#overviewOrgTable th,
+#overviewOrgTable td,
+#agamaOrgTable,
+#agamaOrgTable th,
+#agamaOrgTable td {
+  color: var(--fg-strong); /* strong light text for dark background */
+}
+
+/* Make those table rows sit on a darker surface so the text pops */
+#overviewOrgTable tbody tr,
+#agamaOrgTable tbody tr {
+  background-color: rgba(5, 10, 20, 0.95);
+}
+
+#overviewOrgTable tbody tr + tr,
+#agamaOrgTable tbody tr + tr {
+  border-top: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+/* --- Suite picker contrast tweak (ValueSphere / RevenueForge / ProcurePath) --- */
+
+#agamaOrgSuites .suite-tile {
+  color: var(--fg); /* default light text on dark tile */
+}
+
+/* Selected tiles: keep the gradient but force strong text */
+#agamaOrgSuites .suite-tile[aria-pressed="true"] {
+  color: var(--fg-strong);
+}
+
+/* Make titles stand out clearly on both normal + selected tiles */
+#agamaOrgSuites .suite-tile-title {
+  color: var(--fg-strong);
+  font-weight: 600;
+}
+
+/* Descriptions slightly muted but still readable */
+#agamaOrgSuites .suite-tile-desc {
+  color: var(--fg-2);
+}
+
+/* --- Agama Admin Console: table contrast fix --- */
+/* Only affects tables inside the admin console main area */
+
+.admin-main .table-modern tbody tr {
+  /* give rows a dark background so the existing light text is readable */
+  background-color: rgba(15, 23, 42, 0.96);
+}
+
+.admin-main .table-modern tbody tr:nth-child(even) {
+  /* very subtle striping, still dark */
+  background-color: rgba(15, 23, 42, 0.9);
+}
+
+/* --- Admin org tables: fix contrast ONLY on these two tables --- */
+
+#overviewOrgTable,
+#overviewOrgTable th,
+#overviewOrgTable td,
+#agamaOrgTable,
+#agamaOrgTable th,
+#agamaOrgTable td {
+  /* Dark ink on light table background */
+  color: #020617 !important; /* nearly-black slate */
+}
+
+/* Optional: light striping so rows are still visible but not blinding */
+#overviewOrgTable tbody tr:nth-child(odd),
+#agamaOrgTable tbody tr:nth-child(odd) {
+  background-color: #ffffff !important;
+}
+
+#overviewOrgTable tbody tr:nth-child(even),
+#agamaOrgTable tbody tr:nth-child(even) {
+  background-color: #f1f5f9 !important; /* light grey */
+}
+
+/* --- Admin audit log table: match other darker text style --- */
+
+.admin-main table[aria-label="Audit log"],
+.admin-main table[aria-label="Audit log"] th,
+.admin-main table[aria-label="Audit log"] td {
+  color: #020617 !important; /* same dark text as other org tables */
+}
+
+.admin-main table[aria-label="Audit log"] tbody tr:nth-child(odd) {
+  background-color: #ffffff !important;
+}
+
+.admin-main table[aria-label="Audit log"] tbody tr:nth-child(even) {
+  background-color: #f1f5f9 !important;
+}
+

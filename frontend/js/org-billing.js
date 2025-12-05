@@ -16,6 +16,23 @@ async function updateOrgBilling(payload) {
   return res.json();
 }
 
+function setText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+function formatCurrency(value) {
+  if (value === undefined || value === null || Number.isNaN(Number(value))) return '—';
+  const amount = Number(value);
+  return amount < 0 ? `-$${Math.abs(amount).toLocaleString()}` : `$${amount.toLocaleString()}`;
+}
+
+function formatDate(value) {
+  if (!value) return 'Not scheduled';
+  const date = new Date(value);
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 function formatSeatLabel(organization) {
   const total = organization.seatLimit || 0;
   const used = organization.seatsUsed || 0;
@@ -38,6 +55,11 @@ function populateOverview(data) {
   document.getElementById('seatUsage').textContent = formatSeatLabel(org);
   document.getElementById('suiteBadge').textContent = formatSuiteStatus(org);
 
+  const sellerLimit = org.seatLimits?.sellerSuite || org.seatLimit || 0;
+  const buyerLimit = org.seatLimits?.buyerSuite || org.seatLimit || 0;
+  setText('billingSeatMix', `${sellerLimit} seller • ${buyerLimit} buyer`);
+  setText('billingSeatHint', 'Seat mix across suites');
+
   document.getElementById('seatLimitInput').value = org.seatLimit || 10;
   document.getElementById('sellerSeatInput').value = org.seatLimits?.sellerSuite || org.seatLimit || 0;
   document.getElementById('buyerSeatInput').value = org.seatLimits?.buyerSuite || org.seatLimit || 0;
@@ -54,6 +76,14 @@ function populateOverview(data) {
   document.getElementById('cardPreview').textContent = billing.cardPreview || 'No payment method';
   document.getElementById('billingContact').textContent = billing.billingName || billing.email || 'Enter billing details to save.';
   document.getElementById('billingCadence').textContent = billing.billingCadence || 'Monthly';
+
+  setText('nextPaymentDate', formatDate(billing.nextPaymentDate));
+  setText('nextPaymentHint', billing.nextPaymentDate ? 'Scheduled renewal' : 'Awaiting schedule');
+  setText('lastBillingAmount', formatCurrency(billing.lastPaymentAmount || billing.lastAmount));
+  setText('lastBillingHint', billing.lastPaymentDate ? `Processed ${formatDate(billing.lastPaymentDate)}` : 'No invoices yet');
+  const payable = billing.totalPayable ?? billing.outstandingBalance ?? billing.currentBalance;
+  setText('totalAmountDue', formatCurrency(payable));
+  setText('totalAmountHint', payable ? 'Includes taxes & adjustments' : 'No outstanding balance');
 }
 
 function toggleAccess(isAllowed) {
