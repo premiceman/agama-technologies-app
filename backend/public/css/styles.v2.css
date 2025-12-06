@@ -1292,6 +1292,7 @@ small.text-fg { color: var(--fg) !important; }
   max-width: 560px;
 }
 
+#createRoomModal .modal-content,
 #createRoomModal .modal-content.glass {
   background: var(--glass);
   border: 1px solid var(--glass-border);
