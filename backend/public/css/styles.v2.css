@@ -1286,6 +1286,51 @@ small.text-fg { color: var(--fg) !important; }
   border-top: 1px solid rgba(148, 163, 184, 0.25);
 }
 
+/* ===== Engagement Rooms – Create Room Modal (Glass Theme) ===== */
+
+#createRoomModal .modal-dialog {
+  max-width: 560px;
+}
+
+#createRoomModal .modal-content,
+#createRoomModal .modal-content.glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow);
+  color: var(--fg);
+  padding: var(--space-5);
+}
+
+#createRoomModal .modal-header,
+#createRoomModal .modal-footer {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+#createRoomModal .modal-title {
+  font-weight: 600;
+  color: var(--fg-strong);
+}
+
+#createRoomModal .btn-close {
+  filter: invert(1) grayscale(1);
+  opacity: 0.8;
+}
+
+#createRoomModal .form-control,
+#createRoomModal .form-select {
+  background-color: rgba(5, 9, 16, 0.95);
+  border-color: rgba(148, 163, 184, 0.45);
+  color: var(--fg);
+}
+
+#createRoomModal .form-control::placeholder {
+  color: var(--fg-muted);
+}
+
+#createRoomModal .form-text {
+  color: var(--fg-muted);
+}
+
 /* --- Suite picker contrast tweak (ValueSphere / RevenueForge / ProcurePath) --- */
 
 #agamaOrgSuites .suite-tile {
