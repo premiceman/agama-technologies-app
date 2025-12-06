@@ -1360,3 +1360,75 @@ small.text-fg { color: var(--fg) !important; }
   background-color: #f1f5f9 !important;
 }
 
+/* ============================
+   Agama glass modals (Engagement Rooms)
+   Only affects modals tagged with data-agama-modal="glass"
+   ============================ */
+
+[data-agama-modal="glass"] .modal-dialog {
+  max-width: 640px;
+}
+
+[data-agama-modal="glass"] .modal-content {
+  background:
+    radial-gradient(circle at top left, rgba(148, 163, 255, 0.22), transparent 55%),
+    radial-gradient(circle at bottom right, rgba(236, 72, 153, 0.22), transparent 55%),
+    rgba(5, 10, 20, 0.96);
+  border-radius: 1.5rem;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 30px 80px rgba(3, 8, 18, 0.85);
+  color: var(--fg);
+  backdrop-filter: blur(18px);
+}
+
+/* Header + footer lines match the rest of the glass theme */
+[data-agama-modal="glass"] .modal-header,
+[data-agama-modal="glass"] .modal-footer {
+  border-color: rgba(148, 163, 184, 0.25);
+  background: transparent;
+}
+
+[data-agama-modal="glass"] .modal-title {
+  color: var(--fg-strong);
+  font-weight: 600;
+}
+
+/* Close button – make it visible on dark background */
+[data-agama-modal="glass"] .btn-close {
+  filter: invert(1) grayscale(1);
+  opacity: 0.75;
+}
+
+[data-agama-modal="glass"] .btn-close:hover {
+  opacity: 1;
+}
+
+/* Form labels + help text inside the modal */
+[data-agama-modal="glass"] .form-label {
+  color: var(--fg-2);
+}
+
+[data-agama-modal="glass"] .form-text {
+  color: var(--fg-muted);
+}
+
+/* Inputs/selects – ensure they use the dark field styling */
+[data-agama-modal="glass"] .form-control,
+[data-agama-modal="glass"] .form-select {
+  background: #0d1525 !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: var(--fg) !important;
+}
+
+/* Placeholder text readable on dark fields */
+[data-agama-modal="glass"] .form-control::placeholder {
+  color: var(--fg-muted) !important;
+}
+
+/* Softer blurred overlay behind modals */
+.modal-backdrop.show {
+  background: radial-gradient(circle at top, rgba(15, 23, 42, 0.9), rgba(5, 9, 16, 0.98));
+  opacity: 1;
+  backdrop-filter: blur(18px);
+}
+
