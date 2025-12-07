@@ -57,9 +57,6 @@ async function syncWorkOSUser(workosUser) {
       name: fullName || email,
       passwordHash: null,
       authSource: 'workos',
-      licenseTier: 'personal',
-      licensePlan: 'free-personal',
-      platformAccess: ['valuesphere'],
       valueAssessmentLimit: 3,
       status: 'active'
     });
@@ -75,18 +72,6 @@ async function syncWorkOSUser(workosUser) {
 
   if (!user.workosUserId && workosUser.id) {
     user.workosUserId = workosUser.id;
-  }
-
-  if (!Array.isArray(user.platformAccess) || user.platformAccess.length === 0) {
-    user.platformAccess = ['valuesphere'];
-  }
-
-  if (!user.licenseTier) {
-    user.licenseTier = 'personal';
-  }
-
-  if (!user.licensePlan) {
-    user.licensePlan = user.licenseTier === 'business' ? 'consulting-enterprise' : 'free-personal';
   }
 
   const isDeactivated = workosUserIsDeactivated(workosUser);
@@ -142,15 +127,11 @@ async function syncWorkOSOrganization(workosOrg) {
         slug,
         workosOrganizationId: workosOrgId,
         orgType: 'both',
-        tier: 'business',
-        platformAccess: ['valuesphere'],
-        productAccess: ['valuesphere'],
         domains,
-        seatLimit: 10,
         vendorSuiteEnabled: true,
         buyerSuiteEnabled: true,
-        sharedSuiteEnabled: true,
-        seatLimits: { vendorSuite: 10, buyerSuite: 10, sharedSuite: 10 }
+        productAccess: ['valuesphere'],
+        seatLimits: { vendorSuite: 0, buyerSuite: 0, bothSuites: 0 }
       });
     } else {
       const before = {
@@ -257,9 +238,6 @@ async function syncWorkOSOrganizationMembership(workosMembership) {
   }
   if (membership.buyerSuiteEnabled === undefined) {
     membership.buyerSuiteEnabled = Boolean(organization.buyerSuiteEnabled);
-  }
-  if (membership.sharedSuiteEnabled === undefined) {
-    membership.sharedSuiteEnabled = Boolean(organization.sharedSuiteEnabled);
   }
 
   await membership.save();
