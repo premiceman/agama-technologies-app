@@ -50,21 +50,24 @@ These entities control who the user is, what org they belong to, and what suites
 
 **Key points:**
 
-- A `User` may belong to multiple Organisations through `OrganizationMembership`.  
-- A `User` may participate in multiple `EngagementRoom`s via `RoomParticipant`.  
+- A `User` may belong to multiple Organisations through `OrganizationMembership`.
+- A `User` may participate in multiple `EngagementRoom`s via `RoomParticipant`.
 - A `User` may act as a Guest in another org’s Room.
+- `persona` is a preference that influences UX defaults (what the user wants to do) but does **not** grant suite access by itself.
 
 **Fields:**
 
 - `_id: ObjectId`
-- `primaryEmail: string`  
-- `authProviderId: string` (WorkOS user ID / SSO ID)  
-- `status: 'active' | 'suspended'`  
-- `createdAt: Date`  
-- `lastLoginAt: Date | null`  
-- `globalPreferences: {  
-    language?: string;  
-    timezone?: string;  
+- `primaryEmail: string`
+- `authProviderId: string` (WorkOS user ID / SSO ID)
+- `isStaff: boolean` (Agama staff flag)
+- `status: 'active' | 'deactivated'`
+- `persona: 'vendor' | 'buyer' | 'both'`
+- `createdAt: Date`
+- `lastLoginAt: Date | null`
+- `globalPreferences: {
+    language?: string;
+    timezone?: string;
     darkMode?: boolean;  
   }`
 
@@ -111,13 +114,17 @@ These entities control who the user is, what org they belong to, and what suites
 **Fields:**
 
 - `_id: ObjectId`
-- `name: string`  
-- `domain?: string` (primary email domain)  
-- `createdAt: Date`  
-- `plan: 'free' | 'vendorSuite' | 'buyerSuite' | 'dualSuite'`  
-- `billingInfo?: {  
-    billingEmail: string;  
-    billingProviderId?: string;  
+- `name: string`
+- `domain?: string` (primary email domain)
+- `createdAt: Date`
+- `seatLimits: {
+    vendorSuite: number;   // seats usable only for vendor suite access
+    buyerSuite: number;    // seats usable only for buyer suite access
+    bothSuites: number;    // seats usable when both suites are enabled for a member
+  }`
+- `billingInfo?: {
+    billingEmail: string;
+    billingProviderId?: string;
   }`
 - `settings: {  
     themeBranding?: any;       // future brand overrides  
@@ -125,9 +132,14 @@ These entities control who the user is, what org they belong to, and what suites
     features?: string[];  
   }`
 
+**Seat limit rules:**
+
+- Total seats for the organisation = `vendorSuite + buyerSuite + bothSuites`.
+- When the total configured seats reaches or exceeds **200**, the org should be routed to “Contact Sales” rather than self-serve expansion.
+
 **Relationships:**
 
-- `Organization` 1 — *N* `OrganizationMembership`  
+- `Organization` 1 — *N* `OrganizationMembership`
 - `Organization` 1 — *N* `AgamaAccount` (vendor side view)  
 - `Organization` 1 — *N* `VendorRecord` (buyer side view)  
 - `Organization` 1 — *N* `SourcingEvent`  
@@ -138,31 +150,29 @@ These entities control who the user is, what org they belong to, and what suites
 
 ### 2.4 OrganizationMembership
 
-**Purpose:** Relationship between a User and an Organization, including roles and suite entitlements.
+**Purpose:** Relationship between a User and an Organization, including roles and suite enablement flags.
 
 **Fields:**
 
 - `_id: ObjectId`
-- `userId: ObjectId` (FK → User)  
-- `orgId: ObjectId` (FK → Organization)  
-- `role: 'org_owner' | 'org_admin' | 'user'`  
-- `entitlements: {  
-    vendorSuite: boolean;  
-    buyerSuite: boolean;  
-  }`
-- `superUser: {  
-    vendor: boolean;  
-    buyer: boolean;  
-  }`
-- `status: 'active' | 'pending_invite' | 'suspended'`  
-- `createdAt: Date`  
-- `invitedAt?: Date`  
+- `userId: ObjectId` (FK → User)
+- `orgId: ObjectId` (FK → Organization)
+- `role: 'org_owner' | 'org_admin' | 'vendor_user' | 'buyer_user' | 'guest'`
+- `vendorSuiteEnabled: boolean`
+- `buyerSuiteEnabled: boolean`
+- `status: 'active' | 'pending_invite' | 'suspended'`
+- `createdAt: Date`
+- `invitedAt?: Date`
 - `acceptedAt?: Date`
 
 **Constraints:**
 
-- Each org must have **at least one** `org_owner`.  
-- `org_owner` implies `entitlements` coverage as needed but does *not* automatically grant buyer/vendor suite to all users.
+- Each org must have **at least one** `org_owner`.
+- Seat consumption is derived from the suite flags:
+  - `vendorSuiteEnabled && !buyerSuiteEnabled` → consumes a **vendor** seat.
+  - `buyerSuiteEnabled && !vendorSuiteEnabled` → consumes a **buyer** seat.
+  - `buyerSuiteEnabled && vendorSuiteEnabled` → consumes a **both-suites** seat.
+  - `guest` should keep both flags `false`, consuming **no seat** while retaining limited room access.
 
 ---
 
@@ -174,14 +184,13 @@ These entities control who the user is, what org they belong to, and what suites
 
 - `_id: ObjectId`
 - `email: string`
-- `orgId?: ObjectId` (required for internal invites)  
-- `roomId?: ObjectId` (for room-specific guest invites)  
-- `isGuest: boolean`  
-- `roleAssignments?: {  
-    vendorSuite?: boolean;  
-    buyerSuite?: boolean;  
-    orgRole?: 'org_owner' | 'org_admin' | 'user';  
-    superUser?: { vendor?: boolean; buyer?: boolean };  
+- `orgId?: ObjectId` (required for internal invites)
+- `roomId?: ObjectId` (for room-specific guest invites)
+- `isGuest: boolean`
+- `roleAssignments?: {
+    vendorSuiteEnabled?: boolean;
+    buyerSuiteEnabled?: boolean;
+    orgRole?: 'org_owner' | 'org_admin' | 'vendor_user' | 'buyer_user' | 'guest';
   }`
 - `invitedByUserId: ObjectId`  
 - `token: string`  
@@ -494,9 +503,10 @@ Engagement Rooms are central to Agama’s collaboration design. Domain-wise, we 
 
 **Important invariants:**
 
-- `vendorOrgId` always points to the vendor’s Organisation.  
-- `buyerOrgId` may be null when working with only guest buyers (no Buyer Suite yet).  
+- `vendorOrgId` always points to the vendor’s Organisation.
+- `buyerOrgId` may be null when working with only guest buyers (no Buyer Suite yet).
 - Room participants are defined in `RoomParticipant`.
+- Suite access in the room follows membership flags: vendor suite enablement unlocks vendor-side participation, buyer suite enablement unlocks buyer-side participation, and members with both flags can see both surfaces. Guests have limited shared-only access.
 
 ---
 
@@ -515,15 +525,16 @@ Engagement Rooms are central to Agama’s collaboration design. Domain-wise, we 
 
 **Access rules:**
 
-- `vendor_user`:  
-  - Vendor-only panels + shared panels.  
+- `vendor_user`:
+  - Vendor-only panels + shared panels.
 
-- `buyer_user`:  
-  - Buyer-only panels + shared panels.  
+- `buyer_user`:
+  - Buyer-only panels + shared panels.
 
-- `guest`:  
-  - Shared panels only.  
+- `guest`:
+  - Shared panels only.
   - Locked/greyed vendor/buyer tabs; upsell surfaces.
+- Assignment must respect the org-level suite flags: vendor-side roles require `vendorSuiteEnabled`, buyer-side roles require `buyerSuiteEnabled`, both flags allow dual participation, and guests should have neither flag.
 
 ---
 
