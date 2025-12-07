@@ -12,18 +12,22 @@ function buildEffectiveEntitlements(membership, organization) {
 
   const isGuest = (membership?.role || '').toLowerCase() === 'guest';
 
+  const effectiveVendorSuite = !isGuest && orgVendor && memberVendor;
+  const effectiveBuyerSuite = !isGuest && orgBuyer && memberBuyer;
+
   return {
-    organization: {
+    org: {
       vendorSuiteEnabled: orgVendor,
       buyerSuiteEnabled: orgBuyer,
     },
     membership: {
       vendorSuiteEnabled: memberVendor,
       buyerSuiteEnabled: memberBuyer,
+      role: membership?.role,
     },
     effective: {
-      vendorSuite: orgVendor && memberVendor && !isGuest,
-      buyerSuite: orgBuyer && memberBuyer && !isGuest,
+      vendorSuite: effectiveVendorSuite,
+      buyerSuite: effectiveBuyerSuite,
     },
   };
 }
