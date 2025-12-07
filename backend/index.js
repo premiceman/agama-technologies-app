@@ -36,6 +36,7 @@ const EngagementRoomMessage = require('./models/EngagementRoomMessage');
 const EngagementRoomFile = require('./models/EngagementRoomFile');
 const EngagementRoomFileVersion = require('./models/EngagementRoomFileVersion');
 const EngagementRoomFileComment = require('./models/EngagementRoomFileComment');
+const SearchIndexEntry = require('./models/SearchIndexEntry');
 const AuditEvent = require('./models/AuditEvent');
 const RoomEvent = require('./models/RoomEvent');
 const { getDashboardOverview } = require('./services/dashboard');
@@ -45,6 +46,7 @@ const {
   syncWorkOSOrganization,
   syncWorkOSOrganizationMembership
 } = require('./services/workosSync');
+const searchIndexer = require('./services/searchIndexer');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -643,7 +645,7 @@ async function createOrgForOnboarding({ user, suiteSelection = {}, orgDraft = {}
     }
   }
 
-  const organization = await Organization.create({
+  const organizationPayload = {
     name,
     slug,
     domains,
@@ -657,13 +659,18 @@ async function createOrgForOnboarding({ user, suiteSelection = {}, orgDraft = {}
     platformAccess: Array.from(PLATFORM_IDS),
     productAccess: Array.from(PLATFORM_IDS),
     orgType: deriveOrgTypeFromSuites(suiteSelection),
-    workosOrganizationId,
     vendorSuiteEnabled: Boolean(suiteSelection.vendorSuite),
     buyerSuiteEnabled: Boolean(suiteSelection.buyerSuite),
     sharedSuiteEnabled: true,
     billingProfile: billingDetails ? normalizeBillingDetails(billingDetails) : {},
     createdBy: user._id
-  });
+  };
+
+  if (workosOrganizationId) {
+    organizationPayload.workosOrganizationId = workosOrganizationId;
+  }
+
+  const organization = await Organization.create(organizationPayload);
 
   const membership = await OrganizationMembership.create({
     organization: organization._id,
@@ -1090,21 +1097,6 @@ function normaliseProductAccess(requested) {
     ? Array.from(new Set(requested.map(value => String(value))))
     : [];
   return selections.filter(id => PLATFORM_IDS.has(id));
-}
-
-async function generateUniqueOrgSlug(baseValue) {
-  const baseSlug = String(baseValue || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)+/g, '')
-    .slice(0, 60);
-
-  let slug = baseSlug || `org-${Date.now()}`;
-  let suffix = 1;
-  while (await Organization.findOne({ slug })) {
-    slug = `${baseSlug || `org-${Date.now()}`}-${suffix++}`;
-  }
-  return slug;
 }
 
 async function ensureWorkOSOrganization({ name, domains = [], existingWorkOSId = null }) {
@@ -3502,6 +3494,163 @@ app.get('/api/org/users/search', requireAuth, async (req, res) => {
   }
 });
 
+app.get('/api/search', requireAuth, async (req, res) => {
+  try {
+    const queryString = String(req.query.q || '').trim();
+    if (!queryString) {
+      return res.status(400).json({ error: 'Query parameter q is required' });
+    }
+
+    const orgId = req.auth.orgId || (req.requestingUser && req.requestingUser.defaultOrganization);
+    if (!orgId) {
+      return res.status(400).json({ error: 'Organization context required' });
+    }
+
+    const [organization, membership, user] = await Promise.all([
+      Organization.findById(orgId),
+      OrganizationMembership.findOne({ organization: orgId, user: req.auth.uid, status: 'active' }),
+      req.requestingUser ? Promise.resolve(req.requestingUser) : User.findById(req.auth.uid)
+    ]);
+
+    if (!membership || !organization) {
+      return res.status(403).json({ error: 'No active membership for this organization' });
+    }
+
+    const permissions = getEffectivePermissions(user, organization, membership);
+    const allowedSuites = [];
+    const allowedVisibilities = [];
+    if (permissions.vendorSuiteAccess) {
+      allowedSuites.push('vendor');
+      allowedVisibilities.push('vendor_only');
+    }
+    if (permissions.buyerSuiteAccess) {
+      allowedSuites.push('buyer');
+      allowedVisibilities.push('buyer_only');
+    }
+    if (permissions.sharedSuiteAccess || allowedSuites.length > 0) {
+      allowedSuites.push('shared');
+      allowedVisibilities.push('shared');
+    }
+
+    if (allowedSuites.length === 0) {
+      return res.status(403).json({ error: 'Insufficient entitlements for search' });
+    }
+
+    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
+    const offset = parseInt(req.query.offset, 10) || 0;
+    const entityType = req.query.entityType || req.query.scope || undefined;
+
+    let parsedFilters = {};
+    if (req.query.filters) {
+      try {
+        parsedFilters = typeof req.query.filters === 'string' ? JSON.parse(req.query.filters) : req.query.filters;
+      } catch (err) {
+        return res.status(400).json({ error: 'Invalid filters payload' });
+      }
+    }
+
+    const baseQuery = {
+      orgId,
+      suite: { $in: allowedSuites },
+      visibility: { $in: allowedVisibilities }
+    };
+
+    if (entityType) {
+      baseQuery.entityType = entityType;
+    }
+
+    if (parsedFilters.roomId && mongoose.Types.ObjectId.isValid(parsedFilters.roomId)) {
+      baseQuery.roomId = parsedFilters.roomId;
+    }
+
+    const participantFilter = {
+      $or: [{ participantIds: { $exists: false } }, { participantIds: { $size: 0 } }, { participantIds: user._id }]
+    };
+
+    await SearchIndexEntry.syncIndexes();
+
+    const searchQuery = { ...baseQuery, $and: [participantFilter], $text: { $search: queryString } };
+    const projection = { score: { $meta: 'textScore' } };
+
+    let results = [];
+    try {
+      results = await SearchIndexEntry.find(searchQuery, projection)
+        .sort({ score: { $meta: 'textScore' }, updatedAt: -1 })
+        .skip(offset)
+        .limit(limit)
+        .lean();
+    } catch (err) {
+      if (err?.code === 27) {
+        const fallbackQuery = {
+          ...baseQuery,
+          $and: [participantFilter],
+          $or: [
+            { title: { $regex: queryString, $options: 'i' } },
+            { snippet: { $regex: queryString, $options: 'i' } }
+          ]
+        };
+        results = await SearchIndexEntry.find(fallbackQuery)
+          .sort({ updatedAt: -1 })
+          .skip(offset)
+          .limit(limit)
+          .lean();
+      } else {
+        throw err;
+      }
+    }
+
+    res.json({
+      ok: true,
+      results: results.map(entry => ({
+        id: entry._id.toString(),
+        entityType: entry.entityType,
+        entityId: entry.entityId ? entry.entityId.toString() : null,
+        title: entry.title,
+        snippet: entry.snippet,
+        visibility: entry.visibility,
+        suite: entry.suite,
+        payload: entry.payload,
+        roomId: entry.roomId ? entry.roomId.toString() : null,
+        score: entry.score || entry._doc?.score || null
+      }))
+    });
+  } catch (err) {
+    console.error('Global search error', err);
+    res.status(500).json({ error: 'Unable to execute search' });
+  }
+});
+
+app.post('/api/search/reindex', requireAuth, async (req, res) => {
+  try {
+    const user = req.requestingUser || (await User.findById(req.auth.uid));
+    const orgId = req.auth.orgId || (user && user.defaultOrganization);
+
+    if (!orgId) {
+      return res.status(400).json({ error: 'Organization context required' });
+    }
+
+    const [organization, membership] = await Promise.all([
+      Organization.findById(orgId),
+      OrganizationMembership.findOne({ organization: orgId, user: req.auth.uid, status: 'active' })
+    ]);
+
+    const isOrgOwner = membership && membership.role === 'org_owner';
+    if (!isAgamaStaff(user) && !isOrgOwner) {
+      return res.status(403).json({ error: 'Staff or org_owner access required' });
+    }
+
+    if (!organization || !membership) {
+      return res.status(404).json({ error: 'Organization context not found' });
+    }
+
+    await searchIndexer.reindexOrg(orgId);
+    res.json({ ok: true, reindexed: true });
+  } catch (err) {
+    console.error('Reindex error', err);
+    res.status(500).json({ error: 'Unable to trigger reindex' });
+  }
+});
+
 app.get('/api/org/admin/overview', requireAuth, requireOrgAdmin, async (req, res) => {
   try {
     const organization = req.organization;
@@ -3911,7 +4060,7 @@ app.post(
         }
       }
 
-      const organization = await Organization.create({
+      const organizationPayload = {
         name,
         slug,
         orgType,
@@ -3920,13 +4069,18 @@ app.post(
         platformAccess: normalizedProductAccess,
         seatLimit: seatLimit ?? 10,
         domains: domains || [],
-        workosOrganizationId: resolvedWorkOSId,
         createdBy: req.auth.uid,
         vendorSuiteEnabled,
         buyerSuiteEnabled,
         // Engagement Rooms is a part of the Seller suite
         sharedSuiteEnabled: vendorSuiteEnabled
-      });
+      };
+
+      if (resolvedWorkOSId) {
+        organizationPayload.workosOrganizationId = resolvedWorkOSId;
+      }
+
+      const organization = await Organization.create(organizationPayload);
 
       res.status(201).json({
         ok: true,
@@ -4202,7 +4356,7 @@ app.post('/api/orgs', requireAuth, validateBody(organizationCreateSchema), async
       }
     }
 
-    const organization = await Organization.create({
+    const organizationPayload = {
       name: payload.name,
       slug,
       domains: payload.domains || [],
@@ -4219,9 +4373,14 @@ app.post('/api/orgs', requireAuth, validateBody(organizationCreateSchema), async
       vendorSuiteEnabled: tier === 'business',
       buyerSuiteEnabled: tier === 'business',
       sharedSuiteEnabled: tier === 'business',
-      workosOrganizationId,
       createdBy: req.auth.uid
-    });
+    };
+
+    if (workosOrganizationId) {
+      organizationPayload.workosOrganizationId = workosOrganizationId;
+    }
+
+    const organization = await Organization.create(organizationPayload);
 
     await OrganizationMembership.create({
       organization: organization._id,
@@ -4649,25 +4808,27 @@ app.post('/api/rooms', requireAuth, validateBody(roomCreateSchema), async (req, 
       isGuest: user && user.licenseTier === 'guest'
     });
 
-    await logRoomMutation({
-      type: 'room.created',
-      room,
-      membership: creatorMembership,
-      actorUser: req.auth.uid,
-      targetOrganization: membershipOrg._id,
-      metadata: {
-        title: room.title,
-        vendorOrg: vendorOrg._id,
-        buyerOrg: buyerOrg._id
-      }
-    });
+      await logRoomMutation({
+        type: 'room.created',
+        room,
+        membership: creatorMembership,
+        actorUser: req.auth.uid,
+        targetOrganization: membershipOrg._id,
+        metadata: {
+          title: room.title,
+          vendorOrg: vendorOrg._id,
+          buyerOrg: buyerOrg._id
+        }
+      });
 
-    await transitionRoomStatus(room, 'active', req.auth.uid, creatorMembership);
+      await transitionRoomStatus(room, 'active', req.auth.uid, creatorMembership);
 
-    res.status(201).json({
-      ok: true,
-      room: serializeRoom(room, {
-        role: 'room_admin',
+      await searchIndexer.indexEngagementRoom(room._id);
+
+      res.status(201).json({
+        ok: true,
+        room: serializeRoom(room, {
+          role: 'room_admin',
         organization: membershipOrg,
         isGuest: user && user.licenseTier === 'guest'
       })
@@ -6288,6 +6449,7 @@ app.post('/api/valuesphere/buyer/assessments', requireAuth, requirePlatformAcces
       }
     });
 
+    await searchIndexer.indexBuyerAssessment(assessment._id);
     return res.status(201).json({ ok: true, assessment: serializeBuyerAssessment(assessment) });
   } catch (err) {
     console.error('Buyer assessment create error', err);
@@ -6370,6 +6532,7 @@ app.patch('/api/valuesphere/buyer/assessments/:id', requireAuth, requirePlatform
     }
 
     await assessment.save();
+    await searchIndexer.indexBuyerAssessment(assessment._id);
     return res.json({ ok: true, assessment: serializeBuyerAssessment(assessment) });
   } catch (err) {
     console.error('Buyer assessment update error', err);
@@ -6433,6 +6596,7 @@ app.get('/api/procurepath/vendors', requireAuth, requirePlatformAccess('procurep
           orgId: context.organizationContext.id,
           createdByUserId: context.user._id
         });
+        await searchIndexer.indexProcurementVendor(vendor._id);
         await recordAuditEvent({
           type: 'procurepath.vendor.created',
           actorUser: context.user._id,
@@ -6467,6 +6631,7 @@ app.get('/api/procurepath/vendors', requireAuth, requirePlatformAccess('procurep
           return res.status(404).json({ error: 'Vendor not found' });
         }
 
+        await searchIndexer.indexProcurementVendor(vendor._id);
         await recordAuditEvent({
           type: 'procurepath.vendor.updated',
           actorUser: context.user._id,
@@ -6498,6 +6663,7 @@ app.post(
 
       vendor.objectives.push(req.validatedBody);
       await vendor.save();
+      await searchIndexer.indexProcurementVendor(vendor._id);
       await recordAuditEvent({
         type: 'procurepath.vendor.objective_added',
         actorUser: context.user._id,
@@ -6528,6 +6694,7 @@ app.post(
 
       vendor.touchpoints.push({ ...req.validatedBody, recordedBy: context.user._id });
       await vendor.save();
+      await searchIndexer.indexProcurementVendor(vendor._id);
       await recordAuditEvent({
         type: 'procurepath.vendor.touchpoint_added',
         actorUser: context.user._id,
@@ -6597,6 +6764,8 @@ app.post(
           { $addToSet: { linkedRfx: rfx._id } }
         );
       }
+
+      await searchIndexer.indexRfxItems(rfx._id);
 
       await recordAuditEvent({
         type: 'procurepath.rfx.created',
@@ -6693,6 +6862,7 @@ app.patch(
         }
       }
 
+      await searchIndexer.indexRfxItems(rfx._id);
       await recordAuditEvent({
         type: 'procurepath.rfx.updated',
         actorUser: context.user._id,
@@ -6853,6 +7023,7 @@ app.post(
     const user = await loadRevenueForgeUser(req, res);
     if (!user) return;
     const account = await RevenueAccount.create({ ...req.validatedBody, userId: user._id });
+    await searchIndexer.indexRevenueAccount(account._id, req.auth.orgId);
     res.status(201).json({ ok: true, account, stats: calculateRevenueStats(account) });
   } catch (err) {
     console.error('RevenueForge account create failed', err);
@@ -6892,6 +7063,7 @@ app.post(
       if (!account) return res.status(404).json({ error: 'Account not found' });
       account.opportunities.push(req.validatedBody);
       await account.save();
+      await searchIndexer.indexRevenueAccount(account._id, req.auth.orgId);
       const opportunity = account.opportunities[account.opportunities.length - 1];
       res.status(201).json({ ok: true, opportunity, account, stats: calculateRevenueStats(account) });
     } catch (err) {
@@ -6920,6 +7092,7 @@ app.put(
       });
 
       await account.save();
+      await searchIndexer.indexRevenueAccount(account._id, req.auth.orgId);
       res.json({ ok: true, opportunity, account, stats: calculateRevenueStats(account) });
     } catch (err) {
       console.error('RevenueForge opportunity update failed', err);
@@ -7003,12 +7176,13 @@ app.post(
         } catch (aiErr) {
           console.error('OpenAI meeting summary errored', aiErr);
         }
-      }
+        }
 
-      opportunity.meetingNotes.push(meetingPayload);
-      await account.save();
-      const meeting = opportunity.meetingNotes[opportunity.meetingNotes.length - 1];
-      res.status(201).json({ ok: true, meeting, opportunity, account, stats: calculateRevenueStats(account) });
+        opportunity.meetingNotes.push(meetingPayload);
+        await account.save();
+        await searchIndexer.indexRevenueAccount(account._id, req.auth.orgId);
+        const meeting = opportunity.meetingNotes[opportunity.meetingNotes.length - 1];
+        res.status(201).json({ ok: true, meeting, opportunity, account, stats: calculateRevenueStats(account) });
     } catch (err) {
       console.error('RevenueForge meeting capture failed', err);
       res.status(500).json({ error: 'Unable to capture meeting notes' });
