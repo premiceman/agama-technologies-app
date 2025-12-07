@@ -551,14 +551,10 @@ function applyLicenseSelection(user, selection) {
   user.licensePlan = chosen;
   if (chosen === 'free-personal') {
     user.valueAssessmentLimit = FREE_ASSESSMENT_LIMIT;
-    user.platformAccess = ['valuesphere'];
     return;
   }
 
   user.valueAssessmentLimit = null;
-  const desiredPlatforms = user.platformAccess && user.platformAccess.length ? user.platformAccess : Array.from(PLATFORM_IDS);
-  const normalised = normalisePlatformAccess({ isGuest: false }, desiredPlatforms);
-  user.platformAccess = normalised.error ? Array.from(PLATFORM_IDS) : normalised.platformAccess;
 }
 
 function suitePlanFromSelection(selection = {}) {
@@ -667,7 +663,6 @@ async function createOrgForOnboarding({ user, suiteSelection = {}, orgDraft = {}
       sharedSuite: roomsSeatLimit
     },
     tier: 'business',
-    platformAccess: Array.from(PLATFORM_IDS),
     productAccess: Array.from(PLATFORM_IDS),
     orgType: deriveOrgTypeFromSuites(suiteSelection),
     vendorSuiteEnabled: Boolean(suiteSelection.vendorSuite),
@@ -1040,7 +1035,6 @@ function serializeAuditEvent(event) {
 function getPlatformEntitlement(user, organizationContext, platformId) {
   const platform = PLATFORM_DEFINITIONS.find(p => p.id === platformId);
   const effectiveLicense = computeEffectiveLicense(user, organizationContext);
-  const userPlatforms = Array.isArray(user?.platformAccess) ? user.platformAccess : [];
 
   const membership = organizationContext?.membership;
   const permissions = membership ? getEffectivePermissions(user, organizationContext, membership) : null;
@@ -1053,13 +1047,8 @@ function getPlatformEntitlement(user, organizationContext, platformId) {
     return { allowed: false, reason: 'guest_only', effectiveLicense };
   }
 
-  const hasPlatform = userPlatforms.includes(platformId);
   const requiresBusiness = platform.requiresBusinessLicense === true;
   const isBusiness = effectiveLicense.tier === 'business';
-
-  if (!hasPlatform) {
-    return { allowed: false, reason: 'not_purchased', effectiveLicense };
-  }
 
   if (requiresBusiness && !isBusiness) {
     return { allowed: false, reason: 'requires_business', effectiveLicense };
@@ -1221,22 +1210,6 @@ async function requireOrgAdmin(req, res, next) {
   }
 }
 
-function normalisePlatformAccess({ isGuest }, requested) {
-  const selections = Array.isArray(requested)
-    ? Array.from(new Set(requested.map(value => String(value))))
-    : [];
-
-  if (isGuest) {
-    return { platformAccess: ['valuesphere'] };
-  }
-
-  const filtered = selections.filter(id => PLATFORM_IDS.has(id));
-  if (filtered.length === 0) {
-    return { platformAccess: ['valuesphere'] };
-  }
-  return { platformAccess: filtered };
-}
-
 function normaliseProductAccess(requested) {
   const selections = Array.isArray(requested)
     ? Array.from(new Set(requested.map(value => String(value))))
@@ -1272,8 +1245,7 @@ const signupSchema = z.object({
   password: z.string().min(8),
   company: z.string().trim().max(160).optional(),
   role: z.string().trim().max(160).optional(),
-  industry: z.string().trim().max(160).optional(),
-  platformAccess: z.array(z.string()).optional()
+  industry: z.string().trim().max(160).optional()
 });
 
 const loginSchema = z.object({
@@ -1358,8 +1330,7 @@ const profileUpdateSchema = z.object({
   name: z.string().trim().max(120).optional(),
   company: z.string().trim().max(160).optional(),
   role: z.string().trim().max(160).optional(),
-  industry: z.string().trim().max(160).optional(),
-  platformAccess: z.array(z.string()).optional()
+  industry: z.string().trim().max(160).optional()
 });
 
 const organizationCreateSchema = z.object({
@@ -1371,7 +1342,6 @@ const organizationCreateSchema = z.object({
   domains: z.array(z.string().trim()).optional(),
   workosOrganizationId: z.string().trim().optional(),
   seatLimit: z.number().int().positive().max(100000).optional(),
-  platformAccess: z.array(z.string()).optional(),
   vendorSuiteEnabled: z.boolean().optional(),
   buyerSuiteEnabled: z.boolean().optional(),
   sharedSuiteEnabled: z.boolean().optional()
@@ -1385,7 +1355,6 @@ const organizationUpdateSchema = z.object({
   domains: z.array(z.string().trim()).optional(),
   workosOrganizationId: z.string().trim().optional(),
   seatLimit: z.number().int().positive().max(100000).optional(),
-  platformAccess: z.array(z.string()).optional(),
   vendorSuiteEnabled: z.boolean().optional(),
   buyerSuiteEnabled: z.boolean().optional(),
   sharedSuiteEnabled: z.boolean().optional()
@@ -2232,12 +2201,7 @@ app.get('/api/auth/workos/signup', (req, res) => startWorkOSAuthorization(req, r
 
 app.post('/api/auth/signup', validateBody(signupSchema), async (req, res) => {
   try {
-    const { name, email, password, company, role, industry, platformAccess } = req.validatedBody;
-
-    const normalised = normalisePlatformAccess({ isGuest: false }, platformAccess || ['valuesphere']);
-    if (normalised.error) {
-      return res.status(400).json({ error: normalised.error });
-    }
+    const { name, email, password, company, role, industry } = req.validatedBody;
 
     const existing = await User.findOne({ email: email.toLowerCase().trim() });
     if (existing) {
@@ -2251,7 +2215,6 @@ app.post('/api/auth/signup', validateBody(signupSchema), async (req, res) => {
       company,
       role,
       industry,
-      platformAccess: normalised.platformAccess,
       licensePlan: 'free-personal',
       valueAssessmentLimit: FREE_ASSESSMENT_LIMIT
     });
@@ -2349,7 +2312,6 @@ app.get('/api/auth/workos/callback', async (req, res) => {
           workosOrganizationId: workosOrgId,
           orgType: 'both',
           tier: 'business',
-          platformAccess: ['valuesphere'],
           productAccess: ['valuesphere']
         });
         await organization.save();
@@ -2438,7 +2400,6 @@ app.get('/api/auth/workos/callback', async (req, res) => {
           slug,
           orgType: 'both',
           tier: 'business',
-          platformAccess: ['valuesphere'],
           productAccess: ['valuesphere'],
           vendorSuiteEnabled: true,
           buyerSuiteEnabled: false,
@@ -2962,7 +2923,6 @@ app.post('/api/onboarding', requireAuth, validateBody(onboardingSchema), async (
       } else if (selection !== 'free-personal') {
         user.licensePlan = selection;
         user.valueAssessmentLimit = null;
-        user.platformAccess = Array.from(PLATFORM_IDS);
       }
       user.onboardingStatus = 'completed';
     }
@@ -3108,11 +3068,7 @@ app.get(
             }
           }
 
-          const productAccess = Array.isArray(org.productAccess)
-            ? org.productAccess
-            : Array.isArray(org.platformAccess)
-              ? org.platformAccess
-              : [];
+          const productAccess = Array.isArray(org.productAccess) ? org.productAccess : [];
 
           return {
             id: org._id.toString(),
@@ -3175,11 +3131,7 @@ app.get(
         }
       }
 
-      const productAccess = Array.isArray(organization.productAccess)
-        ? organization.productAccess
-        : Array.isArray(organization.platformAccess)
-          ? organization.platformAccess
-          : [];
+      const productAccess = Array.isArray(organization.productAccess) ? organization.productAccess : [];
 
       res.json({
         ok: true,
@@ -3365,8 +3317,7 @@ app.post(
       let user = await User.findOne({ email: normalizedEmail });
       if (!user) {
         user = await User.create({
-          email: normalizedEmail,
-          platformAccess: []
+          email: normalizedEmail
         });
       }
 
@@ -3662,9 +3613,7 @@ app.get('/api/org/current', requireAuth, async (req, res) => {
       if (organization && membership) {
         const productAccess = Array.isArray(organization.productAccess)
           ? [...organization.productAccess]
-          : Array.isArray(organization.platformAccess)
-            ? [...organization.platformAccess]
-            : [];
+          : [];
 
         organizationPayload = {
           id: organization._id.toString(),
@@ -3979,12 +3928,10 @@ app.post('/api/search/reindex', requireAuth, async (req, res) => {
 
 app.get('/api/org/admin/overview', requireAuth, requireOrgAdmin, async (req, res) => {
   try {
-    const organization = req.organization;
-    const productAccess = Array.isArray(organization.productAccess)
-      ? [...organization.productAccess]
-      : Array.isArray(organization.platformAccess)
-        ? [...organization.platformAccess]
-        : [];
+  const organization = req.organization;
+  const productAccess = Array.isArray(organization.productAccess)
+    ? [...organization.productAccess]
+    : [];
 
     const seatsUsed = await OrganizationMembership.countActiveSeats(organization._id);
     const members = await OrganizationMembership.find({
@@ -4078,8 +4025,7 @@ app.post('/api/org/admin/members', requireAuth, requireOrgAdmin, validateBody(me
     let user = await User.findOne({ email: normalizedEmail });
     if (!user) {
       user = await User.create({
-        email: normalizedEmail,
-        platformAccess: []
+        email: normalizedEmail
       });
     }
 
@@ -4352,11 +4298,6 @@ app.put('/api/auth/me', requireAuth, validateBody(profileUpdateSchema), async (r
     if (!user) return res.status(404).json({ error: 'Not found' });
 
     const payload = req.validatedBody;
-    const desiredPlatforms = payload.platformAccess || user.platformAccess;
-    const normalised = normalisePlatformAccess({ isGuest: false }, desiredPlatforms);
-    if (normalised.error) {
-      return res.status(400).json({ error: normalised.error });
-    }
 
     ['name', 'company', 'role', 'industry'].forEach(field => {
       if (payload[field] !== undefined) {
@@ -4364,7 +4305,6 @@ app.put('/api/auth/me', requireAuth, validateBody(profileUpdateSchema), async (r
       }
     });
 
-    user.platformAccess = normalised.platformAccess;
     await user.save();
     res.json({ ok: true, user: user.public(), platforms: PLATFORM_DEFINITIONS });
   } catch (err) {
@@ -4387,7 +4327,6 @@ app.delete('/api/auth/me/data', requireAuth, async (req, res) => {
     user.persona = 'unknown';
     user.onboardingStatus = 'pending';
     user.onboardingResponses = {};
-    user.platformAccess = ['valuesphere'];
     user.licensePlan = 'free-personal';
     user.valueAssessmentLimit = FREE_ASSESSMENT_LIMIT;
     user.billingProfile = {};
@@ -4456,7 +4395,6 @@ app.post(
         orgType,
         tier,
         productAccess: normalizedProductAccess,
-        platformAccess: normalizedProductAccess,
         seatLimit: seatLimit ?? 10,
         domains: domains || [],
         createdBy: req.auth.uid,
@@ -4537,7 +4475,6 @@ app.patch(
         orgType: organization.orgType,
         tier: organization.tier,
         productAccess: organization.productAccess,
-        platformAccess: organization.platformAccess,
         seatLimit: organization.seatLimit,
         domains: organization.domains,
         workosOrganizationId: organization.workosOrganizationId
@@ -4549,7 +4486,6 @@ app.patch(
       if (payload.orgType) organization.orgType = payload.orgType;
       if (payload.tier) organization.tier = payload.tier;
       if (payload.productAccess) organization.productAccess = payload.productAccess;
-      if (payload.platformAccess) organization.platformAccess = payload.platformAccess;
       if (payload.seatLimit !== undefined) organization.seatLimit = payload.seatLimit;
       if (payload.domains !== undefined) organization.domains = payload.domains;
       if (payload.vendorSuiteEnabled !== undefined) {
@@ -4574,35 +4510,6 @@ app.patch(
 
       await organization.save();
 
-      const orgAccess = Array.isArray(organization.productAccess)
-        ? normaliseProductAccess(organization.productAccess)
-        : Array.isArray(organization.platformAccess)
-          ? normaliseProductAccess(organization.platformAccess)
-          : [];
-
-      const activeMemberships = await OrganizationMembership.find({
-        organization: organization._id,
-        status: 'active'
-      }).populate({ path: 'user', select: 'platformAccess' });
-
-      await Promise.all(
-        activeMemberships.map(async membership => {
-          if (!membership.user) return;
-
-          const user = membership.user;
-          const isGuest = membership.role === 'guest';
-          const nextAccess = isGuest ? [] : orgAccess;
-
-          const uniqueNextAccess = Array.from(new Set(nextAccess));
-          const currentAccess = Array.isArray(user.platformAccess) ? user.platformAccess : [];
-
-          if (JSON.stringify(uniqueNextAccess) !== JSON.stringify(currentAccess)) {
-            user.platformAccess = uniqueNextAccess;
-            await user.save();
-          }
-        })
-      );
-
       console.log('[admin] Organization updated via admin API', {
         orgId: organization._id.toString(),
         workosOrganizationId: organization.workosOrganizationId,
@@ -4612,7 +4519,6 @@ app.patch(
           orgType: organization.orgType,
           tier: organization.tier,
           productAccess: organization.productAccess,
-          platformAccess: organization.platformAccess,
           seatLimit: organization.seatLimit,
           domains: organization.domains,
           workosOrganizationId: organization.workosOrganizationId,
@@ -4666,7 +4572,6 @@ app.patch(
           orgType: organization.orgType,
           tier: organization.tier,
           productAccess: organization.productAccess,
-          platformAccess: organization.platformAccess,
           seatLimit: organization.seatLimit,
           domains: organization.domains,
           workosOrganizationId: organization.workosOrganizationId,
@@ -4717,7 +4622,7 @@ app.get('/api/orgs', requireAuth, async (req, res) => {
 app.post('/api/orgs', requireAuth, validateBody(organizationCreateSchema), async (req, res) => {
   try {
     const payload = req.validatedBody;
-    const normalizedProductAccess = normaliseProductAccess(payload.platformAccess || ['valuesphere']);
+    const normalizedProductAccess = normaliseProductAccess(payload.productAccess || ['valuesphere']);
     const personalProductAccess = normalizedProductAccess.filter(id => PERSONAL_ALLOWED_PLATFORMS.has(id));
     const productAccess = personalProductAccess.length > 0 ? personalProductAccess : ['valuesphere'];
     const orgType =
@@ -4750,7 +4655,6 @@ app.post('/api/orgs', requireAuth, validateBody(organizationCreateSchema), async
         sharedSuite: payload.seatLimit || 10
       },
       tier,
-      platformAccess: productAccess,
       productAccess,
       orgType,
       vendorSuiteEnabled: tier === 'business',
@@ -4833,14 +4737,13 @@ app.put('/api/orgs/:orgId', requireAuth, requireOrgRole('org_owner'), validateBo
     const payload = req.validatedBody;
     if (payload.name !== undefined) req.organization.name = payload.name.trim();
     if (payload.seatLimit !== undefined) req.organization.seatLimit = payload.seatLimit;
-    if (payload.platformAccess) {
-      const normalized = normaliseProductAccess(payload.platformAccess);
+    if (payload.productAccess) {
+      const normalized = normaliseProductAccess(payload.productAccess);
       const allowedAccess =
         req.organization.tier === 'personal'
           ? normalized.filter(id => PERSONAL_ALLOWED_PLATFORMS.has(id))
           : normalized;
       if (allowedAccess.length > 0) {
-        req.organization.platformAccess = allowedAccess;
         req.organization.productAccess = allowedAccess;
       }
     }
@@ -6407,9 +6310,7 @@ async function loadBuyerContext(req, res) {
   const canUseBuyerMode = orgContext?.membership?.role !== 'guest' && entitlement.allowed;
   const productAccess = Array.isArray(organization?.productAccess)
     ? organization.productAccess
-    : Array.isArray(organization?.platformAccess)
-      ? organization.platformAccess
-      : [];
+    : [];
 
   const isBusinessBuyerWithProcurePath =
     effectiveLicense.tier === 'business' &&
