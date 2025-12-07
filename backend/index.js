@@ -480,7 +480,7 @@ function computeEffectiveLicense(user, organizationContext) {
 }
 
 function computeAccessState(user, organizationContext) {
-  if (user?.isStaff) return 'active';
+  if (user && user.isStaff) return 'active';
 
   if (!organizationContext) return 'needs_onboarding';
 
@@ -489,7 +489,11 @@ function computeAccessState(user, organizationContext) {
     (seatLimits.vendorSuite || 0) + (seatLimits.buyerSuite || 0) + (seatLimits.bothSuites || 0);
 
   if (totalSeats <= 0) return 'needs_onboarding';
-  if (user?.onboardingStatus !== 'completed') return 'needs_onboarding';
+
+  const onboardingStatus = (user && user.onboardingStatus) || organizationContext.onboardingStatus;
+  if (onboardingStatus && onboardingStatus !== 'completed') {
+    return 'needs_onboarding';
+  }
 
   return 'active';
 }
@@ -1098,7 +1102,8 @@ async function buildOrganizationContext(user, orgId, { includeSeatDetails = fals
     orgType: organization.orgType || 'both',
     role: membership.role,
     membership,
-    seatLimits: organization.seatLimits || {}
+    seatLimits: organization.seatLimits || {},
+    onboardingStatus: organization.onboardingStatus
   };
 
   context.vendorSuiteEnabled = Boolean(organization.vendorSuiteEnabled);
@@ -2480,7 +2485,8 @@ app.get('/api/auth/workos/callback', async (req, res) => {
             vendorSuiteEnabled: Boolean(membership?.vendorSuiteEnabled),
             buyerSuiteEnabled: Boolean(membership?.buyerSuiteEnabled)
           },
-          seatLimits: organization.seatLimits || {}
+          seatLimits: organization.seatLimits || {},
+          onboardingStatus: organization.onboardingStatus
         };
       }
     }
@@ -2731,7 +2737,8 @@ app.get('/api/me/context', requireAuth, async (req, res) => {
               vendorSuiteEnabled: Boolean(membership.vendorSuiteEnabled),
               buyerSuiteEnabled: Boolean(membership.buyerSuiteEnabled)
             },
-            seatLimits: organization.seatLimits || {}
+            seatLimits: organization.seatLimits || {},
+            onboardingStatus: organization.onboardingStatus
           }
         : null;
 
@@ -2885,7 +2892,8 @@ app.get('/api/dashboard/overview', requireAuth, async (req, res) => {
         vendorSuiteEnabled: Boolean(membership.vendorSuiteEnabled),
         buyerSuiteEnabled: Boolean(membership.buyerSuiteEnabled)
       },
-      seatLimits: organization.seatLimits || {}
+      seatLimits: organization.seatLimits || {},
+      onboardingStatus: organization.onboardingStatus
     };
 
     const accessState = computeAccessState(user, organizationContext);
