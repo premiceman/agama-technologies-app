@@ -2,10 +2,32 @@
 
 Version: 1.0  
 Owner: Agama Technologies  
-Status: Architectural Migration Roadmap (MVP → Enterprise Cloud)  
-Last Updated: (update before commit)
+Status: Architectural Migration Roadmap (MVP → Enterprise Cloud)
+Last Updated: 2025-12-07
 
 This document defines how Agama will evolve from its current development environment (Render + MongoDB Atlas) to a **fully enterprise-grade production environment** on AWS or GCP. The migration plan focuses on scalability, security, performance, observability, multi-tenancy, data governance, and compliance — ensuring Agama can support large global customers.
+
+---
+
+# Licensing & Suites Refactor
+
+Agama’s licensing model now aligns to suites and seats instead of the legacy personal tier framing.
+
+- **Removed concepts:**
+  - `licenseTier` (personal/free variations)
+  - `platformAccess`
+  - `valueAssessmentLimit`
+  - `sharedSuiteEnabled`
+- **New concepts:**
+  - Suite selection is explicit: **Vendor Suite**, **Buyer Suite**, **Both Suites**, or **Guest** access.
+  - Organizations define **seatLimits per suite**, enabling separate capacity controls for vendor and buyer usage.
+  - User `persona` enum is normalized to `vendor` | `buyer` | `both` (replacing the former `dual`).
+  - Pricing is **USD per-seat** with a **200-seat threshold** guiding enterprise packaging.
+
+Expected data migrations:
+
+- Migrate any user with persona `dual` to `both`.
+- Legacy licensing fields above can be dropped or ignored going forward.
 
 ---
 
