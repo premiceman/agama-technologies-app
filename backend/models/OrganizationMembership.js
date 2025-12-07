@@ -1,3 +1,4 @@
+// Non-guest memberships SHOULD have at least one suite flag enabled; guests SHOULD have both false.
 const mongoose = require('mongoose');
 
 const { Schema } = mongoose;
@@ -19,8 +20,7 @@ const OrganizationMembershipSchema = new Schema(
     roleOrigin: { type: String, enum: ['app', 'idp'], default: 'app' },
     invitedEmail: { type: String, trim: true },
     vendorSuiteEnabled: { type: Boolean, default: false },
-    buyerSuiteEnabled: { type: Boolean, default: false },
-    sharedSuiteEnabled: { type: Boolean, default: false }
+    buyerSuiteEnabled: { type: Boolean, default: false }
   },
   { timestamps: true }
 );

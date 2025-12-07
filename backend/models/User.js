@@ -14,20 +14,12 @@ const UserSchema = new Schema(
     company: { type: String, trim: true },
     role: { type: String, trim: true },
     industry: { type: String, trim: true },
-    licenseTier: { type: String, enum: ['personal', 'business', 'guest'], default: 'personal' },
-    licensePlan: {
-      type: String,
-      enum: ['free-personal', 'vendor-enterprise', 'procurement-enterprise', 'consulting-enterprise'],
-      default: 'free-personal'
-    },
     authSource: { type: String, enum: ['workos', 'local'], default: 'workos' },
     forceLogoutAt: { type: Date, default: null },
     onboardingStatus: { type: String, enum: ['pending', 'in-progress', 'completed'], default: 'pending' },
     onboardingResponses: { type: Schema.Types.Mixed, default: {} },
-    valueAssessmentLimit: { type: Number, default: 3 },
     billingProfile: { type: Schema.Types.Mixed, default: {} },
-    platformAccess: { type: [String], default: ['valuesphere'] },
-    persona: { type: String, enum: ['vendor', 'buyer', 'dual'], default: 'dual' },
+    persona: { type: String, enum: ['vendor', 'buyer', 'both'], default: 'both' },
     valuesphereMode: { type: String, enum: ['vendor', 'buyer'], default: 'vendor' },
     defaultOrganization: { type: Schema.Types.ObjectId, ref: 'Organization', default: null },
     lastLoginAt: { type: Date }
@@ -45,17 +37,13 @@ UserSchema.methods.public = function() {
     company: this.company,
     role: this.role,
     industry: this.industry,
-    licenseTier: this.licenseTier,
-    persona: this.persona || 'dual',
+    persona: this.persona || 'both',
     valuesphereMode: this.valuesphereMode || 'vendor',
     emailVerified: this.emailVerified,
     status: this.status,
-    licensePlan: this.licensePlan || 'free-personal',
     onboardingStatus: this.onboardingStatus || 'pending',
     onboardingResponses: this.onboardingResponses || {},
-    valueAssessmentLimit: this.valueAssessmentLimit,
     billingProfile: this.billingProfile || {},
-    platformAccess: Array.isArray(this.platformAccess) ? [...this.platformAccess] : [],
     defaultOrganizationId: this.defaultOrganization ? this.defaultOrganization.toString() : null,
     lastLoginAt: this.lastLoginAt || null,
     createdAt: this.createdAt,
@@ -76,11 +64,7 @@ UserSchema.statics.createSecure = async function({
   password,
   company,
   role,
-  industry,
-  licenseTier = 'personal',
-  platformAccess = ['valuesphere'],
-  licensePlan = licenseTier === 'business' ? 'consulting-enterprise' : 'free-personal',
-  valueAssessmentLimit
+  industry
 }) {
   const salt = await bcrypt.genSalt(12);
   const hash = await bcrypt.hash(password, salt);
@@ -92,10 +76,6 @@ UserSchema.statics.createSecure = async function({
     company,
     role,
     industry,
-    licenseTier,
-    licensePlan,
-    platformAccess,
-    valueAssessmentLimit: licenseTier === 'personal' ? valueAssessmentLimit ?? 3 : null,
     defaultOrganization: null
   });
 };
@@ -120,11 +100,7 @@ UserSchema.statics.findOrCreateFromWorkOSProfile = async function(profile) {
       email,
       name: fullName,
       passwordHash: null,
-      authSource: 'workos',
-      licenseTier: 'personal',
-      licensePlan: 'free-personal',
-      platformAccess: ['valuesphere'],
-      valueAssessmentLimit: 3
+      authSource: 'workos'
     });
     return user;
   }
@@ -146,28 +122,8 @@ UserSchema.statics.findOrCreateFromWorkOSProfile = async function(profile) {
     changed = true;
   }
 
-  if (!Array.isArray(user.platformAccess) || user.platformAccess.length === 0) {
-    user.platformAccess = ['valuesphere'];
-    changed = true;
-  }
-
-  if (!user.licenseTier) {
-    user.licenseTier = 'personal';
-    changed = true;
-  }
-
-  if (!user.licensePlan) {
-    user.licensePlan = user.licenseTier === 'business' ? 'consulting-enterprise' : 'free-personal';
-    changed = true;
-  }
-
   if (user.authSource !== 'workos') {
     user.authSource = 'workos';
-    changed = true;
-  }
-
-  if (user.valueAssessmentLimit === undefined && user.licenseTier === 'personal') {
-    user.valueAssessmentLimit = 3;
     changed = true;
   }
 
