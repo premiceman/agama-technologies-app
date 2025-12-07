@@ -1,12 +1,12 @@
 const steps = ['seller', 'buyer', 'plan'];
-const PRICING = { seller: 240, buyer: 180 };
+const PRICING = { vendor: 150, buyer: 190, both: 250 };
 
 const onboardingState = {
   currentStep: 0,
   user: null,
   organization: null,
   orgManaged: false,
-  suites: { seller: false, buyer: false },
+  seats: { vendor: 0, buyer: 0, both: 0 },
   billing: {},
   orgDraft: {
     seats: 10,
@@ -57,38 +57,99 @@ function formatPrice(amount) {
   return `$${amount.toLocaleString()}/mo`;
 }
 
+function getTotalSeats() {
+  return onboardingState.seats.vendor + onboardingState.seats.buyer + onboardingState.seats.both;
+}
+
+function getMonthlyTotal() {
+  return (onboardingState.seats.vendor * PRICING.vendor)
+    + (onboardingState.seats.buyer * PRICING.buyer)
+    + (onboardingState.seats.both * PRICING.both);
+}
+
+function isContactSalesMode() {
+  return getTotalSeats() > 200;
+}
+
+function getSuiteSeatCount(suite) {
+  if (suite === 'seller') return onboardingState.seats.vendor + onboardingState.seats.both;
+  if (suite === 'buyer') return onboardingState.seats.buyer + onboardingState.seats.both;
+  return 0;
+}
+
+function syncSeatInputsFromState() {
+  const vendorInput = document.getElementById('vendorSeatsInput');
+  if (vendorInput) vendorInput.value = onboardingState.seats.vendor || '';
+  const buyerInput = document.getElementById('buyerSeatsInput');
+  if (buyerInput) buyerInput.value = onboardingState.seats.buyer || '';
+  const bothInput = document.getElementById('bothSeatsInput');
+  if (bothInput) bothInput.value = onboardingState.seats.both || '';
+}
+
 function updatePriceSummary() {
   const summary = document.getElementById('priceSummary');
   const helper = document.getElementById('suiteSelectionHelper');
-  const sellerActive = onboardingState.suites.seller;
-  const buyerActive = onboardingState.suites.buyer;
-  const total = (sellerActive ? PRICING.seller : 0) + (buyerActive ? PRICING.buyer : 0);
-  if (summary) summary.textContent = formatPrice(total);
+  const totalSeats = getTotalSeats();
+  const total = getMonthlyTotal();
+  if (summary) {
+    summary.textContent = totalSeats > 0
+      ? `${totalSeats} seats — ${formatPrice(total)}`
+      : '$0/mo';
+  }
   if (helper) {
-    helper.textContent = total > 0
-      ? 'Monthly billing preview (cards accepted later).'
-      : 'Select at least one suite to enable billing.';
+    if (totalSeats === 0) {
+      helper.textContent = 'Add at least one seat to continue.';
+    } else if (isContactSalesMode()) {
+      helper.textContent = 'Contact Sales to provision more than 200 seats.';
+    } else {
+      helper.textContent = 'Monthly billing preview (cards accepted later).';
+    }
+  }
+
+  const contactBanner = document.getElementById('contactSalesBanner');
+  if (contactBanner) contactBanner.classList.toggle('d-none', !isContactSalesMode());
+
+  const nextBtn = document.getElementById('nextStep');
+  if (nextBtn) {
+    const disabled = totalSeats === 0 || isContactSalesMode();
+    nextBtn.disabled = disabled;
+    nextBtn.setAttribute('aria-disabled', disabled ? 'true' : 'false');
   }
 }
 
 function updateSuiteButtons() {
+  const sellerPriceLabel = document.getElementById('sellerPriceLabel');
+  if (sellerPriceLabel) sellerPriceLabel.textContent = '$150/seat/mo';
+  const buyerPriceLabel = document.getElementById('buyerPriceLabel');
+  if (buyerPriceLabel) buyerPriceLabel.textContent = '$190/seat/mo';
+
+  const suiteKeyMap = { seller: 'vendor', buyer: 'buyer' };
   document.querySelectorAll('[data-suite-toggle]').forEach(btn => {
     const suite = btn.getAttribute('data-suite-toggle');
-    const active = onboardingState.suites[suite];
+    const suiteKey = suiteKeyMap[suite];
+    const activeSeatCount = suite ? getSuiteSeatCount(suite) : 0;
+    const active = Boolean(activeSeatCount);
     btn.classList.toggle('btn-primary', active);
     btn.classList.toggle('btn-outline-light', !active);
-    btn.textContent = active ? 'Selected' : `Add ${suite === 'seller' ? 'Seller' : 'Buyer'} Suite`;
+    const label = suite === 'seller' ? 'Seller' : 'Buyer';
+    btn.textContent = active
+      ? `Selected (${activeSeatCount} seats)`
+      : `Add ${label} Suite`;
+    if (suiteKey) {
+      btn.setAttribute('data-seat-key', suiteKey);
+    }
   });
 
   document.querySelectorAll('.selectable-card').forEach(card => {
     const suite = card.getAttribute('data-suite');
-    const active = onboardingState.suites[suite];
+    const active = getSuiteSeatCount(suite) > 0;
     card.classList.toggle('border', true);
     card.classList.toggle('border-success', active);
     card.classList.toggle('shadow', active);
     card.classList.toggle('opacity-50', onboardingState.orgManaged);
   });
 
+  syncSeatInputsFromState();
   updatePriceSummary();
 }
 
@@ -107,7 +168,7 @@ function collectBillingDetails() {
 function collectOrgDraft() {
   return {
     name: document.getElementById('orgNameInput')?.value?.trim(),
-    seatLimit: Number(document.getElementById('orgSeatsInput')?.value || 10),
+    seatLimit: getTotalSeats() || Number(document.getElementById('orgSeatsInput')?.value || 10),
     domains: document.getElementById('orgDomainInput')?.value?.trim()
       ? [document.getElementById('orgDomainInput').value.trim()]
       : []
@@ -159,6 +220,11 @@ function setOrgManagedUI(managed, organization) {
     btn.setAttribute('aria-disabled', managed ? 'true' : 'false');
   });
 
+  document.querySelectorAll('#vendorSeatsInput, #buyerSeatsInput, #bothSeatsInput').forEach(input => {
+    input.disabled = managed;
+    input.setAttribute('aria-disabled', managed ? 'true' : 'false');
+  });
+
   updateSuiteButtons();
 }
 
@@ -193,10 +259,19 @@ async function loadContext() {
     }
     const onboardingJson = await onboardingRes.json();
     onboardingState.user = onboardingJson.user;
-    onboardingState.suites = {
-      seller: Boolean(onboardingJson.onboarding?.responses?.suiteSelection?.sellerSuite),
-      buyer: Boolean(onboardingJson.onboarding?.responses?.suiteSelection?.buyerSuite)
+    const seatSelection = onboardingJson.onboarding?.responses?.seatSelection || {};
+    onboardingState.seats = {
+      vendor: Number(seatSelection.vendorSeats || 0),
+      buyer: Number(seatSelection.buyerSeats || 0),
+      both: Number(seatSelection.bothSeats || 0)
     };
+
+    if (!seatSelection.vendorSeats && onboardingJson.onboarding?.responses?.suiteSelection?.sellerSuite) {
+      onboardingState.seats.vendor = 1;
+    }
+    if (!seatSelection.buyerSeats && onboardingJson.onboarding?.responses?.suiteSelection?.buyerSuite) {
+      onboardingState.seats.buyer = 1;
+    }
     onboardingState.billing = onboardingJson.user?.billingProfile || {};
     onboardingState.orgDraft = onboardingJson.onboarding?.responses?.organizationDraft || onboardingState.orgDraft;
 
@@ -225,9 +300,11 @@ async function loadContext() {
 }
 
 function recommendedLicense() {
-  if (onboardingState.suites.seller && onboardingState.suites.buyer) return 'vendor-enterprise';
-  if (onboardingState.suites.seller) return 'vendor-enterprise';
-  if (onboardingState.suites.buyer) return 'procurement-enterprise';
+  const vendorActive = getSuiteSeatCount('seller') > 0;
+  const buyerActive = getSuiteSeatCount('buyer') > 0;
+  if (vendorActive && buyerActive) return 'vendor-enterprise';
+  if (vendorActive) return 'vendor-enterprise';
+  if (buyerActive) return 'procurement-enterprise';
   return 'free-personal';
 }
 
@@ -239,10 +316,14 @@ async function handleNextStep() {
     return;
   }
 
+  const totalSeats = getTotalSeats();
   if (!onboardingState.orgManaged) {
-    const hasSuite = onboardingState.suites.seller || onboardingState.suites.buyer;
-    if (!hasSuite) {
-      alert('Select at least one suite to continue.');
+    if (totalSeats === 0) {
+      alert('Add at least one seat to continue.');
+      return;
+    }
+    if (isContactSalesMode()) {
+      alert('Contact Sales to provision more than 200 seats.');
       return;
     }
   }
@@ -254,8 +335,8 @@ async function handleNextStep() {
 
   if (!onboardingState.orgManaged) {
     payload.suiteSelection = {
-      sellerSuite: onboardingState.suites.seller,
-      buyerSuite: onboardingState.suites.buyer
+      sellerSuite: getSuiteSeatCount('seller') > 0,
+      buyerSuite: getSuiteSeatCount('buyer') > 0
     };
     payload.licenseSelection = recommendedLicense();
     payload.organizationDraft = collectOrgDraft();
@@ -290,7 +371,27 @@ function bindSuiteSelection() {
     btn.addEventListener('click', () => {
       if (onboardingState.orgManaged) return;
       const suite = btn.getAttribute('data-suite-toggle');
-      onboardingState.suites[suite] = !onboardingState.suites[suite];
+      const suiteKey = btn.getAttribute('data-seat-key') || (suite === 'seller' ? 'vendor' : 'buyer');
+      const current = onboardingState.seats[suiteKey] || 0;
+      onboardingState.seats[suiteKey] = current > 0 ? 0 : 1;
+      updateSuiteButtons();
+    });
+  });
+}
+
+function bindSeatInputs() {
+  const seatInputs = [
+    { id: 'vendorSeatsInput', key: 'vendor' },
+    { id: 'buyerSeatsInput', key: 'buyer' },
+    { id: 'bothSeatsInput', key: 'both' }
+  ];
+
+  seatInputs.forEach(({ id, key }) => {
+    const input = document.getElementById(id);
+    if (!input) return;
+    input.addEventListener('input', () => {
+      const value = Math.max(0, Number(input.value) || 0);
+      onboardingState.seats[key] = value;
       updateSuiteButtons();
     });
   });
@@ -327,6 +428,7 @@ function bindOrgRefresh() {
 document.addEventListener('DOMContentLoaded', () => {
   bindNavigation();
   bindSuiteSelection();
+  bindSeatInputs();
   bindOrgRefresh();
   loadContext();
 });
