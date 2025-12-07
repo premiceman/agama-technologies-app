@@ -120,6 +120,51 @@ Exact fields must match those defined in `domain_model.md`.
   - OrganizationMemberships
   - Preferences
 
+#### GET /api/me/context
+
+- Returns the authenticated user's current session context.
+- Response shape (all fields required unless stated otherwise):
+
+    {
+      "status": "ok",
+      "data": {
+        "user": {
+          "id": "user_123",
+          "name": "Alex Smith",
+          "email": "alex@example.com",
+          "persona": "vendor"
+        },
+        "activeOrg": {
+          "id": "org_123",
+          "name": "Acme Corp",
+          "seatLimits": {
+            "vendorSuite": 50,
+            "buyerSuite": 20,
+            "bothSuites": 10
+          },
+          "seatUsage": {
+            "vendorUsed": 34,
+            "buyerUsed": 12,
+            "bothUsed": 6,
+            "totalUsed": 52
+          },
+          "contactSalesRequired": false
+        },
+        "orgRole": "admin",
+        "suites": {
+          "vendor": true,
+          "buyer": false
+        },
+        "persona": "vendor",
+        "themeHint": "vendor"
+      },
+      "correlationId": "123e4567-e89b-12d3-a456-426614174000"
+    }
+
+- Notes:
+  - `persona` reflects the user's chosen mode and can be `vendor`, `buyer`, or `both`.
+  - Seat limits are per suite and must align with billing configuration; there is no `licenseTier`, `platformAccess`, `valueAssessmentLimit`, or `sharedSuiteEnabled` field.
+
 #### PATCH /api/users/me
 
 - Updates:
@@ -157,6 +202,75 @@ Payload example:
 
 - Org owner/admin only.
 - Returns list of OrganisationMemberships.
+
+#### GET /api/org/billing
+
+- Org owner/admin only.
+- Returns current billing configuration and usage for the active org.
+- Response payload (within the standard envelope):
+
+    {
+      "seatLimits": {
+        "vendorSuite": 120,
+        "buyerSuite": 80,
+        "bothSuites": 30
+      },
+      "seatUsage": {
+        "vendorUsed": 90,
+        "buyerUsed": 65,
+        "bothUsed": 18,
+        "totalUsed": 173
+      },
+      "pricing": {
+        "vendorSeatUsd": 45,
+        "buyerSeatUsd": 35,
+        "bothSeatUsd": 70,
+        "monthlyTotalUsd": 8650
+      },
+      "contactSalesRequired": false
+    }
+
+#### POST /api/org/billing
+
+- Org owner/admin only.
+- Creates or replaces billing configuration when setting up seat-based licensing.
+- Request body:
+
+    {
+      "seatLimits": {
+        "vendorSuite": 50,
+        "buyerSuite": 50,
+        "bothSuites": 10
+      },
+      "pricing": {
+        "vendorSeatUsd": 45,
+        "buyerSeatUsd": 35,
+        "bothSeatUsd": 70
+      }
+    }
+
+- Behaviour:
+  - `contactSalesRequired` becomes `true` if any seat limit (vendor, buyer, or both) exceeds 200; clients should block self-serve purchase flows when this is returned.
+  - All prices are denominated in USD.
+
+#### PATCH /api/org/billing
+
+- Org owner/admin only.
+- Partially updates seat limits or pricing.
+- Request body supports updating any subset of:
+
+    {
+      "seatLimits": {
+        "vendorSuite": 150,
+        "buyerSuite": 150
+      },
+      "pricing": {
+        "bothSeatUsd": 65,
+        "vendorSeatUsd": 40
+      }
+    }
+
+- Response mirrors `GET /api/org/billing`, recalculating `seatUsage.totalUsed` and `pricing.monthlyTotalUsd` based on the current configuration.
 
 ---
 
