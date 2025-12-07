@@ -40,6 +40,8 @@ const Notification = require('./models/Notification');
 const SearchIndexEntry = require('./models/SearchIndexEntry');
 const AuditEvent = require('./models/AuditEvent');
 const RoomEvent = require('./models/RoomEvent');
+const IntegrationConnection = require('./models/IntegrationConnection');
+const IntegrationState = require('./models/IntegrationState');
 const { getDashboardOverview } = require('./services/dashboard');
 const { requireOrgRole, getEffectivePermissions } = require('./middleware/orgAuth');
 const {
@@ -48,6 +50,7 @@ const {
   syncWorkOSOrganizationMembership
 } = require('./services/workosSync');
 const searchIndexer = require('./services/searchIndexer');
+const { simulateIntegrationSync, upsertIntegrationState } = require('./services/integrations');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -755,6 +758,27 @@ async function recordAuditEvent({
   }
 }
 
+function serializeIntegrationConnection(connection, state = null) {
+  if (!connection) return null;
+  const connectionId = connection._id?.toString?.() || connection.id || null;
+  return {
+    id: connectionId,
+    orgId: connection.orgId?.toString?.() || connection.orgId || null,
+    type: connection.type,
+    provider: connection.provider,
+    status: connection.status,
+    lastErrorMessage: connection.lastErrorMessage || null,
+    config: connection.config || {},
+    createdAt: connection.createdAt,
+    updatedAt: connection.updatedAt,
+    lastSyncAt: state?.lastSyncAt || null,
+    nextSyncAt: state?.nextSyncAt || null,
+    lastSyncStatus: state?.lastSyncStatus || null,
+    lastSyncSummary: state?.lastSyncSummary || null,
+    errorCount: state?.errorCount || 0
+  };
+}
+
 function deriveRoomVisibility(room, membership, explicitVisibility) {
   if (explicitVisibility) return explicitVisibility;
   const orgId = membership?.organization?._id || membership?.organization || null;
@@ -1408,6 +1432,23 @@ const adminOrganizationUpdateSchema = z
     message: 'Invalid product access selection',
     path: ['productAccess']
   });
+
+const INTEGRATION_TYPES = ['crm', 'gong', 'clari', 'email', 'calendar', 'procurement_erp', 'other'];
+
+const adminIntegrationCreateSchema = z.object({
+  orgId: z.string().trim(),
+  type: z.enum(INTEGRATION_TYPES),
+  provider: z.string().trim().min(2).max(160),
+  config: z.record(z.any()).optional(),
+  status: z.enum(['not_configured', 'configured', 'error']).optional()
+});
+
+const orgIntegrationCreateSchema = z.object({
+  type: z.enum(INTEGRATION_TYPES),
+  provider: z.string().trim().min(2).max(160),
+  config: z.record(z.any()).optional(),
+  status: z.enum(['not_configured', 'configured', 'error']).optional()
+});
 
 const membershipUpdateSchema = z.object({
   role: z.enum(['org_owner', 'org_admin', 'vendor_user', 'buyer_user', 'guest']).optional(),
@@ -3438,7 +3479,90 @@ app.post(
       return res.json({ ok: true });
     } catch (err) {
       console.error('Agama staff resend invite error', err);
-      return res.status(500).json({ error: 'Unable to resend invite' });
+    return res.status(500).json({ error: 'Unable to resend invite' });
+    }
+  }
+);
+
+app.get(
+  '/api/agama-admin/integrations',
+  requireAuth,
+  requireAgamaStaff,
+  requireAdminConsoleUnlocked,
+  async (req, res) => {
+    try {
+      const filter = {};
+      if (req.query.orgId) {
+        filter.orgId = req.query.orgId;
+      }
+      const connections = await IntegrationConnection.find(filter).sort({ createdAt: -1 });
+      const stateList = await IntegrationState.find({
+        integrationConnection: { $in: connections.map(conn => conn._id) }
+      });
+      const stateMap = new Map(stateList.map(state => [state.integrationConnection.toString(), state]));
+
+      res.json({
+        ok: true,
+        integrations: connections.map(conn =>
+          serializeIntegrationConnection(conn, stateMap.get(conn._id.toString()))
+        )
+      });
+    } catch (err) {
+      console.error('[agama-admin] List integrations failed', err);
+      res.status(500).json({ error: 'Unable to list integrations' });
+    }
+  }
+);
+
+app.post(
+  '/api/agama-admin/integrations',
+  requireAuth,
+  requireAgamaStaff,
+  requireAdminConsoleUnlocked,
+  validateBody(adminIntegrationCreateSchema),
+  async (req, res) => {
+    try {
+      const { orgId, type, provider, config, status } = req.validatedBody;
+      const organization = await Organization.findById(orgId);
+      if (!organization) {
+        return res.status(404).json({ error: 'Organization not found' });
+      }
+
+      const connection = await IntegrationConnection.create({
+        orgId,
+        type,
+        provider,
+        config: config || {},
+        status: status || 'configured'
+      });
+
+      const state = await upsertIntegrationState(connection);
+
+      res.status(201).json({ ok: true, integration: serializeIntegrationConnection(connection, state) });
+    } catch (err) {
+      console.error('[agama-admin] Create integration failed', err);
+      res.status(500).json({ error: 'Unable to create integration' });
+    }
+  }
+);
+
+app.post(
+  '/api/agama-admin/integrations/:integrationId/sync',
+  requireAuth,
+  requireAgamaStaff,
+  requireAdminConsoleUnlocked,
+  async (req, res) => {
+    try {
+      const integration = await IntegrationConnection.findById(req.params.integrationId);
+      if (!integration) {
+        return res.status(404).json({ error: 'Integration not found' });
+      }
+
+      const state = await simulateIntegrationSync(integration);
+      res.json({ ok: true, integration: serializeIntegrationConnection(integration, state) });
+    } catch (err) {
+      console.error('[agama-admin] Integration sync failed', err);
+      res.status(500).json({ error: 'Unable to sync integration' });
     }
   }
 );
@@ -4126,6 +4250,74 @@ app.get('/api/org/admin/audit', requireAuth, requireOrgAdmin, async (req, res) =
     res.status(500).json({ error: 'Unable to load audit history' });
   }
 });
+
+app.get('/api/org/admin/integrations', requireAuth, requireOrgAdmin, async (req, res) => {
+  try {
+    const connections = await IntegrationConnection.find({ orgId: req.organization._id }).sort({ createdAt: -1 });
+    const stateList = await IntegrationState.find({
+      integrationConnection: { $in: connections.map(conn => conn._id) }
+    });
+    const stateMap = new Map(stateList.map(state => [state.integrationConnection.toString(), state]));
+
+    res.json({
+      ok: true,
+      integrations: connections.map(conn => serializeIntegrationConnection(conn, stateMap.get(conn._id.toString())))
+    });
+  } catch (err) {
+    console.error('Org admin list integrations failed', err);
+    res.status(500).json({ error: 'Unable to load integrations' });
+  }
+});
+
+app.post(
+  '/api/org/admin/integrations',
+  requireAuth,
+  requireOrgAdmin,
+  validateBody(orgIntegrationCreateSchema),
+  async (req, res) => {
+    try {
+      const { type, provider, config, status } = req.validatedBody;
+      const connection = await IntegrationConnection.create({
+        orgId: req.organization._id,
+        type,
+        provider,
+        config: config || {},
+        status: status || 'configured'
+      });
+
+      const state = await upsertIntegrationState(connection);
+
+      res.status(201).json({ ok: true, integration: serializeIntegrationConnection(connection, state) });
+    } catch (err) {
+      console.error('Org admin create integration failed', err);
+      res.status(500).json({ error: 'Unable to create integration' });
+    }
+  }
+);
+
+app.post(
+  '/api/org/admin/integrations/:integrationId/sync',
+  requireAuth,
+  requireOrgAdmin,
+  async (req, res) => {
+    try {
+      const integration = await IntegrationConnection.findOne({
+        _id: req.params.integrationId,
+        orgId: req.organization._id
+      });
+
+      if (!integration) {
+        return res.status(404).json({ error: 'Integration not found' });
+      }
+
+      const state = await simulateIntegrationSync(integration);
+      res.json({ ok: true, integration: serializeIntegrationConnection(integration, state) });
+    } catch (err) {
+      console.error('Org admin integration sync failed', err);
+      res.status(500).json({ error: 'Unable to sync integration' });
+    }
+  }
+);
 
 app.put('/api/auth/me', requireAuth, validateBody(profileUpdateSchema), async (req, res) => {
   try {

@@ -6,7 +6,8 @@ const adminState = {
   members: [],
   auditEvents: [],
   showActiveOnly: false,
-  auditLoaded: false
+  auditLoaded: false,
+  integrations: []
 };
 
 function setText(id, text) {
@@ -90,6 +91,137 @@ function renderAnalytics() {
   setText('statBuyers', buyerCount.toString());
   setText('statSellersSub', dualCount ? `${dualCount} with both suites` : 'Seller provisioned');
   setText('statBuyersSub', dualCount ? `${dualCount} with both suites` : 'Buyer provisioned');
+}
+
+function renderIntegrations() {
+  const list = document.getElementById('orgIntegrationList');
+  const empty = document.getElementById('orgIntegrationEmpty');
+  const errorEl = document.getElementById('orgIntegrationError');
+  const count = document.getElementById('orgIntegrationCount');
+
+  if (!list || !empty || !count) return;
+  if (errorEl) errorEl.textContent = '';
+
+  list.innerHTML = '';
+  const integrations = Array.isArray(adminState.integrations) ? adminState.integrations : [];
+  count.textContent = `${integrations.length}`;
+
+  if (!integrations.length) {
+    empty.style.display = '';
+    return;
+  }
+
+  empty.style.display = 'none';
+
+  integrations.forEach(integration => {
+    const item = document.createElement('div');
+    item.className = 'glass-subtle p-2 rounded-3 d-flex justify-content-between align-items-start gap-2';
+
+    const meta = document.createElement('div');
+    meta.innerHTML = `
+      <div class="fw-semibold text-uppercase small">${integration.type}</div>
+      <div class="text-fg-3 small">${integration.provider}</div>
+      <div class="text-fg-3 small">${integration.lastSyncSummary || 'No syncs yet.'}</div>
+    `;
+
+    const action = document.createElement('button');
+    action.className = 'btn btn-outline-light btn-sm';
+    action.type = 'button';
+    action.textContent = 'Simulate sync';
+    action.addEventListener('click', () => simulateIntegrationSync(integration.id));
+
+    const detail = document.createElement('div');
+    detail.className = 'text-fg-3 small text-end';
+    detail.textContent = integration.lastSyncAt
+      ? new Date(integration.lastSyncAt).toLocaleString()
+      : 'Never synced';
+
+    const actions = document.createElement('div');
+    actions.className = 'd-flex flex-column align-items-end gap-1';
+    actions.appendChild(action);
+    actions.appendChild(detail);
+
+    item.appendChild(meta);
+    item.appendChild(actions);
+    list.appendChild(item);
+  });
+}
+
+async function loadIntegrations() {
+  try {
+    const res = await fetch('/api/org/admin/integrations', { credentials: 'include' });
+    const json = await res.json();
+    if (!res.ok || !json.ok) throw new Error(json.error || 'Unable to load integrations');
+    adminState.integrations = json.integrations || [];
+    renderIntegrations();
+  } catch (err) {
+    console.error(err);
+    adminState.integrations = [];
+    const errorEl = document.getElementById('orgIntegrationError');
+    if (errorEl) errorEl.textContent = 'Unable to load integrations.';
+    renderIntegrations();
+  }
+}
+
+function mergeOrgIntegration(integration) {
+  const list = Array.isArray(adminState.integrations) ? [...adminState.integrations] : [];
+  const idx = list.findIndex(item => item.id === integration.id);
+  if (idx >= 0) {
+    list[idx] = integration;
+  } else {
+    list.unshift(integration);
+  }
+  adminState.integrations = list;
+}
+
+async function addIntegration(event) {
+  event.preventDefault();
+  const errorEl = document.getElementById('orgIntegrationError');
+  if (errorEl) errorEl.textContent = '';
+
+  const provider = document.getElementById('orgIntegrationProvider')?.value || '';
+  const type = document.getElementById('orgIntegrationType')?.value || 'crm';
+  const notes = document.getElementById('orgIntegrationNotes')?.value || '';
+
+  try {
+    const res = await fetch('/api/org/admin/integrations', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type,
+        provider,
+        config: notes ? { notes } : {}
+      })
+    });
+    const json = await res.json();
+    if (!res.ok || !json.ok) throw new Error(json.error || 'Unable to create integration');
+    mergeOrgIntegration(json.integration);
+    renderIntegrations();
+    const form = document.getElementById('orgIntegrationForm');
+    if (form) form.reset();
+  } catch (err) {
+    console.error(err);
+    if (errorEl) errorEl.textContent = err.message || 'Unable to create integration.';
+  }
+}
+
+async function simulateIntegrationSync(integrationId) {
+  if (!integrationId) return;
+  try {
+    const res = await fetch(`/api/org/admin/integrations/${encodeURIComponent(integrationId)}/sync`, {
+      method: 'POST',
+      credentials: 'include'
+    });
+    const json = await res.json();
+    if (!res.ok || !json.ok) throw new Error(json.error || 'Unable to sync integration');
+    mergeOrgIntegration(json.integration);
+    renderIntegrations();
+  } catch (err) {
+    console.error(err);
+    const errorEl = document.getElementById('orgIntegrationError');
+    if (errorEl) errorEl.textContent = 'Sync failed. Try again later.';
+  }
 }
 
 function renderMembers() {
@@ -313,6 +445,7 @@ async function fetchOverview() {
     renderOverview();
     renderMembers();
     renderAnalytics();
+    await loadIntegrations();
     fetchAuditLog();
   } catch (err) {
     setText('orgName', 'Unable to load organisation');
@@ -429,10 +562,18 @@ function bindLogout() {
   }
 }
 
+function bindIntegrationForm() {
+  const form = document.getElementById('orgIntegrationForm');
+  if (form) {
+    form.addEventListener('submit', addIntegration);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   bindInviteForm();
   bindLogout();
   bindAuditControls();
   bindMemberFilters();
+  bindIntegrationForm();
   fetchAuthContext();
 });

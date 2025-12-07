@@ -8,6 +8,7 @@ const adminState = {
   currentOrgTab: 'overview',
   currentOrgOverview: null,
   currentOrgMembers: [],
+  integrations: [],
   saving: false,
   auditEvents: [],
   auditFilters: {
@@ -533,6 +534,7 @@ async function openOrgDetail(org) {
     detailCard.classList.remove('d-none');
   }
 
+  await loadAdminIntegrations(org.id);
   await loadOrgOverview(org.id);
   setOrgTab('overview');
 }
@@ -563,6 +565,158 @@ async function loadOrgOverview(orgId) {
     adminState.currentOrgMembers = [];
     renderOrgOverview();
     renderOrgMembers();
+  }
+}
+
+function renderAdminIntegrations(errorMessage = '') {
+  const list = document.getElementById('agamaIntegrationList');
+  const empty = document.getElementById('agamaIntegrationEmpty');
+  const orgLabel = document.getElementById('agamaIntegrationOrgLabel');
+  const errorEl = document.getElementById('agamaIntegrationError');
+
+  if (orgLabel) {
+    orgLabel.textContent = adminState.selectedOrg?.name || 'Select org';
+  }
+  if (errorEl) {
+    errorEl.textContent = errorMessage || '';
+  }
+  if (!list || !empty) return;
+
+  list.innerHTML = '';
+  const integrations = Array.isArray(adminState.integrations) ? adminState.integrations : [];
+
+  if (!adminState.selectedOrg) {
+    empty.classList.remove('d-none');
+    empty.textContent = 'Select an organisation to manage integrations.';
+    return;
+  }
+
+  if (!integrations.length) {
+    empty.classList.remove('d-none');
+    empty.textContent = 'No integrations configured yet.';
+    return;
+  }
+
+  empty.classList.add('d-none');
+
+  integrations.forEach(integration => {
+    const item = document.createElement('div');
+    item.className = 'glass-subtle p-2 rounded-3 d-flex justify-content-between align-items-start gap-3';
+
+    const meta = document.createElement('div');
+    meta.innerHTML = `
+      <div class="fw-semibold text-uppercase small">${integration.type || 'integration'}</div>
+      <div class="text-fg-3 small">Provider: ${integration.provider || 'Unknown'}</div>
+      <div class="text-fg-3 small">Status: ${integration.lastSyncStatus || integration.status || 'pending'}</div>
+      <div class="text-fg-3 small">${integration.lastSyncSummary || 'No syncs yet.'}</div>
+    `;
+
+    const actions = document.createElement('div');
+    actions.className = 'd-flex flex-column align-items-end gap-1';
+    const syncBtn = document.createElement('button');
+    syncBtn.className = 'btn btn-outline-light btn-sm';
+    syncBtn.type = 'button';
+    syncBtn.textContent = 'Simulate sync';
+    syncBtn.addEventListener('click', () => simulateAdminIntegrationSync(integration.id));
+
+    const timestamps = document.createElement('div');
+    timestamps.className = 'text-fg-3 small text-end';
+    const lastSyncLabel = integration.lastSyncAt
+      ? new Date(integration.lastSyncAt).toLocaleString()
+      : 'Never synced';
+    timestamps.textContent = lastSyncLabel;
+
+    actions.appendChild(syncBtn);
+    actions.appendChild(timestamps);
+
+    item.appendChild(meta);
+    item.appendChild(actions);
+    list.appendChild(item);
+  });
+}
+
+async function loadAdminIntegrations(orgId) {
+  if (!orgId) {
+    adminState.integrations = [];
+    renderAdminIntegrations();
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/agama-admin/integrations?orgId=${encodeURIComponent(orgId)}`, {
+      credentials: 'include'
+    });
+    const json = await res.json();
+    if (!res.ok || !json.ok) throw new Error(json.error || 'Unable to load integrations');
+    adminState.integrations = json.integrations || [];
+    renderAdminIntegrations();
+  } catch (err) {
+    console.error(err);
+    adminState.integrations = [];
+    renderAdminIntegrations('Unable to load integrations');
+  }
+}
+
+function mergeIntegrationIntoState(integration) {
+  const list = Array.isArray(adminState.integrations) ? [...adminState.integrations] : [];
+  const idx = list.findIndex(item => item.id === integration.id);
+  if (idx >= 0) {
+    list[idx] = integration;
+  } else {
+    list.unshift(integration);
+  }
+  adminState.integrations = list;
+}
+
+async function submitAdminIntegration(event) {
+  event.preventDefault();
+  if (!adminState.selectedOrg) {
+    renderAdminIntegrations('Select an organisation first.');
+    return;
+  }
+
+  const provider = document.getElementById('agamaIntegrationProvider')?.value || '';
+  const type = document.getElementById('agamaIntegrationType')?.value || 'crm';
+  const notes = document.getElementById('agamaIntegrationNotes')?.value || '';
+
+  try {
+    const res = await fetch('/api/agama-admin/integrations', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orgId: adminState.selectedOrg.id,
+        type,
+        provider,
+        config: notes ? { notes } : {}
+      })
+    });
+    const json = await res.json();
+    if (!res.ok || !json.ok) throw new Error(json.error || 'Unable to create integration');
+    mergeIntegrationIntoState(json.integration);
+    renderAdminIntegrations();
+    const form = document.getElementById('agamaIntegrationForm');
+    if (form) form.reset();
+  } catch (err) {
+    console.error(err);
+    renderAdminIntegrations('Unable to create integration');
+  }
+}
+
+async function simulateAdminIntegrationSync(integrationId) {
+  if (!integrationId) return;
+  try {
+    const res = await fetch(`/api/agama-admin/integrations/${encodeURIComponent(integrationId)}/sync`, {
+      method: 'POST',
+      credentials: 'include'
+    });
+    const json = await res.json();
+    if (!res.ok || !json.ok) throw new Error(json.error || 'Unable to sync integration');
+    mergeIntegrationIntoState(json.integration);
+    renderAdminIntegrations();
+  } catch (err) {
+    console.error(err);
+    renderAdminIntegrations('Sync failed');
   }
 }
 
@@ -1068,6 +1222,7 @@ async function loadOrganizations(focusOrgId) {
     renderOrganizations(adminState.organizations);
     populateAuditOrgFilter();
     populateOrgEditor(adminState.selectedOrg);
+    await loadAdminIntegrations(adminState.selectedOrg?.id || null);
     await fetchAuditLog();
   } catch (err) {
     console.error(err);
@@ -1291,6 +1446,10 @@ function initHandlers() {
   const orgForm = document.getElementById('agamaOrgForm');
   if (orgForm) {
     orgForm.addEventListener('submit', saveOrganization);
+  }
+  const integrationForm = document.getElementById('agamaIntegrationForm');
+  if (integrationForm) {
+    integrationForm.addEventListener('submit', submitAdminIntegration);
   }
   initSuiteTiles('agamaOrgSuites');
 
