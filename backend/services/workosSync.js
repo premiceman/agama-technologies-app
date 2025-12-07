@@ -55,9 +55,6 @@ async function syncWorkOSUser(workosUser) {
       workosUserId: workosUser.id,
       email,
       name: fullName || email,
-      passwordHash: null,
-      authSource: 'workos',
-      valueAssessmentLimit: 3,
       status: 'active'
     });
   }
@@ -126,11 +123,9 @@ async function syncWorkOSOrganization(workosOrg) {
         name: baseName,
         slug,
         workosOrganizationId: workosOrgId,
-        orgType: 'both',
         domains,
         vendorSuiteEnabled: true,
         buyerSuiteEnabled: true,
-        productAccess: ['valuesphere'],
         seatLimits: { vendorSuite: 0, buyerSuite: 0, bothSuites: 0 }
       });
     } else {
