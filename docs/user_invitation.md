@@ -3,7 +3,7 @@
 Version: 1.0  
 Owner: Agama Technologies  
 Status: Authoritative Specification for User & Guest Invitation System  
-Last Updated: (update before commit)
+Last Updated: 2024-05-08
 
 This document defines the complete invitation and onboarding architecture for Agama.  
 It covers internal user invites, guest invites, WorkOS integration, organisation creation, suite entitlement assignment, role assignment, and cross-org collaboration rules.
@@ -23,13 +23,14 @@ This file ensures that the entire user lifecycle is permission-safe, scalable, a
 
 Agama supports two invitation types:
 
-1. **Internal User Invitation**  
-   - Creates or updates an OrganizationMembership  
-   - Assigns suite entitlements (vendorSuite, buyerSuite)  
-   - Assigns org roles (org_owner, org_admin, user)  
-   - Uses WorkOS SSO authentication flow  
+1. **Internal User Invitation**
+   - Creates or updates an OrganizationMembership
+   - Assigns suite entitlements (vendorSuite, buyerSuite)
+   - Sets persona preference (`vendor`, `buyer`, or `both`) for UI/AI only
+   - Assigns org roles (org_owner, org_admin, user)
+   - Uses WorkOS SSO authentication flow
 
-2. **Guest Invitation (Room-Specific)**  
+2. **Guest Invitation (Room-Specific)**
    - Allows external users to join a single Engagement Room  
    - Creates a minimal guest User + RoomParticipant  
    - No suite entitlements  
@@ -37,6 +38,8 @@ Agama supports two invitation types:
    - Uses magic link authentication  
 
 Internal users are org-bound; guests are room-bound.
+
+Org Owners and Org Admins may invite vendor users, buyer users, dual-mode users (`persona = both`), or guests. Vendor/buyer/both invitations must remain within the available seat limits for each suite assignment. Guests never consume seats and remain constrained to guest permissions.
 
 Both invitation types use the `Invite` object defined in `domain_model.md`.
 
@@ -50,9 +53,10 @@ Fields:
 - `orgId?`
 - `roomId?`
 - `isGuest` (boolean)
+- `persona?` ('vendor' | 'buyer' | 'both') for UI/AI defaults
 - `roleAssignments` (optional):
-  - `orgRole`  
-  - `vendorSuite`  
+  - `orgRole`
+  - `vendorSuite`
   - `buyerSuite`  
   - `superUser { vendor?, buyer? }`  
 - `invitedByUserId`
@@ -76,28 +80,30 @@ Internal invites onboard people into an Organisation.
 
 ## 3.1 Flow Overview
 
-1. Org Owner/Admin opens **Organisation Settings → Users**  
-2. Enters email(s)  
+1. Org Owner/Admin opens **Organisation Settings → Users**
+2. Enters email(s)
 3. Selects:
-   - Org Role (owner, admin, user)  
-   - Vendor Suite entitlement  
-   - Buyer Suite entitlement  
-   - SuperUser flags  
-4. System creates `Invite` object  
-5. Email is sent with a **WorkOS SSO invite link**:
-   - https://agama.app/invite?token=XYZ  
-6. User clicks link  
-7. User signs in via WorkOS:
-   - If new user → create User record  
-   - If existing user → attach invitation  
-8. Invitation is validated, consumed, and:
-   - OrganizationMembership is created or updated  
-   - Suite entitlements are assigned  
-   - SuperUser flags applied  
-9. Redirect:
-   - Vendor Suite → RevenueForge  
-   - Buyer Suite → ProcurePath  
-   - Dual Suite → dashboard with mode selector  
+   - Org Role (owner, admin, user)
+   - Persona preference (vendor, buyer, both) for UI/AI defaults
+   - Vendor Suite entitlement
+   - Buyer Suite entitlement
+   - SuperUser flags
+4. System validates available suite seats per entitlement; vendor/buyer/both invitations cannot exceed seat limits for each suite.
+5. System creates `Invite` object
+6. Email is sent with a **WorkOS SSO invite link**:
+   - https://agama.app/invite?token=XYZ
+7. User clicks link
+8. User signs in via WorkOS:
+   - If new user → create User record
+   - If existing user → attach invitation
+9. Invitation is validated, consumed, and:
+   - OrganizationMembership is created or updated
+   - Suite entitlements are assigned
+   - SuperUser flags applied
+10. Redirect:
+   - Vendor Suite → RevenueForge
+   - Buyer Suite → ProcurePath
+   - Dual Suite → dashboard with mode selector
 
 ## 3.2 Edge Cases
 
@@ -123,7 +129,7 @@ Not allowed: internal users must join org via internal invite.
 
 # 4. Guest Invitation Flow (Room-Based)
 
-Guest invitations allow non-Agama users to join a specific Room.
+Guest invitations allow non-Agama users to join a specific Room without consuming any suite seats.
 
 ## 4.1 Flow Overview
 
@@ -148,7 +154,7 @@ Guest invitations allow non-Agama users to join a specific Room.
 
 ## 4.2 Guest Permissions
 
-Guests may:
+Guests may (guest access does not consume suite seats):
 - View shared panels  
 - Send messages  
 - Upload shared documents  
@@ -156,11 +162,12 @@ Guests may:
 - Answer RFX questions if acting as vendor representative  
 
 Guests may NOT:
-- View vendor-only panels  
-- View buyer-only panels  
-- Access RevenueForge or ProcurePath  
-- Manage org settings  
-- Score RFX responses  
+- View vendor-only panels
+- View buyer-only panels
+- Access RevenueForge or ProcurePath
+- Manage org settings
+- Score RFX responses
+Guest capabilities are constrained by the guest role definitions in roles_permissions and do not expand beyond shared surfaces.
 
 ## 4.3 Guest → Buyer Suite Upsell Path
 
