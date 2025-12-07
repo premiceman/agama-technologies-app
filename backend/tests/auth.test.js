@@ -7,6 +7,9 @@ const mongoose = require('mongoose');
 const request = require('supertest');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const { installWorkOSStub, FakeWorkOS } = require('./helpers/workosStub');
+const Organization = require('../models/Organization');
+const OrganizationMembership = require('../models/OrganizationMembership');
+const User = require('../models/User');
 
 let app;
 let mongo;
@@ -110,6 +113,252 @@ describe('Authentication & licensing', () => {
 
     expect(updateRes.status).toBe(400);
     expect(Boolean(updateRes.body.error && /select at least one platform/i.test(updateRes.body.error))).toBeTruthy();
+  });
+
+  test('returns context for user with multiple organizations', async () => {
+    const agent = request.agent(app);
+    await agent.post('/api/auth/signup').send({
+      name: 'Context Multi',
+      email: 'multiorg@example.com',
+      password: 'password123',
+      licenseTier: 'business',
+      platformAccess: ['valuesphere', 'procurepath']
+    });
+
+    const orgOne = await agent.post('/api/orgs').send({ name: 'Context One', slug: 'context-one' });
+    const orgTwo = await agent.post('/api/orgs').send({ name: 'Context Two', slug: 'context-two' });
+
+    expect(orgOne.status).toBe(201);
+    expect(orgTwo.status).toBe(201);
+
+    const contextRes = await agent.get('/api/me/context');
+    expect(contextRes.status).toBe(200);
+    expect(contextRes.body.activeOrganization.id).toBe(orgOne.body.organization.id);
+    const normalized = {
+      ok: contextRes.body.ok,
+      orgRole: contextRes.body.orgRole,
+      suiteEntitlements: contextRes.body.suiteEntitlements,
+      activePersona: contextRes.body.activePersona,
+      themeHints: contextRes.body.themeHints,
+      effectivePermissions: contextRes.body.effectivePermissions,
+      activeOrganization: {
+        ...contextRes.body.activeOrganization,
+        id: '<org-one>',
+        suites: contextRes.body.activeOrganization.suites
+      },
+      user: {
+        email: contextRes.body.user.email,
+        persona: contextRes.body.user.persona,
+        defaultOrganizationId: contextRes.body.user.defaultOrganizationId ? '<org-one>' : null
+      }
+    };
+
+    expect(normalized).toEqual({
+      ok: true,
+      orgRole: 'org_owner',
+      suiteEntitlements: {
+        buyerSuite: true,
+        sharedSuite: true,
+        vendorSuite: true
+      },
+      activePersona: 'shared',
+      themeHints: { primary: 'shared', persona: 'shared' },
+      effectivePermissions: {
+        role: 'org_owner',
+        entitlements: { buyerSuite: true, sharedSuite: true, vendorSuite: true },
+        isOrgOwner: true,
+        isOrgAdmin: false,
+        canManageOrg: true,
+        vendorSuiteAccess: true,
+        buyerSuiteAccess: true,
+        sharedSuiteAccess: true
+      },
+      activeOrganization: {
+        id: '<org-one>',
+        name: 'Context One',
+        slug: 'context-one',
+        tier: 'business',
+        orgType: 'both',
+        role: 'org_owner',
+        suites: {
+          organization: {
+            vendorSuiteEnabled: true,
+            buyerSuiteEnabled: true,
+            sharedSuiteEnabled: true
+          },
+          membership: {
+            vendorSuiteEnabled: true,
+            buyerSuiteEnabled: true,
+            sharedSuiteEnabled: true
+          }
+        }
+      },
+      user: {
+        email: 'multiorg@example.com',
+        persona: 'dual',
+        defaultOrganizationId: '<org-one>'
+      }
+    });
+
+    const secondOrgContext = await agent.get(`/api/me/context?orgId=${orgTwo.body.organization.id}`);
+    expect(secondOrgContext.status).toBe(200);
+    expect(secondOrgContext.body.activeOrganization.id).toBe(orgTwo.body.organization.id);
+  });
+
+  test('returns mixed suite access entitlements', async () => {
+    const agent = request.agent(app);
+    await agent.post('/api/auth/signup').send({
+      name: 'Suite Mix',
+      email: 'mix@example.com',
+      password: 'password123',
+      licenseTier: 'business',
+      platformAccess: ['valuesphere']
+    });
+
+    const orgRes = await agent.post('/api/orgs').send({ name: 'Mix Org', slug: 'mix-org' });
+    const orgId = orgRes.body.organization.id;
+
+    const membership = await OrganizationMembership.findOne({ organization: orgId });
+    membership.buyerSuiteEnabled = false;
+    membership.vendorSuiteEnabled = true;
+    membership.sharedSuiteEnabled = true;
+    await membership.save();
+
+    const contextRes = await agent.get(`/api/me/context?orgId=${orgId}`);
+    expect(contextRes.status).toBe(200);
+    const normalized = {
+      ok: contextRes.body.ok,
+      orgRole: contextRes.body.orgRole,
+      suiteEntitlements: contextRes.body.suiteEntitlements,
+      activePersona: contextRes.body.activePersona,
+      themeHints: contextRes.body.themeHints,
+      effectivePermissions: contextRes.body.effectivePermissions,
+      activeOrganization: {
+        ...contextRes.body.activeOrganization,
+        id: '<org-id>',
+        suites: contextRes.body.activeOrganization.suites
+      },
+      user: {
+        email: contextRes.body.user.email,
+        persona: contextRes.body.user.persona,
+        defaultOrganizationId: contextRes.body.user.defaultOrganizationId ? '<org-id>' : null
+      }
+    };
+
+    expect(normalized).toEqual({
+      ok: true,
+      orgRole: 'org_owner',
+      suiteEntitlements: { buyerSuite: false, sharedSuite: true, vendorSuite: true },
+      activePersona: 'seller',
+      themeHints: { primary: 'seller', persona: 'seller' },
+      effectivePermissions: {
+        role: 'org_owner',
+        entitlements: { buyerSuite: false, sharedSuite: true, vendorSuite: true },
+        isOrgOwner: true,
+        isOrgAdmin: false,
+        canManageOrg: true,
+        vendorSuiteAccess: true,
+        buyerSuiteAccess: false,
+        sharedSuiteAccess: true
+      },
+      activeOrganization: {
+        id: '<org-id>',
+        name: 'Mix Org',
+        slug: 'mix-org',
+        tier: 'business',
+        orgType: 'both',
+        role: 'org_owner',
+        suites: {
+          organization: {
+            vendorSuiteEnabled: true,
+            buyerSuiteEnabled: true,
+            sharedSuiteEnabled: true
+          },
+          membership: {
+            vendorSuiteEnabled: true,
+            buyerSuiteEnabled: false,
+            sharedSuiteEnabled: true
+          }
+        }
+      },
+      user: {
+        email: 'mix@example.com',
+        persona: 'dual',
+        defaultOrganizationId: '<org-id>'
+      }
+    });
+  });
+
+  test('returns buyer theme when persona is buyer', async () => {
+    const agent = request.agent(app);
+    await agent.post('/api/auth/signup').send({
+      name: 'Buyer Persona',
+      email: 'buyer@example.com',
+      password: 'password123',
+      licenseTier: 'business',
+      platformAccess: ['procurepath']
+    });
+
+    await agent.patch('/api/auth/persona').send({ persona: 'buyer' });
+    const orgRes = await agent.post('/api/orgs').send({ name: 'Buyer Org', slug: 'buyer-org' });
+    const orgId = orgRes.body.organization.id;
+
+    const contextRes = await agent.get(`/api/me/context?orgId=${orgId}`);
+    expect(contextRes.status).toBe(200);
+    const normalized = {
+      ok: contextRes.body.ok,
+      orgRole: contextRes.body.orgRole,
+      suiteEntitlements: contextRes.body.suiteEntitlements,
+      activePersona: contextRes.body.activePersona,
+      themeHints: contextRes.body.themeHints,
+      activeOrganization: {
+        id: '<org-id>',
+        name: contextRes.body.activeOrganization.name,
+        slug: contextRes.body.activeOrganization.slug,
+        tier: contextRes.body.activeOrganization.tier,
+        orgType: contextRes.body.activeOrganization.orgType,
+        role: contextRes.body.activeOrganization.role,
+        suites: contextRes.body.activeOrganization.suites
+      },
+      user: {
+        email: contextRes.body.user.email,
+        persona: contextRes.body.user.persona,
+        defaultOrganizationId: contextRes.body.user.defaultOrganizationId ? '<org-id>' : null
+      }
+    };
+
+    expect(normalized).toEqual({
+      ok: true,
+      orgRole: 'org_owner',
+      suiteEntitlements: { buyerSuite: true, sharedSuite: true, vendorSuite: true },
+      activePersona: 'buyer',
+      themeHints: { primary: 'buyer', persona: 'buyer' },
+      activeOrganization: {
+        id: '<org-id>',
+        name: 'Buyer Org',
+        slug: 'buyer-org',
+        tier: 'business',
+        orgType: 'both',
+        role: 'org_owner',
+        suites: {
+          organization: {
+            vendorSuiteEnabled: true,
+            buyerSuiteEnabled: true,
+            sharedSuiteEnabled: true
+          },
+          membership: {
+            vendorSuiteEnabled: true,
+            buyerSuiteEnabled: true,
+            sharedSuiteEnabled: true
+          }
+        }
+      },
+      user: {
+        email: 'buyer@example.com',
+        persona: 'buyer',
+        defaultOrganizationId: '<org-id>'
+      }
+    });
   });
 
   test('logs out via WorkOS when a hosted session is present', async () => {
