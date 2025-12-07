@@ -33,6 +33,7 @@ const EngagementRoomFile = require('./models/EngagementRoomFile');
 const EngagementRoomFileVersion = require('./models/EngagementRoomFileVersion');
 const EngagementRoomFileComment = require('./models/EngagementRoomFileComment');
 const AuditEvent = require('./models/AuditEvent');
+const { getDashboardOverview } = require('./services/dashboard');
 const { requireOrgRole, getEffectivePermissions } = require('./middleware/orgAuth');
 const {
   syncWorkOSUser,
@@ -2347,6 +2348,41 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.get('/api/dashboard/overview', requireAuth, async (req, res) => {
+  try {
+    const user = req.requestingUser || (await User.findById(req.auth.uid));
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const orgId = req.auth.orgId || user.defaultOrganization;
+    if (!orgId) {
+      return res.status(400).json({ error: 'Organization context is required for dashboard' });
+    }
+
+    const organization = await Organization.findById(orgId);
+    if (!organization) {
+      return res.status(404).json({ error: 'Organization not found' });
+    }
+
+    const membership = await OrganizationMembership.findOne({
+      organization: organization._id,
+      user: user._id,
+      status: 'active'
+    });
+
+    if (!membership) {
+      return res.status(403).json({ error: 'No active membership for this organization.' });
+    }
+
+    const permissions = getEffectivePermissions(user, organization, membership);
+    const overview = await getDashboardOverview({ organization, user, permissions });
+
+    return res.json({ ok: true, overview });
+  } catch (err) {
+    console.error('Dashboard overview error', err);
+    return res.status(500).json({ error: 'Unable to load dashboard overview' });
   }
 });
 
