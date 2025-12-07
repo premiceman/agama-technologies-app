@@ -126,6 +126,11 @@ async function loadWorkspace() {
   try {
     clearError();
     const context = await fetchJson('/api/me/context');
+    const { accessState } = context || {};
+    if (accessState === 'needs_onboarding') {
+      window.location.href = '/onboarding.html';
+      return;
+    }
     workspaceState.context = context;
     renderHeader(context);
 
