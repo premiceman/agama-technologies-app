@@ -819,7 +819,7 @@ Migration must be **transparent** to tenants and maintain all security and audit
 
 ## 15. Active Organisation Context
 
-Users belonging to multiple Organisations must explicitly select an active org context after authentication.  
+Users belonging to multiple Organisations must explicitly select an active org context after authentication.
 All suite entitlements, dashboard views, room visibility, search results, and notifications depend on the active org.
 
 Switching org updates:
@@ -832,5 +832,36 @@ Switching org updates:
 Org context switching must never reveal cross-org data during transition.
 
 
-This MASTER SPEC defines the **complete conceptual blueprint** of the Agama platform.  
+---
+
+## 16. Licensing and Pricing
+
+- Every real user belongs to an **Organisation**; licences are **business-only** and purchased at the org level.
+- Licensing is **seat-based**. Seat assignments are tied to suites and are managed by org owners/admins.
+
+Suites and seat types:
+
+- **Vendor Suite** – paid seat for vendor-side users.
+- **Buyer Suite** – paid seat for buyer-side users.
+- **Both Suites** – paid seat that combines Vendor and Buyer suite entitlements.
+- **Guest** – invited participant in Engagement Rooms with shared-tab access only; **no seat consumption**.
+
+Seat limits (per organisation):
+
+- `seatLimits.vendorSuite`
+- `seatLimits.buyerSuite`
+- `seatLimits.bothSuites`
+- `seatLimits.totalSeats` governs combined usage; any requested increase above **200 total seats** triggers a **“Contact Sales”** flow.
+
+Pricing (USD, monthly):
+
+- Vendor Suite: **$150 / seat / month**
+- Buyer Suite: **$190 / seat / month**
+- Both Suites: **$250 / seat / month**
+- Guests: **Free**
+
+For full details, see `/docs/licensing_and_pricing.md`.
+
+
+This MASTER SPEC defines the **complete conceptual blueprint** of the Agama platform.
 All subsequent `.md` files (domain_model, roles_permissions, ui_conventions, etc.) elaborate specific slices of this model and must stay consistent with this document.
