@@ -18,6 +18,7 @@ const { validateBody } = require('./middleware/validation');
 const User = require('./models/User');
 const AdminConfig = require('./models/AdminConfig');
 const ProcurementVendor = require('./models/ProcurementVendor');
+const ValueSphereTemplate = require('./models/ValueSphereTemplate');
 const BuyerValueAssessment = require('./models/BuyerValueAssessment');
 const RevenueAccount = require('./models/RevenueAccount');
 const Organization = require('./models/Organization');
@@ -5719,11 +5720,12 @@ async function loadBuyerContext(req, res) {
   const orgId = req.auth?.orgId || user.defaultOrganization;
   let organization = null;
   let orgContext = null;
+  let membership = null;
 
   if (orgId) {
     const org = await Organization.findById(orgId);
     if (org) {
-      const membership = await OrganizationMembership.findOne({
+      membership = await OrganizationMembership.findOne({
         organization: org._id,
         user: user._id,
         status: 'active'
@@ -5736,7 +5738,8 @@ async function loadBuyerContext(req, res) {
           name: org.name,
           tier: org.tier,
           orgType: org.orgType || 'both',
-          role: membership.role
+          role: membership.role,
+          membership
         };
       }
     }
@@ -5758,7 +5761,14 @@ async function loadBuyerContext(req, res) {
     (organization.orgType === 'buyer' || organization.orgType === 'both') &&
     productAccess.includes('procurepath');
 
-  return { user, organization, effectiveLicense, canUseBuyerMode, isBusinessBuyerWithProcurePath };
+  return {
+    user,
+    organization,
+    effectiveLicense,
+    canUseBuyerMode,
+    isBusinessBuyerWithProcurePath,
+    membership
+  };
 }
 
 function serializeBuyerAssessment(assessment) {
@@ -5769,15 +5779,66 @@ function serializeBuyerAssessment(assessment) {
     dimensions: Array.isArray(assessment.dimensions) ? assessment.dimensions : [],
     summary: assessment.summary || '',
     tags: Array.isArray(assessment.tags) ? assessment.tags : [],
+    state: assessment.state,
+    mode: assessment.mode,
+    templateId: assessment.template ? assessment.template.toString() : null,
+    templateVersion: assessment.templateVersion,
+    procurementVendor: assessment.procurementVendor ? assessment.procurementVendor.toString() : null,
+    revenueAccount: assessment.revenueAccount ? assessment.revenueAccount.toString() : null,
+    engagementRoom: assessment.engagementRoom ? assessment.engagementRoom.toString() : null,
+    criteria: Array.isArray(assessment.criteria) ? assessment.criteria : [],
+    scoring: assessment.scoring || {},
+    decision: assessment.decision || {},
+    stakeholders: Array.isArray(assessment.stakeholders) ? assessment.stakeholders : [],
+    responses: Array.isArray(assessment.responses) ? assessment.responses : [],
     createdAt: assessment.createdAt,
     updatedAt: assessment.updatedAt
   };
 }
 
+function serializeTemplate(template) {
+  return {
+    id: template._id.toString(),
+    name: template.name,
+    description: template.description || '',
+    mode: template.mode,
+    versionNumber: template.versionNumber,
+    changeSummary: template.changeSummary || '',
+    previousVersion: template.previousVersion ? template.previousVersion.toString() : null,
+    isDeprecated: template.isDeprecated,
+    sections: template.sections || [],
+    createdAt: template.createdAt,
+    updatedAt: template.updatedAt
+  };
+}
+
+function ensureBuyerSuiteAccess(context, res) {
+  if (!context.organization || !context.membership || !context.membership.buyerSuiteEnabled) {
+    res.status(403).json({ error: 'BUYER_SUITE_REQUIRED' });
+    return false;
+  }
+
+  if (context.organization.orgType === 'vendor') {
+    res.status(403).json({ error: 'BUYER_SUITE_REQUIRED' });
+    return false;
+  }
+
+  return true;
+}
+
+const BUYER_ASSESSMENT_TRANSITIONS = {
+  draft: ['shared', 'agreed'],
+  shared: ['agreed'],
+  agreed: ['locked'],
+  locked: []
+};
+
 app.get('/api/valuesphere/buyer/vendors', requireAuth, requirePlatformAccess('valuesphere'), async (req, res) => {
   try {
     const context = await loadBuyerContext(req, res);
     if (!context) return;
+
+    if (!ensureBuyerSuiteAccess(context, res)) return;
 
     if (context.isBusinessBuyerWithProcurePath && context.organization) {
       const vendors = await ProcurementVendor.find({ organization: context.organization._id })
@@ -5803,24 +5864,176 @@ app.get('/api/valuesphere/buyer/vendors', requireAuth, requirePlatformAccess('va
   }
 });
 
+app.get('/api/valuesphere/templates', requireAuth, requirePlatformAccess('valuesphere'), async (req, res) => {
+  try {
+    const context = await loadBuyerContext(req, res);
+    if (!context) return;
+
+    if (!ensureBuyerSuiteAccess(context, res)) return;
+
+    const { mode = 'buyer', includeDeprecated = 'false' } = req.query;
+    const query = {
+      organization: context.organization?._id,
+      mode
+    };
+
+    if (includeDeprecated !== 'true') {
+      query.isDeprecated = { $ne: true };
+    }
+
+    const templates = await ValueSphereTemplate.find(query).sort({ updatedAt: -1 });
+    return res.json({ ok: true, templates: templates.map(serializeTemplate) });
+  } catch (err) {
+    console.error('Template list error', err);
+    return res.status(500).json({ error: 'Unable to load templates' });
+  }
+});
+
+app.post('/api/valuesphere/templates', requireAuth, requirePlatformAccess('valuesphere'), async (req, res) => {
+  try {
+    const context = await loadBuyerContext(req, res);
+    if (!context) return;
+
+    if (!ensureBuyerSuiteAccess(context, res)) return;
+
+    const { name, description, sections, mode = 'buyer', changeSummary } = req.body || {};
+    if (!name || typeof name !== 'string') {
+      return res.status(400).json({ error: 'name is required' });
+    }
+
+    if (!Array.isArray(sections)) {
+      return res.status(400).json({ error: 'sections must be an array' });
+    }
+
+    const template = await ValueSphereTemplate.create({
+      organization: context.organization._id,
+      mode,
+      name,
+      description,
+      sections,
+      changeSummary,
+      versionNumber: 1,
+      createdBy: context.user._id
+    });
+
+    await recordAuditEvent({
+      type: 'valuesphere.template.created',
+      actorUser: context.user._id,
+      actorOrganization: context.organization._id,
+      metadata: { templateId: template._id, mode }
+    });
+
+    return res.status(201).json({ ok: true, template: serializeTemplate(template) });
+  } catch (err) {
+    console.error('Template create error', err);
+    return res.status(500).json({ error: 'Unable to create template' });
+  }
+});
+
+app.get('/api/valuesphere/templates/:id', requireAuth, requirePlatformAccess('valuesphere'), async (req, res) => {
+  try {
+    const context = await loadBuyerContext(req, res);
+    if (!context) return;
+
+    if (!ensureBuyerSuiteAccess(context, res)) return;
+
+    const template = await ValueSphereTemplate.findById(req.params.id);
+    if (!template || !template.organization.equals(context.organization._id)) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
+    return res.json({ ok: true, template: serializeTemplate(template) });
+  } catch (err) {
+    console.error('Template get error', err);
+    return res.status(500).json({ error: 'Unable to load template' });
+  }
+});
+
+app.patch('/api/valuesphere/templates/:id', requireAuth, requirePlatformAccess('valuesphere'), async (req, res) => {
+  try {
+    const context = await loadBuyerContext(req, res);
+    if (!context) return;
+    if (!ensureBuyerSuiteAccess(context, res)) return;
+
+    const existing = await ValueSphereTemplate.findById(req.params.id);
+    if (!existing || !existing.organization.equals(context.organization._id)) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
+    const { name, description, sections, changeSummary } = req.body || {};
+    const nextVersionNumber = (existing.versionNumber || 1) + 1;
+    const updatedTemplate = await ValueSphereTemplate.create({
+      organization: existing.organization,
+      mode: existing.mode,
+      name: name || existing.name,
+      description: description || existing.description,
+      sections: Array.isArray(sections) ? sections : existing.sections,
+      changeSummary: changeSummary || 'Updated template',
+      versionNumber: nextVersionNumber,
+      previousVersion: existing._id,
+      createdBy: context.user._id
+    });
+
+    existing.isDeprecated = true;
+    await existing.save();
+
+    await recordAuditEvent({
+      type: 'valuesphere.template.versioned',
+      actorUser: context.user._id,
+      actorOrganization: context.organization._id,
+      metadata: { templateId: updatedTemplate._id, previousVersion: existing._id }
+    });
+
+    return res.json({ ok: true, template: serializeTemplate(updatedTemplate) });
+  } catch (err) {
+    console.error('Template update error', err);
+    return res.status(500).json({ error: 'Unable to update template' });
+  }
+});
+
+app.delete('/api/valuesphere/templates/:id', requireAuth, requirePlatformAccess('valuesphere'), async (req, res) => {
+  try {
+    const context = await loadBuyerContext(req, res);
+    if (!context) return;
+    if (!ensureBuyerSuiteAccess(context, res)) return;
+
+    const template = await ValueSphereTemplate.findById(req.params.id);
+    if (!template || !template.organization.equals(context.organization._id)) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
+    template.isDeprecated = true;
+    await template.save();
+
+    await recordAuditEvent({
+      type: 'valuesphere.template.deprecated',
+      actorUser: context.user._id,
+      actorOrganization: context.organization._id,
+      metadata: { templateId: template._id }
+    });
+
+    return res.json({ ok: true, template: serializeTemplate(template) });
+  } catch (err) {
+    console.error('Template delete error', err);
+    return res.status(500).json({ error: 'Unable to delete template' });
+  }
+});
+
 app.get('/api/valuesphere/buyer/assessments', requireAuth, requirePlatformAccess('valuesphere'), async (req, res) => {
   try {
     const context = await loadBuyerContext(req, res);
     if (!context) return;
 
-    const { vendorId } = req.query;
-    let query = {};
+    if (!ensureBuyerSuiteAccess(context, res)) return;
 
-    if (context.isBusinessBuyerWithProcurePath && context.organization) {
-      query.organization = context.organization._id;
-      if (vendorId) {
-        if (!mongoose.Types.ObjectId.isValid(vendorId)) {
-          return res.status(400).json({ error: 'Invalid vendorId' });
-        }
-        query.procurementVendor = vendorId;
+    const { vendorId } = req.query;
+    const query = { organization: context.organization?._id };
+
+    if (vendorId) {
+      if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+        return res.status(400).json({ error: 'Invalid vendorId' });
       }
-    } else {
-      query = { organization: null, createdBy: context.user._id };
+      query.procurementVendor = vendorId;
     }
 
     const assessments = await BuyerValueAssessment.find(query).sort({ updatedAt: -1 });
@@ -5836,46 +6049,127 @@ app.post('/api/valuesphere/buyer/assessments', requireAuth, requirePlatformAcces
     const context = await loadBuyerContext(req, res);
     if (!context) return;
 
-    const { vendorId, vendorName, title, dimensions, summary, tags } = req.body || {};
+    if (!ensureBuyerSuiteAccess(context, res)) return;
 
-    if (!vendorName || typeof vendorName !== 'string') {
+    const {
+      vendorId,
+      vendorName,
+      title,
+      dimensions,
+      summary,
+      tags,
+      templateId,
+      criteria,
+      responses,
+      scoring,
+      decision,
+      stakeholders,
+      roomId,
+      revenueAccountId
+    } = req.body || {};
+
+    let resolvedVendorName = vendorName;
+
+    let procurementVendorId = null;
+    let templateVersion = null;
+    let engagementRoomId = null;
+    let resolvedRevenueAccountId = null;
+    let templateRef = null;
+
+    if (!context.organization) {
+      return res.status(400).json({ error: 'Organization context required' });
+    }
+
+    if (vendorId) {
+      if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+        return res.status(400).json({ error: 'Invalid vendorId' });
+      }
+
+      const procurementVendor = await ProcurementVendor.findOne({
+        _id: vendorId,
+        organization: context.organization._id
+      });
+
+      if (!procurementVendor) {
+        return res.status(404).json({ error: 'Vendor not found' });
+      }
+
+      procurementVendorId = procurementVendor._id;
+      resolvedVendorName = resolvedVendorName || procurementVendor.name;
+    }
+
+    if (!resolvedVendorName || typeof resolvedVendorName !== 'string') {
       return res.status(400).json({ error: 'vendorName is required' });
     }
 
-    let procurementVendorId = null;
-
-    if (context.isBusinessBuyerWithProcurePath) {
-      if (!context.organization) {
-        return res.status(400).json({ error: 'Organization context required' });
+    if (templateId) {
+      if (!mongoose.Types.ObjectId.isValid(templateId)) {
+        return res.status(400).json({ error: 'Invalid templateId' });
       }
 
-      if (vendorId) {
-        if (!mongoose.Types.ObjectId.isValid(vendorId)) {
-          return res.status(400).json({ error: 'Invalid vendorId' });
-        }
-
-        const procurementVendor = await ProcurementVendor.findOne({
-          _id: vendorId,
-          organization: context.organization._id
-        });
-
-        if (!procurementVendor) {
-          return res.status(404).json({ error: 'Vendor not found' });
-        }
-
-        procurementVendorId = procurementVendor._id;
+      templateRef = await ValueSphereTemplate.findById(templateId);
+      if (!templateRef || !templateRef.organization.equals(context.organization._id)) {
+        return res.status(404).json({ error: 'Template not found' });
       }
+      if (templateRef.mode !== 'buyer') {
+        return res.status(400).json({ error: 'Template mode mismatch' });
+      }
+      templateVersion = templateRef.versionNumber || 1;
+    }
+
+    if (roomId) {
+      if (!mongoose.Types.ObjectId.isValid(roomId)) {
+        return res.status(400).json({ error: 'Invalid roomId' });
+      }
+      const membership = await EngagementRoomMembership.findOne({ room: roomId, user: context.user._id });
+      if (!membership) {
+        return res.status(403).json({ error: 'Room access denied' });
+      }
+      engagementRoomId = roomId;
+    }
+
+    if (revenueAccountId) {
+      if (!mongoose.Types.ObjectId.isValid(revenueAccountId)) {
+        return res.status(400).json({ error: 'Invalid revenueAccountId' });
+      }
+      const account = await RevenueAccount.findOne({ _id: revenueAccountId, userId: context.user._id });
+      if (!account) {
+        return res.status(404).json({ error: 'Revenue account not found' });
+      }
+      resolvedRevenueAccountId = account._id;
     }
 
     const assessment = await BuyerValueAssessment.create({
-      organization: context.isBusinessBuyerWithProcurePath && context.organization ? context.organization._id : null,
+      organization: context.organization ? context.organization._id : null,
       procurementVendor: procurementVendorId,
-      vendorName,
+      vendorName: resolvedVendorName,
       title,
       dimensions: Array.isArray(dimensions) ? dimensions : [],
       summary,
       tags: Array.isArray(tags) ? tags : [],
+      template: templateRef ? templateRef._id : null,
+      templateVersion: templateVersion || 1,
+      criteria: Array.isArray(criteria) ? criteria : [],
+      responses: Array.isArray(responses) ? responses : [],
+      scoring: scoring || {},
+      decision: decision || undefined,
+      stakeholders: Array.isArray(stakeholders) ? stakeholders : [],
+      engagementRoom: engagementRoomId,
+      revenueAccount: resolvedRevenueAccountId,
       createdBy: context.user._id
+    });
+
+    await recordAuditEvent({
+      type: 'valuesphere.assessment.created',
+      actorUser: context.user._id,
+      actorOrganization: assessment.organization,
+      targetOrganization: assessment.organization,
+      targetRoom: engagementRoomId,
+      metadata: {
+        assessmentId: assessment._id,
+        state: assessment.state,
+        mode: assessment.mode
+      }
     });
 
     return res.status(201).json({ ok: true, assessment: serializeBuyerAssessment(assessment) });
@@ -5889,6 +6183,8 @@ app.patch('/api/valuesphere/buyer/assessments/:id', requireAuth, requirePlatform
   try {
     const context = await loadBuyerContext(req, res);
     if (!context) return;
+
+    if (!ensureBuyerSuiteAccess(context, res)) return;
 
     const assessment = await BuyerValueAssessment.findById(req.params.id);
     if (!assessment) {
@@ -5910,6 +6206,10 @@ app.patch('/api/valuesphere/buyer/assessments/:id', requireAuth, requirePlatform
       return res.status(403).json({ error: 'Forbidden' });
     }
 
+    if (assessment.state === 'locked' && req.body.state !== 'locked') {
+      return res.status(400).json({ error: 'Assessment is locked' });
+    }
+
     ['title', 'dimensions', 'summary', 'tags'].forEach(field => {
       if (req.body[field] !== undefined) {
         assessment[field] = field === 'tags' || field === 'dimensions'
@@ -5919,6 +6219,39 @@ app.patch('/api/valuesphere/buyer/assessments/:id', requireAuth, requirePlatform
           : req.body[field];
       }
     });
+
+    if (req.body.criteria !== undefined && Array.isArray(req.body.criteria)) {
+      assessment.criteria = req.body.criteria;
+    }
+    if (req.body.responses !== undefined && Array.isArray(req.body.responses)) {
+      assessment.responses = req.body.responses;
+    }
+    if (req.body.scoring !== undefined) {
+      assessment.scoring = req.body.scoring;
+    }
+    if (req.body.decision !== undefined) {
+      assessment.decision = req.body.decision;
+    }
+    if (req.body.stakeholders !== undefined && Array.isArray(req.body.stakeholders)) {
+      assessment.stakeholders = req.body.stakeholders;
+    }
+
+    if (req.body.state) {
+      const allowedTransitions = BUYER_ASSESSMENT_TRANSITIONS[assessment.state] || [];
+      if (!allowedTransitions.includes(req.body.state) && assessment.state !== req.body.state) {
+        return res.status(400).json({ error: 'Invalid state transition' });
+      }
+      const previousState = assessment.state;
+      assessment.state = req.body.state;
+      await recordAuditEvent({
+        type: 'valuesphere.assessment.state_changed',
+        actorUser: context.user._id,
+        actorOrganization: assessment.organization,
+        targetOrganization: assessment.organization,
+        targetRoom: assessment.engagementRoom,
+        metadata: { assessmentId: assessment._id, from: previousState, to: req.body.state }
+      });
+    }
 
     await assessment.save();
     return res.json({ ok: true, assessment: serializeBuyerAssessment(assessment) });
