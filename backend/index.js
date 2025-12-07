@@ -36,6 +36,7 @@ const EngagementRoomMessage = require('./models/EngagementRoomMessage');
 const EngagementRoomFile = require('./models/EngagementRoomFile');
 const EngagementRoomFileVersion = require('./models/EngagementRoomFileVersion');
 const EngagementRoomFileComment = require('./models/EngagementRoomFileComment');
+const Notification = require('./models/Notification');
 const SearchIndexEntry = require('./models/SearchIndexEntry');
 const AuditEvent = require('./models/AuditEvent');
 const RoomEvent = require('./models/RoomEvent');
@@ -766,6 +767,123 @@ function deriveRoomVisibility(room, membership, explicitVisibility) {
   return 'shared';
 }
 
+function membershipMatchesVisibility(room, membership, visibility) {
+  if (visibility === 'shared') return true;
+  if (!membership?.organization) return false;
+  const orgId = membership.organization.toString();
+  if (visibility === 'vendor_only') {
+    return room.vendorOrg && room.vendorOrg.toString() === orgId;
+  }
+  if (visibility === 'buyer_only') {
+    return room.buyerOrg && room.buyerOrg.toString() === orgId;
+  }
+  return false;
+}
+
+function buildRoomNotificationContent(type, room, metadata = {}) {
+  const roomTitle = room?.title || 'Engagement Room';
+  switch (type) {
+    case 'room.message.created':
+      return { title: `New message in ${roomTitle}`, body: 'A new message was posted in the room.' };
+    case 'room.issue.created':
+      return {
+        title: `Issue created in ${roomTitle}`,
+        body: metadata.title ? `Issue “${metadata.title}” was created.` : 'A new room issue was created.'
+      };
+    case 'room.issue.updated':
+      return {
+        title: `Issue updated in ${roomTitle}`,
+        body: metadata.title ? `Issue “${metadata.title}” was updated.` : 'A room issue was updated.'
+      };
+    case 'room.deliverable.created':
+      return {
+        title: `Deliverable added to ${roomTitle}`,
+        body: metadata.title ? `Deliverable “${metadata.title}” was added.` : 'A new deliverable was added to the room.'
+      };
+    case 'room.deliverable.updated':
+      return {
+        title: `Deliverable updated in ${roomTitle}`,
+        body: metadata.title ? `Deliverable “${metadata.title}” was updated.` : 'A room deliverable was updated.'
+      };
+    case 'room.issue.comment.created':
+      return { title: `New comment in ${roomTitle}`, body: 'A new comment was added to a room issue.' };
+    case 'room.member.added':
+      return { title: `New member in ${roomTitle}`, body: 'A new participant joined the room.' };
+    case 'room.member.updated':
+      return { title: `Room membership updated`, body: 'A room participant’s role or org was updated.' };
+    case 'room.lifecycle.changed':
+      return {
+        title: `Room status changed`,
+        body:
+          metadata.to && metadata.from
+            ? `Room moved from ${metadata.from} to ${metadata.to}.`
+            : 'Room status was updated.'
+      };
+    default:
+      return { title: `Activity in ${roomTitle}`, body: 'There is new activity in this room.' };
+  }
+}
+
+async function notifyRoomMembers({ type, room, actorUser, visibility, metadata = {} }) {
+  try {
+    const roomDoc = room?._id ? room : await EngagementRoom.findById(room);
+    if (!roomDoc) return;
+
+    const content = buildRoomNotificationContent(type, roomDoc, metadata);
+    if (!content) return;
+
+    const memberships = await EngagementRoomMembership.find({ room: roomDoc._id });
+    const recipients = memberships.filter(member => {
+      if (!member.user) return false;
+      if (actorUser && member.user.toString() === actorUser.toString()) return false;
+      return membershipMatchesVisibility(roomDoc, member, visibility || 'shared');
+    });
+
+    if (recipients.length === 0) return;
+
+    const payloads = recipients.map(member => ({
+      userId: member.user,
+      orgId: member.organization,
+      type,
+      title: content.title,
+      body: content.body,
+      entityType: 'EngagementRoom',
+      entityId: roomDoc._id
+    }));
+
+    await Notification.insertMany(payloads);
+  } catch (err) {
+    console.error('notifyRoomMembers error', err);
+  }
+}
+
+async function notifyOrgMembers({ orgId, actorUser, type, title, body, entityType = null, entityId = null, suite = null }) {
+  try {
+    if (!orgId) return;
+    const members = await OrganizationMembership.find({ organization: orgId, status: 'active' });
+    const filtered = members.filter(member => {
+      if (!member.user) return false;
+      if (actorUser && member.user.toString() === actorUser.toString()) return false;
+      if (suite === 'buyer' && !member.buyerSuiteEnabled) return false;
+      if (suite === 'vendor' && !member.vendorSuiteEnabled) return false;
+      return true;
+    });
+    if (filtered.length === 0) return;
+    const notifications = filtered.map(member => ({
+      userId: member.user,
+      orgId: orgId,
+      type,
+      title,
+      body,
+      entityType,
+      entityId
+    }));
+    await Notification.insertMany(notifications);
+  } catch (err) {
+    console.error('notifyOrgMembers error', err);
+  }
+}
+
 async function recordRoomEvent({
   type,
   room,
@@ -825,6 +943,13 @@ async function logRoomMutation({
       actorOrganization,
       targetUser,
       targetOrganization,
+      visibility: resolvedVisibility,
+      metadata
+    }),
+    notifyRoomMembers({
+      type,
+      room,
+      actorUser,
       visibility: resolvedVisibility,
       metadata
     })
@@ -2403,6 +2528,55 @@ app.post('/api/auth/logout', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('POST logout error', err);
     return res.status(500).json({ error: 'Unable to logout' });
+  }
+});
+
+app.get('/api/notifications', requireAuth, async (req, res) => {
+  try {
+    const notifications = await Notification.find({ userId: req.auth.uid })
+      .sort({ createdAt: -1 })
+      .limit(100);
+
+    res.json({ ok: true, notifications });
+  } catch (err) {
+    console.error('List notifications error', err);
+    res.status(500).json({ error: 'Unable to load notifications' });
+  }
+});
+
+app.post('/api/notifications/:id/read', requireAuth, async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+
+    const notification = await Notification.findOne({ _id: req.params.id, userId: req.auth.uid });
+    if (!notification) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+
+    notification.read = true;
+    notification.readAt = notification.readAt || new Date();
+    await notification.save();
+
+    res.json({ ok: true, notification });
+  } catch (err) {
+    console.error('Mark notification read error', err);
+    res.status(500).json({ error: 'Unable to update notification' });
+  }
+});
+
+app.post('/api/notifications/mark-all-read', requireAuth, async (req, res) => {
+  try {
+    const now = new Date();
+    const result = await Notification.updateMany(
+      { userId: req.auth.uid, read: false },
+      { $set: { read: true, readAt: now } }
+    );
+    res.json({ ok: true, updated: result.modifiedCount || 0 });
+  } catch (err) {
+    console.error('Mark all notifications read error', err);
+    res.status(500).json({ error: 'Unable to mark notifications' });
   }
 });
 
@@ -6449,6 +6623,17 @@ app.post('/api/valuesphere/buyer/assessments', requireAuth, requirePlatformAcces
       }
     });
 
+    await notifyOrgMembers({
+      orgId: assessment.organization,
+      actorUser: context.user._id,
+      type: 'valuesphere.assessment.created',
+      title: 'Assessment created',
+      body: assessment.title ? `New assessment “${assessment.title}” created.` : 'A new assessment was created.',
+      entityType: 'ValueAssessment',
+      entityId: assessment._id,
+      suite: 'buyer'
+    });
+
     await searchIndexer.indexBuyerAssessment(assessment._id);
     return res.status(201).json({ ok: true, assessment: serializeBuyerAssessment(assessment) });
   } catch (err) {
@@ -6775,6 +6960,17 @@ app.post(
         metadata: { rfxId: rfx._id }
       });
 
+      await notifyOrgMembers({
+        orgId: context.organizationContext.id,
+        actorUser: context.user._id,
+        type: 'procurepath.rfx.created',
+        title: 'RFX created',
+        body: rfx.topicArea ? `New RFX created for ${rfx.topicArea}.` : 'A new RFX was created.',
+        entityType: 'Rfx',
+        entityId: rfx._id,
+        suite: 'buyer'
+      });
+
       res.status(201).json({ ok: true, rfx, items });
     } catch (err) {
       console.error(err);
@@ -6871,6 +7067,17 @@ app.patch(
         metadata: { rfxId: rfx._id }
       });
 
+      await notifyOrgMembers({
+        orgId: context.organizationContext.id,
+        actorUser: context.user._id,
+        type: 'procurepath.rfx.updated',
+        title: 'RFX updated',
+        body: rfx.topicArea ? `RFX for ${rfx.topicArea} was updated.` : 'An RFX was updated.',
+        entityType: 'Rfx',
+        entityId: rfx._id,
+        suite: 'buyer'
+      });
+
       res.json({ ok: true, rfx });
     } catch (err) {
       console.error(err);
@@ -6916,6 +7123,17 @@ app.post(
         actorOrganization: context.organizationContext.id,
         targetOrganization: context.organizationContext.id,
         metadata: { rfxId: rfx._id, vendorOrgId: req.validatedBody.vendorOrgId, count: responses.length }
+      });
+
+      await notifyOrgMembers({
+        orgId: context.organizationContext.id,
+        actorUser: context.user._id,
+        type: 'procurepath.rfx.response_recorded',
+        title: 'RFX responses recorded',
+        body: `${responses.length} responses captured for this RFX.`,
+        entityType: 'Rfx',
+        entityId: rfx._id,
+        suite: 'buyer'
       });
 
       res.status(201).json({ ok: true, responses });
