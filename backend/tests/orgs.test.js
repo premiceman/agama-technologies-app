@@ -69,11 +69,11 @@ describe('Organizations and memberships', () => {
 
     const createRes = await agent.post('/api/orgs').send({ name: 'Acme Corp', slug: 'acme' });
     expect(createRes.status).toBe(201);
-    expect(createRes.body.organization.role).toBe('owner');
+    expect(createRes.body.organization.role).toBe('org_owner');
 
     const listRes = await agent.get('/api/orgs');
     expect(listRes.status).toBe(200);
-    expect(listRes.body.organizations[0]).toMatchObject({ name: 'Acme Corp', role: 'owner' });
+    expect(listRes.body.organizations[0]).toMatchObject({ name: 'Acme Corp', role: 'org_owner' });
   });
 
   test('self-service org creation stores WorkOS organization id when configured', async () => {
@@ -160,7 +160,7 @@ describe('Organizations and memberships', () => {
 
     const addRes = await ownerAgent
       .post(`/api/orgs/${orgId}/members`)
-      .send({ email: 'second@example.com', role: 'member' });
+      .send({ email: 'second@example.com', role: 'vendor_user' });
 
     expect(addRes.status).toBe(403);
     expect(/Seat limit/i.test(addRes.body.error || '')).toBeTruthy();
@@ -261,7 +261,7 @@ describe('Organizations and memberships', () => {
     await OrganizationMembership.create({
       organization: organization._id,
       user: memberUser._id,
-      role: 'member',
+      role: 'vendor_user',
       status: 'active'
     });
 
@@ -313,7 +313,7 @@ describe('Organizations and memberships', () => {
     await OrganizationMembership.create({
       organization: organization._id,
       user: personalUser._id,
-      role: 'member',
+      role: 'vendor_user',
       status: 'active'
     });
 
@@ -325,5 +325,69 @@ describe('Organizations and memberships', () => {
 
     const refreshedPersonal = await User.findById(personalUser._id);
     expect(refreshedPersonal.platformAccess).toEqual([]);
+  });
+
+  test('enforces suite boundaries for vendor endpoints', async () => {
+    const ownerAgent = request.agent(app);
+    await ownerAgent.post('/api/auth/signup').send({
+      name: 'Vendor Owner',
+      email: 'vendor-owner@example.com',
+      password: 'password123',
+      licenseTier: 'business',
+      platformAccess: ['valuesphere', 'revenueforge']
+    });
+
+    const orgRes = await ownerAgent.post('/api/orgs').send({ name: 'Vendor Org', slug: 'vendor-org' });
+    expect(orgRes.status).toBe(201);
+    const orgId = orgRes.body.organization.id;
+
+    const buyerAgent = request.agent(app);
+    await buyerAgent.post('/api/auth/signup').send({
+      name: 'Buyer Member',
+      email: 'buyer-member@example.com',
+      password: 'password123',
+      licenseTier: 'business',
+      platformAccess: ['valuesphere', 'procurepath']
+    });
+
+    const addRes = await ownerAgent.post(`/api/orgs/${orgId}/members`).send({
+      email: 'buyer-member@example.com',
+      role: 'buyer_user',
+      buyerSuiteEnabled: true,
+      vendorSuiteEnabled: false,
+      sharedSuiteEnabled: true
+    });
+    expect(addRes.status === 200 || addRes.status === 201).toBe(true);
+
+    const User = require('../models/User');
+    const buyerUser = await User.findOne({ email: 'buyer-member@example.com' });
+    buyerUser.defaultOrganization = orgId;
+    await buyerUser.save();
+
+    const vendorAccess = await ownerAgent.get('/api/revenueforge/accounts');
+    expect(vendorAccess.status).toBe(200);
+
+    const buyerBlocked = await buyerAgent.get('/api/revenueforge/accounts');
+    expect(buyerBlocked.status).toBe(403);
+  });
+
+  test('dual-suite users can access buyer endpoints inside the same org', async () => {
+    const dualAgent = request.agent(app);
+    await dualAgent.post('/api/auth/signup').send({
+      name: 'Dual Persona',
+      email: 'dual@example.com',
+      password: 'password123',
+      licenseTier: 'business',
+      platformAccess: ['valuesphere', 'revenueforge', 'procurepath']
+    });
+
+    const orgRes = await dualAgent.post('/api/orgs').send({ name: 'Dual Org', slug: 'dual-org' });
+    expect(orgRes.status).toBe(201);
+
+    const procurePathRes = await dualAgent.get('/api/procurepath/vendors');
+    expect(procurePathRes.status).toBe(200);
+
+    const revenueRes = await dualAgent.get('/api/revenueforge/accounts');
+    expect(revenueRes.status).toBe(200);
   });
 });
