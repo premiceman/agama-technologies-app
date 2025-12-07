@@ -8,6 +8,8 @@ const mongoose = require('mongoose');
 const request = require('supertest');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const { installWorkOSStub } = require('./helpers/workosStub');
+const AuditEvent = require('../models/AuditEvent');
+const RoomEvent = require('../models/RoomEvent');
 
 let app;
 let mongo;
@@ -192,6 +194,45 @@ describe('Engagement rooms', () => {
     expect(issueUpdate.status).toBe(200);
     expect(issueUpdate.body.issue.status).toBe('completed');
     expect(issueUpdate.body.issue.notes).toBe('Resolved');
+  });
+
+  test('emits audit and room events for lifecycle and mutations', async () => {
+    const adminAgent = request.agent(app);
+    await signup(adminAgent, {
+      name: 'Event Admin',
+      email: 'eventadmin@example.com',
+      password: 'password123',
+      licenseTier: 'business',
+      platformAccess: ['valuesphere']
+    });
+    const vendor = await createOrg(adminAgent, 'Vendor Event Org', 'vendor-event');
+    const buyer = await createOrg(adminAgent, 'Buyer Event Org', 'buyer-event');
+
+    const roomRes = await adminAgent.post('/api/rooms').send({
+      title: 'Event Room',
+      vendorOrg: vendor.body.organization.id,
+      buyerOrg: buyer.body.organization.id
+    });
+    expect(roomRes.status).toBe(201);
+    const roomId = roomRes.body.room.id;
+
+    const lifecycleEvents = await RoomEvent.find({ room: roomId });
+    const creationEvent = lifecycleEvents.find(e => e.type === 'room.created');
+    const transitionEvent = lifecycleEvents.find(e => e.type === 'room.lifecycle.changed');
+    expect(creationEvent).toBeDefined();
+    expect(transitionEvent).toBeDefined();
+    expect(creationEvent.visibility).toBe('vendor_only');
+
+    const issueRes = await adminAgent
+      .post(`/api/rooms/${roomId}/issues`)
+      .send({ title: 'Lifecycle Issue', status: 'in_progress' });
+    expect(issueRes.status).toBe(201);
+
+    const issueEvents = await RoomEvent.find({ room: roomId, type: 'room.issue.created' });
+    expect(issueEvents).toHaveLength(1);
+
+    const auditCount = await AuditEvent.countDocuments({ targetRoom: roomId });
+    expect(auditCount).toBeGreaterThan(2);
   });
 
   test('returns AI summaries and file validation payloads', async () => {

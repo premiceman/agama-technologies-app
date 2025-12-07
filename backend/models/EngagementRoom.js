@@ -9,7 +9,7 @@ const EngagementRoomSchema = new Schema(
     buyerOrg: { type: Schema.Types.ObjectId, ref: 'Organization', required: true },
     revenueAccount: { type: Schema.Types.ObjectId, ref: 'RevenueAccount' },
     procurementVendor: { type: Schema.Types.ObjectId, ref: 'ProcurementVendor' },
-    status: { type: String, enum: ['active', 'archived'], default: 'active' },
+    status: { type: String, enum: ['draft', 'active', 'closed', 'archived'], default: 'draft' },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     lastActivityAt: { type: Date, default: Date.now }
   },
