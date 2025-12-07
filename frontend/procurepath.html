@@ -3,107 +3,132 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ProcurePath Control Tower — Agama Technologies</title>
+  <title>ProcurePath — Buyer Control Tower</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <link rel="stylesheet" href="/css/styles.v2.css">
 </head>
-<body class="bg-body text-fg">
+<body class="bg-body text-fg" data-theme="buyer" data-page="procurepath-home">
   <div class="liquid-bg" aria-hidden="true">
     <div class="blob blob-blue"></div>
     <div class="blob blob-teal"></div>
     <div class="blob blob-magenta"></div>
   </div>
 
-  <nav class="navbar navbar-expand-lg sticky-top bg-glass border-bottom">
-    <div class="container">
-      <a class="navbar-brand d-flex align-items-center gap-2" href="/">
-        <span class="brand-dot"></span>
-        Agama <strong>Technologies</strong>
-      </a>
-      <button class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#nav"><span class="navbar-toggler-icon"></span></button>
-      <div class="collapse navbar-collapse" id="nav">
-        <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-3">
-          <li class="nav-item"><a href="/" class="nav-link">Back to suite</a></li>
-          <li class="nav-item"><a href="/valuesphere.html" class="nav-link">ValueSphere</a></li>
-          <li class="nav-item"><a href="/revenueforge.html" class="nav-link">RevenueForge</a></li>
-          <li class="nav-item"><a href="/api/auth/workos/signup" class="btn btn-primary">Create account</a></li>
-          <li class="nav-item"><a href="/api/auth/workos/login" class="btn btn-outline-light">Client login</a></li>
-        </ul>
+  <div class="app-shell">
+    <aside class="app-sidebar glass" aria-label="Primary navigation">
+      <div class="sidebar-brand">
+        <div class="mark">AT</div>
+        <div class="sidebar-label">
+          <span class="eyebrow d-block mb-1">Agama</span>
+          <strong>Workspace</strong>
+        </div>
       </div>
+      <nav class="sidebar-nav" aria-label="Workspace">
+        <a class="sidebar-link" href="/workspace.html">
+          <i class="bi bi-grid"></i>
+          <span class="sidebar-label">Dashboard</span>
+        </a>
+        <div class="sidebar-section-label">Applications</div>
+        <div class="sidebar-section">
+          <a class="sidebar-link" href="/rooms.html">
+            <i class="bi bi-people"></i>
+            <span class="sidebar-label">Engagement Rooms</span>
+          </a>
+          <a class="sidebar-link" href="/revenueforge-tool.html">
+            <i class="bi bi-lightning-charge"></i>
+            <span class="sidebar-label">RevenueForge</span>
+          </a>
+          <a class="sidebar-link" href="/valuesphere-tool.html">
+            <i class="bi bi-kanban"></i>
+            <span class="sidebar-label">ValueSphere</span>
+          </a>
+          <a class="sidebar-link active" href="/procurepath.html">
+            <i class="bi bi-diagram-3"></i>
+            <span class="sidebar-label">ProcurePath</span>
+          </a>
+        </div>
+        <div class="sidebar-section-label">Docs</div>
+        <div class="sidebar-section">
+          <a class="sidebar-link" href="/docs.html">
+            <i class="bi bi-journal-text"></i>
+            <span class="sidebar-label">Docs</span>
+          </a>
+        </div>
+        <div class="sidebar-section-label">Account &amp; Settings</div>
+        <div class="sidebar-section">
+          <a class="sidebar-link" href="/profile.html">
+            <i class="bi bi-person"></i>
+            <span class="sidebar-label">Profile</span>
+          </a>
+          <a class="sidebar-link" href="/settings.html">
+            <i class="bi bi-gear"></i>
+            <span class="sidebar-label">Settings</span>
+          </a>
+          <a class="sidebar-link" href="/billing.html">
+            <i class="bi bi-credit-card"></i>
+            <span class="sidebar-label">Billing</span>
+          </a>
+        </div>
+      </nav>
+    </aside>
+
+    <div class="app-content">
+      <nav class="navbar navbar-expand-lg bg-glass border-bottom mb-4">
+        <div class="container-fluid">
+          <a class="navbar-brand d-flex align-items-center gap-2" href="/">
+            <span class="brand-dot"></span>
+            Agama <strong>Technologies</strong>
+          </a>
+          <div class="d-flex align-items-center gap-2">
+            <a class="btn btn-outline-light btn-sm" href="/workspace.html">Back to workspace</a>
+            <button class="btn btn-primary btn-sm" id="logout">Logout</button>
+          </div>
+        </div>
+      </nav>
+
+      <main class="container py-4" style="max-width: 1280px;">
+        <div class="alert alert-warning d-none" role="alert" id="procurepathAlert"></div>
+
+        <header class="card glass p-4 mb-4">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div>
+              <span class="eyebrow">Buyer suite · ProcurePath</span>
+              <h1 class="h4 mb-2">Vendor lifecycle control tower</h1>
+              <p class="text-fg-3 mb-0">Track vendor intake through RFX, evaluation, shortlist, and contracting with risk-aware scores.</p>
+            </div>
+            <div class="d-flex gap-2 align-items-center">
+              <a class="btn btn-outline-light btn-sm" href="/procurepath-tool.html">Open vendor detail</a>
+              <button class="btn btn-primary btn-sm" id="refreshBoard">Refresh board</button>
+            </div>
+          </div>
+        </header>
+
+        <section class="row g-3 mb-4" id="overviewMetrics" aria-label="ProcurePath overview"></section>
+
+        <section class="card glass p-4" aria-labelledby="pipelineHeading">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <h2 class="h5 mb-1" id="pipelineHeading">Procurement stages</h2>
+              <p class="text-fg-3 small mb-0">Kanban view of every vendor across intake, RFX, evaluation, and decision gates.</p>
+            </div>
+            <div class="d-flex align-items-center gap-2 text-fg-3 small">
+              <span class="badge bg-success-subtle text-success" id="boardBuyerPill">Buyer-only</span>
+              <span class="badge bg-light text-dark">Internal scoring only</span>
+            </div>
+          </div>
+          <div class="agama-board" id="stageBoard" aria-live="polite"></div>
+          <div class="text-center text-fg-3 small mt-3" id="boardEmpty" hidden>
+            No vendors have been added yet. Create vendor records from sourcing events to populate this view.
+          </div>
+        </section>
+      </main>
     </div>
-  </nav>
-
-  <main class="container py-5" style="max-width: 1080px;">
-    <header class="mb-5 text-center">
-      <span class="eyebrow">ProcurePath Control Tower</span>
-      <h1 class="display-5 fw-bold">A procurement operating system for orchestrating every vendor relationship</h1>
-      <p class="text-fg-2 lead">ProcurePath is available to business license customers. It empowers sourcing, finance, and legal teams to collaborate around a living vendor intelligence hub.</p>
-    </header>
-
-    <section class="row g-4 mb-5">
-      <div class="col-md-4">
-        <div class="card glass h-100 p-4">
-          <h2 class="h5 mb-3">Vendor Relationship Graphs</h2>
-          <p class="text-fg-3">Understand supplier performance, obligations, and risks through relationship graphs that update as contracts evolve.</p>
-          <ul class="text-fg-2 small mb-0">
-            <li>Operational and financial health scoring.</li>
-            <li>Automatic detection of renewal cliffs and obligations.</li>
-            <li>Shared notes and actions for category leads.</li>
-          </ul>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="card glass h-100 p-4">
-          <h2 class="h5 mb-3">Deal Strategy Engine</h2>
-          <p class="text-fg-3">Model commercial scenarios, negotiation concessions, and savings playbooks with transparent guardrails.</p>
-          <ul class="text-fg-2 small mb-0">
-            <li>AI-generated negotiation preparation dossiers.</li>
-            <li>What-if pricing and term modelling aligned to risk appetite.</li>
-            <li>Executive-ready summaries for approvals.</li>
-          </ul>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="card glass h-100 p-4">
-          <h2 class="h5 mb-3">Contract Lifecycle Ops</h2>
-          <p class="text-fg-3">Automate intake, authoring, redlines, and compliance steps with auditable trails.</p>
-          <ul class="text-fg-2 small mb-0">
-            <li>Clause libraries tuned for security, data, and sustainability.</li>
-            <li>Milestone automation with notifications and accountability.</li>
-            <li>Compliance artefacts ready for audits and regulators.</li>
-          </ul>
-        </div>
-      </div>
-    </section>
-
-    <section class="card glass p-4 mb-5">
-      <h2 class="h4 mb-3">ProcurePath roadmap</h2>
-      <ul class="text-fg-2 small mb-0">
-        <li>Interactive contract workbench with collaborative reviews and guidance.</li>
-        <li>Vendor risk scoring with signals from finance, security, and ESG domains.</li>
-        <li>Negotiation analytics and savings dashboards linked to strategic targets.</li>
-      </ul>
-    </section>
-
-    <section class="text-center">
-      <p class="text-fg-3 mb-3">Enable ProcurePath for your organisation</p>
-      <div class="d-flex gap-3 justify-content-center flex-wrap">
-        <a class="btn btn-primary" href="/api/auth/workos/signup">Create a business license</a>
-        <a class="btn btn-outline-light" href="mailto:hello@agamasuite.com">Request a briefing</a>
-      </div>
-    </section>
-  </main>
-
-  <footer class="border-top border-soft py-4 mt-5">
-    <div class="container d-flex flex-wrap justify-content-between gap-3 text-fg-3 small">
-      <span>&copy; <span id="year"></span> Agama Technologies.</span>
-      <a href="mailto:hello@agamasuite.com" class="text-fg-3">Contact</a>
-    </div>
-  </footer>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="/js/main.js" type="module"></script>
+  <script type="module" src="/js/procurepath.js"></script>
 </body>
 </html>

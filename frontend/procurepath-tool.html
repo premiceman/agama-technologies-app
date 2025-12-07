@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ProcurePath Control Tower — Workspace</title>
+  <title>ProcurePath Control Tower — Vendor Detail</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <link rel="stylesheet" href="/css/styles.v2.css">
 </head>
-<body class="bg-body text-fg" data-theme="buyer">
+<body class="bg-body text-fg" data-theme="buyer" data-page="procurepath-detail">
   <div class="liquid-bg" aria-hidden="true">
     <div class="blob blob-blue"></div>
     <div class="blob blob-teal"></div>
@@ -57,20 +57,6 @@
             <span class="sidebar-label">Docs</span>
           </a>
         </div>
-        <div class="sidebar-section-label" id="orgAdminLabel" style="display:none;">Organisation</div>
-        <div class="sidebar-section" id="orgAdminSection" style="display:none;">
-          <a class="sidebar-link" href="/admin-org.html" id="orgAdminLink">
-            <i class="bi bi-building-gear"></i>
-            <span class="sidebar-label">Org &amp; Members</span>
-          </a>
-        </div>
-        <div class="sidebar-section-label" id="agamaAdminLabel" style="display:none;">Agama</div>
-        <div class="sidebar-section" id="agamaAdminSection" style="display:none;">
-          <a class="sidebar-link" href="/agama-admin.html" id="agamaAdminLink">
-            <i class="bi bi-shield-lock"></i>
-            <span class="sidebar-label">Agama Admin Console</span>
-          </a>
-        </div>
         <div class="sidebar-section-label">Account &amp; Settings</div>
         <div class="sidebar-section">
           <a class="sidebar-link" href="/profile.html">
@@ -97,633 +83,132 @@
             Agama <strong>Technologies</strong>
           </a>
           <div class="d-flex align-items-center gap-2">
-            <a class="btn btn-outline-light btn-sm" href="/workspace.html">Back to workspace</a>
+            <a class="btn btn-outline-light btn-sm" href="/procurepath.html">Back to board</a>
             <button class="btn btn-primary btn-sm" id="logout">Logout</button>
           </div>
         </div>
       </nav>
 
       <main class="container py-4" style="max-width: 1200px;">
-        <section class="d-flex flex-column gap-4" id="toolContent">
-        <div class="alert alert-warning d-none" id="licenseNote" role="alert"></div>
+        <div class="alert alert-warning d-none" role="alert" id="procurepathDetailAlert"></div>
 
-        <header class="card glass p-4" id="overview">
-          <span class="eyebrow">Procurement workspace</span>
-          <h1 class="h4 mb-2">Vendor relationship command centre</h1>
-          <p class="text-fg-3 mb-0">Track suppliers, align objectives, and generate negotiation moves in one control tower.</p>
-        </header>
-
-        <div class="card glass p-3 mb-4">
+        <header class="card glass p-4 mb-4">
           <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
             <div>
-              <div class="fw-semibold">Open Engagement Rooms</div>
-              <p class="text-fg-3 small mb-0">Invite vendors into a shared space to manage renewals and touchpoints.</p>
+              <span class="eyebrow">Vendor detail</span>
+              <h1 class="h4 mb-2" id="vendorTitle">ProcurePath record</h1>
+              <p class="text-fg-3 mb-0">Objectives, touchpoints, RFX artefacts, and linked collaboration for each vendor.</p>
             </div>
-            <a class="btn btn-outline-light btn-sm" href="/rooms.html">Launch rooms</a>
+            <div class="text-end">
+              <div class="text-fg-2 small">Visibility</div>
+              <span class="badge bg-success-subtle text-success">Buyer-only</span>
+            </div>
           </div>
-        </div>
+        </header>
 
-        <section class="card glass p-4" aria-labelledby="summaryHeading">
-          <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+        <section class="card glass p-3 mb-4" aria-label="Vendor selection">
+          <div class="d-flex justify-content-between align-items-center mb-3">
             <div>
-              <h2 class="h5" id="summaryHeading">Live health</h2>
-              <p class="text-fg-3 small mb-0">Totals refresh whenever you add vendors, objectives, or touchpoints.</p>
+              <h2 class="h6 mb-1">Vendors</h2>
+              <p class="text-fg-3 small mb-0">Select a vendor to view objectives, touchpoints, and RFX progress.</p>
             </div>
-            <button class="btn btn-outline-light btn-sm" id="refreshOverview">Refresh</button>
+            <button class="btn btn-outline-light btn-sm" id="refreshVendors">Refresh vendors</button>
           </div>
-          <div class="row g-3" id="summaryCards"></div>
+          <div class="row g-3" id="vendorList"></div>
+          <div class="text-center text-fg-3 small" id="vendorListEmpty" hidden>
+            No vendor records yet. Add vendors from sourcing events to activate ProcurePath.
+          </div>
         </section>
 
-        <section class="card glass p-4" id="vendors" aria-labelledby="vendorsHeading">
-          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
-            <div>
-              <h2 class="h5 mb-1" id="vendorsHeading">Vendors &amp; objectives</h2>
-              <p class="text-fg-3 small mb-0">Create vendor records with tiers, risks, spend, and measurable objectives.</p>
-            </div>
-            <button class="btn btn-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#newVendorForm">Add vendor</button>
-          </div>
-
-          <div class="collapse" id="newVendorForm">
-            <form class="card glass p-3 mb-3" id="vendorForm">
-              <div class="row g-3">
-                <div class="col-md-6">
-                  <label class="form-label" for="vendorName">Vendor name</label>
-                  <input class="form-control" id="vendorName" name="name" required>
+        <section class="d-flex flex-column gap-3" id="vendorDetail" aria-live="polite">
+          <div class="card glass p-4" id="vendorOverviewCard">
+            <div class="d-flex flex-wrap justify-content-between gap-3">
+              <div>
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <h2 class="h5 mb-0" id="vendorName">Vendor name</h2>
+                  <span class="badge bg-light text-dark" id="vendorStage"></span>
+                  <span class="badge bg-light text-dark" id="vendorTier"></span>
                 </div>
-                <div class="col-md-6">
-                  <label class="form-label" for="vendorCategory">Category</label>
-                  <input class="form-control" id="vendorCategory" name="category" placeholder="e.g., Cloud, SaaS, Agency">
+                <p class="text-fg-3 small mb-2" id="vendorDomain">Domain &amp; category</p>
+                <div class="d-flex flex-wrap gap-2 align-items-center text-fg-2 small">
+                  <span class="badge bg-success-subtle text-success" id="vendorHealth"></span>
+                  <span class="badge bg-danger-subtle text-danger" id="vendorRisk"></span>
+                  <span class="badge bg-primary-subtle text-primary" id="vendorScore"></span>
+                  <span class="text-fg-3" id="vendorRenewal"></span>
                 </div>
-                <div class="col-md-6">
-                  <label class="form-label" for="vendorTier">Tier</label>
-                  <select class="form-select" id="vendorTier" name="tier">
-                    <option value="strategic">Strategic</option>
-                    <option value="preferred">Preferred</option>
-                    <option value="tactical">Tactical</option>
-                    <option value="specialist">Specialist</option>
-                  </select>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label" for="vendorStatus">Status</label>
-                  <select class="form-select" id="vendorStatus" name="status">
-                    <option value="active">Active</option>
-                    <option value="watchlist">Watchlist</option>
-                    <option value="sunset">Sunset</option>
-                  </select>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label" for="businessOwner">Business owner</label>
-                  <input class="form-control" id="businessOwner" name="businessOwner" placeholder="e.g., VP Marketing">
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label" for="relationshipManager">Relationship manager</label>
-                  <input class="form-control" id="relationshipManager" name="relationshipManager" placeholder="e.g., Category lead">
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label" for="annualSpend">Annual spend (USD)</label>
-                  <input class="form-control" id="annualSpend" name="annualSpend" type="number" min="0" step="1000">
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label" for="renewalDate">Renewal date</label>
-                  <input class="form-control" id="renewalDate" name="renewalDate" type="date">
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label" for="healthScore">Health score</label>
-                  <input class="form-control" id="healthScore" name="healthScore" type="number" min="0" max="100" value="75">
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label" for="riskLevel">Risk</label>
-                  <select class="form-select" id="riskLevel" name="riskLevel">
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                  </select>
-                </div>
-                <div class="col-12">
-                  <label class="form-label" for="vendorNotes">Notes</label>
-                  <textarea class="form-control" id="vendorNotes" name="notes" rows="2" placeholder="Critical dependencies, obligations, coverage notes"></textarea>
-                </div>
-                <div class="col-12 d-flex justify-content-end">
-                  <button class="btn btn-primary" type="submit" id="vendorSubmit">Save vendor</button>
-                </div>
-                <div class="col-12"><div class="form-text" id="vendorFeedback"></div></div>
               </div>
-            </form>
+              <div class="text-end text-fg-2 small">
+                <div id="vendorNotes" class="text-fg-3"></div>
+                <div id="vendorTags" class="mt-2"></div>
+              </div>
+            </div>
           </div>
 
-          <div id="vendorList" class="d-flex flex-column gap-3"></div>
-        </section>
+          <div class="card glass p-4" aria-labelledby="objectivesHeading">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <h3 class="h6 mb-1" id="objectivesHeading">Objectives</h3>
+                <p class="text-fg-3 small mb-0">Buyer-only targets tied to value, compliance, or performance.</p>
+              </div>
+            </div>
+            <div class="list-group list-group-flush" id="objectivesList"></div>
+            <div class="text-fg-3 small" id="objectivesEmpty" hidden>No objectives captured for this vendor yet.</div>
+          </div>
 
-        <section class="card glass p-4" id="touchpoints" aria-labelledby="touchpointHeading">
-          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
-            <div>
-              <h2 class="h5 mb-1" id="touchpointHeading">Relationship history</h2>
-              <p class="text-fg-3 small mb-0">Log executive reviews, QBRs, escalations, or negotiations with outcomes and follow-ups.</p>
+          <div class="card glass p-4" aria-labelledby="touchpointsHeading">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <h3 class="h6 mb-1" id="touchpointsHeading">Touchpoints</h3>
+                <p class="text-fg-3 small mb-0">Meetings, check-ins, and follow-ups tracked for the vendor relationship.</p>
+              </div>
             </div>
+            <div class="list-group list-group-flush" id="touchpointsList"></div>
+            <div class="text-fg-3 small" id="touchpointsEmpty" hidden>No touchpoints recorded.</div>
           </div>
-          <form class="row g-3" id="touchpointForm">
-            <div class="col-md-4">
-              <label class="form-label" for="touchpointVendor">Vendor</label>
-              <select class="form-select" id="touchpointVendor" name="vendor" required></select>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label" for="touchpointType">Interaction type</label>
-              <input class="form-control" id="touchpointType" name="type" placeholder="QBR, Renewal prep, Escalation">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label" for="touchpointDate">Date</label>
-              <input class="form-control" id="touchpointDate" name="occurredOn" type="date">
-            </div>
-            <div class="col-12">
-              <label class="form-label" for="touchpointSummary">Summary</label>
-              <textarea class="form-control" id="touchpointSummary" name="summary" rows="2" required></textarea>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label" for="touchpointFollowUp">Follow-up</label>
-              <input class="form-control" id="touchpointFollowUp" name="followUp" placeholder="Next meeting, deliverables, approvals">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label" for="touchpointSentiment">Sentiment</label>
-              <input class="form-control" id="touchpointSentiment" name="sentiment" placeholder="Positive, Neutral, Concerned">
-            </div>
-            <div class="col-12 d-flex justify-content-end">
-              <button class="btn btn-outline-light" type="submit" id="touchpointSubmit">Save touchpoint</button>
-            </div>
-            <div class="col-12"><div class="form-text" id="touchpointFeedback"></div></div>
-          </form>
-        </section>
 
-        <section class="card glass p-4" id="copilot" aria-labelledby="copilotHeading">
-          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
-            <div>
-              <h2 class="h5 mb-1" id="copilotHeading">AI negotiation copilot</h2>
-              <p class="text-fg-3 small mb-0">Generate guardrails, actions, and KPIs aligned to your vendor objectives.</p>
+          <div class="card glass p-4" aria-labelledby="rfxHeading">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <h3 class="h6 mb-1" id="rfxHeading">RFX artefacts</h3>
+                <p class="text-fg-3 small mb-0">Issued RFX, response state, and evaluation readiness for this vendor.</p>
+              </div>
             </div>
+            <div class="list-group list-group-flush" id="rfxList"></div>
+            <div class="text-fg-3 small" id="rfxEmpty" hidden>No RFX artefacts linked.</div>
           </div>
-          <form class="row g-3" id="playbookForm">
+
+          <div class="row g-3">
             <div class="col-md-6">
-              <label class="form-label" for="playbookVendor">Vendor</label>
-              <select class="form-select" id="playbookVendor" required></select>
+              <div class="card glass p-4 h-100" aria-labelledby="roomsHeading">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <div>
+                    <h3 class="h6 mb-1" id="roomsHeading">Engagement Rooms</h3>
+                    <p class="text-fg-3 small mb-0">Buyer-controlled rooms that include this vendor.</p>
+                  </div>
+                </div>
+                <div id="roomsList" class="d-flex flex-wrap gap-2"></div>
+                <div class="text-fg-3 small" id="roomsEmpty" hidden>No rooms linked yet.</div>
+              </div>
             </div>
-            <div class="col-12">
-              <label class="form-label" for="playbookGoal">Objective</label>
-              <textarea class="form-control" id="playbookGoal" rows="3" placeholder="e.g., Prepare renewal playbook to protect SLAs and reduce cost by 8%" required></textarea>
+            <div class="col-md-6">
+              <div class="card glass p-4 h-100" aria-labelledby="assessmentsHeading">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <div>
+                    <h3 class="h6 mb-1" id="assessmentsHeading">ValueSphere assessments</h3>
+                    <p class="text-fg-3 small mb-0">Buyer-mode assessments used for evaluation and justification.</p>
+                  </div>
+                </div>
+                <div id="assessmentsList" class="d-flex flex-wrap gap-2"></div>
+                <div class="text-fg-3 small" id="assessmentsEmpty" hidden>No buyer-mode assessments linked.</div>
+              </div>
             </div>
-            <div class="col-12 d-flex justify-content-end">
-              <button class="btn btn-primary" type="submit" id="playbookSubmit">Generate playbook</button>
-            </div>
-            <div class="col-12"><div class="form-text" id="playbookFeedback"></div></div>
-          </form>
-          <div class="card glass mt-3 p-3" id="playbookOutput" hidden>
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <h3 class="h6 mb-0">Suggested playbook</h3>
-              <span class="badge-soft" id="playbookStatus">Ready</span>
-            </div>
-            <pre class="small text-wrap" id="playbookText" style="white-space: pre-wrap;"></pre>
           </div>
         </section>
-      </section>
-    </main>
+      </main>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-    const state = { user: null, vendors: [], overview: null };
-
-    function toggleOrgAdminNav(authPayload) {
-      const label = document.getElementById('orgAdminLabel');
-      const section = document.getElementById('orgAdminSection');
-      const { effectiveLicense, organizationContext, memberships } = authPayload || {};
-      const hasBusiness = effectiveLicense?.tier === 'business';
-      const isOrgAdmin = (memberships || []).some(m => m.isHome && ['owner', 'admin'].includes(m.role));
-      const contextAdmin = organizationContext && ['owner', 'admin'].includes(organizationContext.role);
-      const canSee = hasBusiness && (isOrgAdmin || contextAdmin);
-      if (label && section) {
-        label.style.display = canSee ? '' : 'none';
-        section.style.display = canSee ? '' : 'none';
-      }
-    }
-
-    function toggleAgamaAdminNav(user) {
-      const label = document.getElementById('agamaAdminLabel');
-      const section = document.getElementById('agamaAdminSection');
-      const email = (user?.email || '').toLowerCase();
-      const canSee = user?.isStaff === true && email.endsWith('@agamatechnologies.com');
-      if (label && section) {
-        label.style.display = canSee ? '' : 'none';
-        section.style.display = canSee ? '' : 'none';
-      }
-    }
-
-    function renderProcurePathPreview() {
-      const mount = document.getElementById('toolContent');
-      if (!mount) return;
-
-      mount.innerHTML = `
-        <div class="card glass upgrade-hero p-4 p-lg-5">
-          <div class="row g-4 align-items-start">
-            <div class="col-lg-7">
-              <div class="badge-soft mb-2">Business license add-on</div>
-              <h1 class="display-6 fw-semibold mb-3">Centralise supplier intelligence. Automate negotiation leverage.</h1>
-              <p class="lead text-fg-3 mb-4">ProcurePath unifies vendor health, renewal exposure, and AI playbooks so sourcing, finance, and legal teams can make confident decisions before every signature.</p>
-              <div class="d-flex flex-wrap gap-2 mb-4">
-                <span class="pill">Renewal early warnings</span>
-                <span class="pill">Negotiation blueprints</span>
-                <span class="pill">Spend &amp; risk telemetry</span>
-                <span class="pill">Cross-team governance</span>
-              </div>
-              <div class="d-flex flex-wrap gap-3">
-                <a class="btn btn-primary btn-lg" href="/billing.html">Enable ProcurePath in billing</a>
-                <a class="btn btn-outline-light btn-lg" href="/procurepath.html">See the ProcurePath story</a>
-              </div>
-              <p class="text-fg-3 small mt-3 mb-0">Your workspace will unlock as soon as the ProcurePath platform is toggled on for your business license.</p>
-            </div>
-            <div class="col-lg-5">
-              <div class="glass gradient-card p-3 p-lg-4 h-100">
-                <div class="d-flex align-items-center gap-3 mb-3">
-                  <div class="icon-tile"><i class="bi bi-diagram-3"></i></div>
-                  <div>
-                    <p class="mb-0 text-fg-3 small">ProcurePath Control Tower</p>
-                    <h3 class="h5 mb-0">What you unlock</h3>
-                  </div>
-                </div>
-                <ul class="list-unstyled d-flex flex-column gap-3 mb-4">
-                  <li class="d-flex gap-2 align-items-start"><span class="checkmark">&#10003;</span><span>Vendor dossiers with tiers, renewal risk, and spend coverage.</span></li>
-                  <li class="d-flex gap-2 align-items-start"><span class="checkmark">&#10003;</span><span>Objective tracking with owners, timelines, and AI-crafted next steps.</span></li>
-                  <li class="d-flex gap-2 align-items-start"><span class="checkmark">&#10003;</span><span>Negotiation playbooks generated from obligations, usage, and appetite.</span></li>
-                </ul>
-                <div class="d-flex flex-wrap gap-3">
-                  <div class="metric-tile">
-                    <p class="text-fg-3 small mb-1">Renewals de-risked</p>
-                    <strong class="h4 mb-0">-18%</strong>
-                    <p class="text-fg-3 small mb-0">Avg. TCO reduction with playbook guardrails.</p>
-                  </div>
-                  <div class="metric-tile">
-                    <p class="text-fg-3 small mb-1">Cycle time</p>
-                    <strong class="h4 mb-0">2.4x faster</strong>
-                    <p class="text-fg-3 small mb-0">From intake to signed amendment with shared context.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="row g-3 mt-4">
-            <div class="col-md-4">
-              <div class="preview-tile">
-                <p class="text-fg-3 small mb-1">Command centre</p>
-                <h3 class="h6 mb-1">Live vendor health</h3>
-                <p class="text-fg-3 mb-0">Objectives, escalations, and renewal guardrails captured in one pane of glass.</p>
-              </div>
-            </div>
-            <div class="col-md-4">
-              <div class="preview-tile">
-                <p class="text-fg-3 small mb-1">Governance</p>
-                <h3 class="h6 mb-1">Shared ownership</h3>
-                <p class="text-fg-3 mb-0">Assign procurement, finance, and legal to every touchpoint to keep deals aligned.</p>
-              </div>
-            </div>
-            <div class="col-md-4">
-              <div class="preview-tile">
-                <p class="text-fg-3 small mb-1">Automation</p>
-                <h3 class="h6 mb-1">AI playbook studio</h3>
-                <p class="text-fg-3 mb-0">Turn obligations, usage, and risk into ready-to-send negotiation language.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-    }
-
-    async function initProcurePath() {
-      try {
-        const authRes = await fetch('/api/auth/me', { credentials: 'include' });
-        if (authRes.status === 401) {
-          window.location.href = '/api/auth/workos/login';
-          return;
-        }
-        const authJson = await authRes.json();
-        toggleAgamaAdminNav(authJson.user);
-        toggleOrgAdminNav({
-          effectiveLicense: authJson.effectiveLicense,
-          organizationContext: authJson.organizationContext,
-          memberships: authJson.memberships
-        });
-        state.user = authJson.user;
-        const hasProcurePath = state.user?.licenseTier === 'business' && (state.user.platformAccess || []).includes('procurepath');
-        if (!hasProcurePath) {
-          renderProcurePathPreview();
-          return;
-        }
-
-        const note = document.getElementById('licenseNote');
-        note.classList.remove('d-none');
-        note.classList.remove('alert-warning', 'alert-danger');
-        note.classList.add('alert-success');
-        note.textContent = 'Business license verified — ProcurePath unlocked.';
-        await loadOverview();
-      } catch (err) {
-        console.error(err);
-        const note = document.getElementById('licenseNote');
-        note.classList.remove('d-none');
-        note.classList.remove('alert-success', 'alert-warning');
-        note.classList.add('alert-danger');
-        note.textContent = 'Unable to verify access. Please retry.';
-      }
-    }
-
-    async function loadOverview() {
-      const button = document.getElementById('refreshOverview');
-      if (button) button.disabled = true;
-      try {
-        const res = await fetch('/api/procurepath/overview', { credentials: 'include' });
-        const json = await res.json();
-        if (res.ok && json.ok) {
-          state.overview = json.overview;
-          state.vendors = json.vendors || [];
-          renderSummary();
-          renderVendors();
-          hydrateVendorDropdowns();
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        if (button) button.disabled = false;
-      }
-    }
-
-    function renderSummary() {
-      const cards = document.getElementById('summaryCards');
-      if (!cards || !state.overview) return;
-      const { totalVendors = 0, totalObjectives = 0, atRiskVendors = 0, upcomingRenewals = 0 } = state.overview;
-      const items = [
-        { label: 'Vendors tracked', value: totalVendors },
-        { label: 'Objectives in flight', value: totalObjectives },
-        { label: 'At-risk relationships', value: atRiskVendors },
-        { label: 'Renewals < 90 days', value: upcomingRenewals }
-      ];
-      cards.innerHTML = '';
-      items.forEach(item => {
-        const col = document.createElement('div');
-        col.className = 'col-md-3';
-        col.innerHTML = `
-          <div class="card glass h-100 p-3">
-            <span class="text-fg-3 small">${item.label}</span>
-            <div class="display-6 fw-bold">${item.value}</div>
-          </div>
-        `;
-        cards.appendChild(col);
-      });
-    }
-
-    function renderVendors() {
-      const list = document.getElementById('vendorList');
-      if (!list) return;
-      list.innerHTML = '';
-      if (!state.vendors.length) {
-        list.innerHTML = '<p class="text-fg-3 small mb-0">Add your first vendor to start tracking objectives and history.</p>';
-        return;
-      }
-
-      state.vendors.forEach(vendor => {
-        const objectives = vendor.objectives || [];
-        const touchpoints = vendor.touchpoints || [];
-        const card = document.createElement('div');
-        card.className = 'card glass p-3';
-        card.innerHTML = `
-          <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-            <div>
-              <h3 class="h6 mb-1">${vendor.name}</h3>
-              <p class="text-fg-3 small mb-0">${vendor.category || 'Uncategorised'} · ${vendor.tier || 'Strategic'} · Risk ${
-          vendor.riskLevel
-        }</p>
-            </div>
-            <div class="text-end">
-              <span class="badge-soft">Health ${vendor.healthScore ?? '–'}</span>
-              <div class="small text-fg-3">Spend $${(vendor.annualSpend || 0).toLocaleString()}</div>
-            </div>
-          </div>
-          <p class="text-fg-2 small mb-2">${vendor.notes || 'No notes yet. Use this space for obligations, dependencies, or guardrails.'}</p>
-          <div class="d-flex flex-wrap gap-3 small mb-2">
-            <span class="badge-soft">Owner: ${vendor.businessOwner || 'Unassigned'}</span>
-            <span class="badge-soft">Manager: ${vendor.relationshipManager || 'Unassigned'}</span>
-            <span class="badge-soft">Status: ${vendor.status || 'active'}</span>
-            ${vendor.renewalDate ? `<span class="badge-soft">Renewal ${new Date(vendor.renewalDate).toLocaleDateString()}</span>` : ''}
-          </div>
-          <div class="mb-2">
-            <h4 class="h6 mb-1">Objectives</h4>
-            ${objectives.length ? '' : '<p class="text-fg-3 small mb-1">No objectives recorded.</p>'}
-            <ul class="small text-fg-2 ps-3 mb-0">
-              ${objectives
-                .map(obj => `<li><strong>${obj.title}</strong> — ${obj.status || 'on-track'}${obj.targetMetric ? ` (${obj.targetMetric})` : ''}</li>`)
-                .join('')}
-            </ul>
-          </div>
-          <div>
-            <h4 class="h6 mb-1">Latest touchpoints</h4>
-            ${touchpoints.length ? '' : '<p class="text-fg-3 small mb-0">No relationship history yet.</p>'}
-            <ul class="small text-fg-2 ps-3 mb-0">
-              ${touchpoints
-                .slice(-3)
-                .reverse()
-                .map(tp => `<li>${tp.type || 'Touchpoint'}: ${tp.summary}</li>`)
-                .join('')}
-            </ul>
-          </div>
-          <div class="mt-3">
-            <form class="row g-2 align-items-end" data-objective-form="${vendor._id}">
-              <div class="col-md-5">
-                <label class="form-label small">New objective</label>
-                <input class="form-control form-control-sm" name="title" placeholder="e.g., Improve NPS to 70" required>
-              </div>
-              <div class="col-md-3">
-                <label class="form-label small">Metric</label>
-                <input class="form-control form-control-sm" name="targetMetric" placeholder="NPS, SLA, Savings">
-              </div>
-              <div class="col-md-2">
-                <label class="form-label small">Status</label>
-                <select class="form-select form-select-sm" name="status">
-                  <option value="on-track">On-track</option>
-                  <option value="at-risk">At risk</option>
-                  <option value="blocked">Blocked</option>
-                  <option value="completed">Completed</option>
-                </select>
-              </div>
-              <div class="col-md-2 d-grid">
-                <button class="btn btn-outline-light btn-sm" type="submit">Add</button>
-              </div>
-            </form>
-          </div>
-        `;
-        list.appendChild(card);
-      });
-
-      document.querySelectorAll('[data-objective-form]').forEach(form => {
-        form.addEventListener('submit', async event => {
-          event.preventDefault();
-          const vendorId = form.getAttribute('data-objective-form');
-          const payload = Object.fromEntries(new FormData(form).entries());
-          await addObjective(vendorId, payload);
-          form.reset();
-        });
-      });
-    }
-
-    function hydrateVendorDropdowns() {
-      const dropdowns = [document.getElementById('touchpointVendor'), document.getElementById('playbookVendor')];
-      dropdowns.forEach(select => {
-        if (!select) return;
-        select.innerHTML = '';
-        state.vendors.forEach(vendor => {
-          const opt = document.createElement('option');
-          opt.value = vendor._id;
-          opt.textContent = vendor.name;
-          select.appendChild(opt);
-        });
-      });
-    }
-
-    async function addObjective(vendorId, payload) {
-      try {
-        const res = await fetch(`/api/procurepath/vendors/${vendorId}/objectives`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(payload)
-        });
-        const json = await res.json();
-        if (res.ok && json.ok) {
-          state.vendors = state.vendors.map(v => (v._id === json.vendor._id ? json.vendor : v));
-          renderVendors();
-          hydrateVendorDropdowns();
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    }
-
-    const vendorForm = document.getElementById('vendorForm');
-    if (vendorForm) {
-      vendorForm.addEventListener('submit', async e => {
-        e.preventDefault();
-        const feedback = document.getElementById('vendorFeedback');
-        feedback.textContent = '';
-        const submit = document.getElementById('vendorSubmit');
-        if (submit) submit.disabled = true;
-        const payload = Object.fromEntries(new FormData(vendorForm).entries());
-        try {
-          const res = await fetch('/api/procurepath/vendors', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(payload)
-          });
-          const json = await res.json();
-          if (res.ok && json.ok) {
-            state.vendors.unshift(json.vendor);
-            renderVendors();
-            hydrateVendorDropdowns();
-            vendorForm.reset();
-            feedback.textContent = 'Vendor saved.';
-          } else {
-            feedback.textContent = json.error || 'Unable to save vendor.';
-          }
-        } catch (err) {
-          feedback.textContent = 'Network error saving vendor.';
-        } finally {
-          if (submit) submit.disabled = false;
-        }
-      });
-    }
-
-    const touchpointForm = document.getElementById('touchpointForm');
-    if (touchpointForm) {
-      touchpointForm.addEventListener('submit', async e => {
-        e.preventDefault();
-        const feedback = document.getElementById('touchpointFeedback');
-        feedback.textContent = '';
-        const submit = document.getElementById('touchpointSubmit');
-        if (submit) submit.disabled = true;
-        const payload = Object.fromEntries(new FormData(touchpointForm).entries());
-        const vendorId = payload.vendor;
-        delete payload.vendor;
-        try {
-          const res = await fetch(`/api/procurepath/vendors/${vendorId}/touchpoints`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(payload)
-          });
-          const json = await res.json();
-          if (res.ok && json.ok) {
-            state.vendors = state.vendors.map(v => (v._id === json.vendor._id ? json.vendor : v));
-            renderVendors();
-            hydrateVendorDropdowns();
-            feedback.textContent = 'Touchpoint saved.';
-            touchpointForm.reset();
-          } else {
-            feedback.textContent = json.error || 'Unable to save touchpoint.';
-          }
-        } catch (err) {
-          feedback.textContent = 'Network error saving touchpoint.';
-        } finally {
-          if (submit) submit.disabled = false;
-        }
-      });
-    }
-
-    const playbookForm = document.getElementById('playbookForm');
-    if (playbookForm) {
-      playbookForm.addEventListener('submit', async e => {
-        e.preventDefault();
-        const feedback = document.getElementById('playbookFeedback');
-        const output = document.getElementById('playbookOutput');
-        const status = document.getElementById('playbookStatus');
-        const text = document.getElementById('playbookText');
-        feedback.textContent = '';
-        const submit = document.getElementById('playbookSubmit');
-        if (submit) submit.disabled = true;
-        try {
-          const payload = {
-            vendorId: document.getElementById('playbookVendor').value,
-            goal: document.getElementById('playbookGoal').value
-          };
-          const res = await fetch('/api/procurepath/ai/playbook', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(payload)
-          });
-          const json = await res.json();
-          if (res.ok && json.ok) {
-            output.hidden = false;
-            status.textContent = 'Generated';
-            text.textContent = json.playbook;
-          } else {
-            feedback.textContent = json.error || 'Unable to generate a playbook.';
-            status.textContent = 'Issue';
-            output.hidden = true;
-          }
-        } catch (err) {
-          feedback.textContent = 'Network error generating playbook.';
-        } finally {
-          if (submit) submit.disabled = false;
-        }
-      });
-    }
-
-    const refresh = document.getElementById('refreshOverview');
-    if (refresh) refresh.addEventListener('click', loadOverview);
-
-    const logout = document.getElementById('logout');
-    if (logout) {
-      logout.addEventListener('click', async () => {
-        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-        window.location.href = '/';
-      });
-    }
-
-    initProcurePath();
-  </script>
+  <script type="module" src="/js/procurepath.js"></script>
 </body>
 </html>
