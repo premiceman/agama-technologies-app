@@ -342,13 +342,6 @@ const PLATFORM_DEFINITIONS = [
 const PLATFORM_IDS = new Set(PLATFORM_DEFINITIONS.map(platform => platform.id));
 const PERSONAL_ALLOWED_PLATFORMS = new Set(['valuesphere']);
 const LICENSE_PLANS = ['free-personal', 'vendor-enterprise', 'procurement-enterprise', 'consulting-enterprise'];
-const FREE_ASSESSMENT_LIMIT = 3;
-
-function computeAssessmentLimit(user) {
-  if (!user) return null;
-  if (!user.defaultOrganization) return user.valueAssessmentLimit || FREE_ASSESSMENT_LIMIT;
-  return null;
-}
 
 function storeWorkOSState(res) {
   const value = crypto.randomBytes(24).toString('hex');
@@ -549,12 +542,6 @@ function recommendLicensePlan(persona, goals = []) {
 function applyLicenseSelection(user, selection) {
   const chosen = LICENSE_PLANS.includes(selection) ? selection : 'free-personal';
   user.licensePlan = chosen;
-  if (chosen === 'free-personal') {
-    user.valueAssessmentLimit = FREE_ASSESSMENT_LIMIT;
-    return;
-  }
-
-  user.valueAssessmentLimit = null;
 }
 
 function suitePlanFromSelection(selection = {}) {
@@ -2215,8 +2202,7 @@ app.post('/api/auth/signup', validateBody(signupSchema), async (req, res) => {
       company,
       role,
       industry,
-      licensePlan: 'free-personal',
-      valueAssessmentLimit: FREE_ASSESSMENT_LIMIT
+      licensePlan: 'free-personal'
     });
 
     const token = issueTokenCookie(res, {
@@ -2713,7 +2699,6 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
     }
 
     const effectiveLicense = computeEffectiveLicense(user, organizationContext);
-    const usageLimits = { valueAssessments: computeAssessmentLimit(user) };
 
     const memberships = await OrganizationMembership.find({
       user: user._id,
@@ -2742,7 +2727,6 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
       organizationContext,
       memberships: membershipsPayload,
       effectiveLicense,
-      usageLimits,
       suiteEntitlements
     });
   } catch (err) {
@@ -2822,7 +2806,6 @@ app.get('/api/onboarding', requireAuth, async (req, res) => {
     if (!user) return res.status(404).json({ error: 'Not found' });
 
     const recommendation = recommendLicensePlan(user.persona, user.onboardingResponses?.goals);
-    const usageLimits = { valueAssessments: computeAssessmentLimit(user) };
 
     return res.json({
       ok: true,
@@ -2832,8 +2815,7 @@ app.get('/api/onboarding', requireAuth, async (req, res) => {
         responses: user.onboardingResponses || {},
         recommendation
       },
-      licensePlan: user.licensePlan || 'free-personal',
-      usageLimits
+      licensePlan: user.licensePlan || 'free-personal'
     });
   } catch (err) {
     console.error('Onboarding fetch error', err);
@@ -2922,7 +2904,6 @@ app.post('/api/onboarding', requireAuth, validateBody(onboardingSchema), async (
         applyLicenseSelection(user, selection);
       } else if (selection !== 'free-personal') {
         user.licensePlan = selection;
-        user.valueAssessmentLimit = null;
       }
       user.onboardingStatus = 'completed';
     }
@@ -2947,7 +2928,6 @@ app.post('/api/onboarding', requireAuth, validateBody(onboardingSchema), async (
 
     await user.save();
 
-    const usageLimits = { valueAssessments: computeAssessmentLimit(user) };
     return res.json({
       ok: true,
       user: user.public(),
@@ -2955,8 +2935,7 @@ app.post('/api/onboarding', requireAuth, validateBody(onboardingSchema), async (
         status: user.onboardingStatus,
         responses: user.onboardingResponses,
         recommendation
-      },
-      usageLimits
+      }
     });
   } catch (err) {
     console.error('Onboarding update error', err);
@@ -2978,13 +2957,11 @@ app.post('/api/onboarding/restart', requireAuth, async (req, res) => {
     await user.save();
 
     const recommendation = recommendLicensePlan(user.persona);
-    const usageLimits = { valueAssessments: computeAssessmentLimit(user) };
 
     return res.json({
       ok: true,
       user: user.public(),
-      onboarding: { status: user.onboardingStatus, responses: user.onboardingResponses, recommendation },
-      usageLimits
+      onboarding: { status: user.onboardingStatus, responses: user.onboardingResponses, recommendation }
     });
   } catch (err) {
     console.error('Onboarding restart error', err);
@@ -4328,7 +4305,6 @@ app.delete('/api/auth/me/data', requireAuth, async (req, res) => {
     user.onboardingStatus = 'pending';
     user.onboardingResponses = {};
     user.licensePlan = 'free-personal';
-    user.valueAssessmentLimit = FREE_ASSESSMENT_LIMIT;
     user.billingProfile = {};
     user.defaultOrganization = null;
     await user.save();
