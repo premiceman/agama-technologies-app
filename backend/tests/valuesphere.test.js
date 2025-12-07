@@ -148,7 +148,11 @@ describe('ValueSphere buyer flows', () => {
     });
     const templateId = templateRes.body.template.id;
 
-    const vendor = await ProcurementVendor.create({ organization: orgId, name: 'Vendor A', userId: signupResId(signupRes) });
+    const vendor = await ProcurementVendor.create({
+      orgId,
+      createdByUserId: signupResId(signupRes),
+      name: 'Vendor A'
+    });
     const room = await EngagementRoom.create({
       title: 'Room',
       vendorOrg: orgId,

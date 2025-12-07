@@ -118,8 +118,8 @@ describe('Dashboard overview aggregation', () => {
       organization: null
     });
     await ProcurementVendor.create({
-      organization: organization._id,
-      userId: user._id,
+      orgId: organization._id,
+      createdByUserId: user._id,
       name: 'Should Not Leak'
     });
     await EngagementRoom.create({
@@ -165,7 +165,7 @@ describe('Dashboard overview aggregation', () => {
 
     const partnerOrg = await seedSharedOrg();
 
-    await ProcurementVendor.create({ organization: organization._id, userId: user._id, name: 'Supplier' });
+    await ProcurementVendor.create({ orgId: organization._id, createdByUserId: user._id, name: 'Supplier' });
     await BuyerValueAssessment.create({
       organization: organization._id,
       procurementVendor: null,
@@ -209,7 +209,7 @@ describe('Dashboard overview aggregation', () => {
     const partnerOrg = await seedSharedOrg();
 
     await RevenueAccount.create({ userId: user._id, name: 'Dual Account' });
-    await ProcurementVendor.create({ organization: organization._id, userId: user._id, name: 'Dual Vendor' });
+    await ProcurementVendor.create({ orgId: organization._id, createdByUserId: user._id, name: 'Dual Vendor' });
     await BuyerValueAssessment.create({
       organization: organization._id,
       procurementVendor: null,
