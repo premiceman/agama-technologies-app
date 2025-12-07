@@ -66,9 +66,17 @@ The core design principle is:
 
 ---
 
-## 3. Personas and Suites
+## 3. Personas, Suites, and Licensing
 
-Agama has three high‑level personas and two purchasable suites.
+Agama uses **org-based, seat-based licensing**. Each organisation configures seat limits for:
+
+- **Vendor Suite** – seats for seller personas.
+- **Buyer Suite** – seats for buyer personas.
+- **Both Suites** – seats for users who require both contexts; these consume a seat from each suite pool.
+
+Guests can be invited into Engagement Rooms without consuming seats.
+
+See [licensing_and_pricing.md](licensing_and_pricing.md) for detailed pricing and packaging guidance.
 
 ### 3.1 Vendor Persona (Seller)
 
@@ -108,13 +116,23 @@ They work primarily in:
 - **Shared panels** in Engagement Rooms  
 - **Buyer‑mode + shared ValueSphere**
 
-### 3.3 Guest Persona
+### 3.3 Both Suites Persona
+
+Some users need **both Vendor and Buyer suite capabilities** (e.g. central deal desks, consultants operating across buyer and seller contexts, or internal enablement teams). Organisations assign them **Both Suites** access so they can:
+
+- Switch between RevenueForge and ProcurePath without separate accounts.
+- Participate in vendor-only, shared, and buyer-only panels within Engagement Rooms, respecting role-based visibility.
+- Work with ValueSphere in both seller and buyer modes.
+
+Both Suites users consume seats from both suite allocations configured by their organisation.
+
+### 3.4 Guest Persona
 
 Guests are external participants invited into Engagement Rooms via **magic links**:
 
-- No org membership required.  
-- No suite entitlements.  
-- Access only to **shared panels** in Engagement Rooms.  
+- No org membership required.
+- No suite entitlements or seat consumption.
+- Access only to **shared panels** in Engagement Rooms.
 - Cannot access RevenueForge or ProcurePath.
 
 They see greyed‑out / upsell areas for:
@@ -231,6 +249,8 @@ ProcurePath is the **source of truth** for buyer‑side procurement intelligence
 ### 4.3 Engagement Rooms
 
 **Purpose:** Provide a **structured, shared workspace** where vendor and buyer interact, while preserving each side’s private spaces.
+
+Engagement Rooms are a core surface included in both the **Vendor Suite** and **Buyer Suite**; there is no separate shared suite product.
 
 A single Engagement Room contains:
 
