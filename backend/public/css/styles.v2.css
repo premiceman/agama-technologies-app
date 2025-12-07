@@ -1286,51 +1286,6 @@ small.text-fg { color: var(--fg) !important; }
   border-top: 1px solid rgba(148, 163, 184, 0.25);
 }
 
-/* ===== Engagement Rooms – Create Room Modal (Glass Theme) ===== */
-
-#createRoomModal .modal-dialog {
-  max-width: 560px;
-}
-
-#createRoomModal .modal-content,
-#createRoomModal .modal-content.glass {
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow);
-  color: var(--fg);
-  padding: var(--space-5);
-}
-
-#createRoomModal .modal-header,
-#createRoomModal .modal-footer {
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-#createRoomModal .modal-title {
-  font-weight: 600;
-  color: var(--fg-strong);
-}
-
-#createRoomModal .btn-close {
-  filter: invert(1) grayscale(1);
-  opacity: 0.8;
-}
-
-#createRoomModal .form-control,
-#createRoomModal .form-select {
-  background-color: rgba(5, 9, 16, 0.95);
-  border-color: rgba(148, 163, 184, 0.45);
-  color: var(--fg);
-}
-
-#createRoomModal .form-control::placeholder {
-  color: var(--fg-muted);
-}
-
-#createRoomModal .form-text {
-  color: var(--fg-muted);
-}
-
 /* --- Suite picker contrast tweak (ValueSphere / RevenueForge / ProcurePath) --- */
 
 #agamaOrgSuites .suite-tile {
@@ -1405,3 +1360,168 @@ small.text-fg { color: var(--fg) !important; }
   background-color: #f1f5f9 !important;
 }
 
+/* ============================
+   Agama glass modals (Engagement Rooms)
+   Only affects modals tagged with data-agama-modal="glass"
+   ============================ */
+
+[data-agama-modal="glass"] .modal-dialog {
+  max-width: 640px;
+}
+
+[data-agama-modal="glass"] .modal-content {
+  background:
+    radial-gradient(circle at top left, rgba(148, 163, 255, 0.22), transparent 55%),
+    radial-gradient(circle at bottom right, rgba(236, 72, 153, 0.22), transparent 55%),
+    rgba(5, 10, 20, 0.96);
+  border-radius: 1.5rem;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 30px 80px rgba(3, 8, 18, 0.85);
+  color: var(--fg);
+  backdrop-filter: blur(18px);
+}
+
+/* Header + footer lines match the rest of the glass theme */
+[data-agama-modal="glass"] .modal-header,
+[data-agama-modal="glass"] .modal-footer {
+  border-color: rgba(148, 163, 184, 0.25);
+  background: transparent;
+}
+
+[data-agama-modal="glass"] .modal-title {
+  color: var(--fg-strong);
+  font-weight: 600;
+}
+
+/* Close button – make it visible on dark background */
+[data-agama-modal="glass"] .btn-close {
+  filter: invert(1) grayscale(1);
+  opacity: 0.75;
+}
+
+[data-agama-modal="glass"] .btn-close:hover {
+  opacity: 1;
+}
+
+/* Form labels + help text inside the modal */
+[data-agama-modal="glass"] .form-label {
+  color: var(--fg-2);
+}
+
+[data-agama-modal="glass"] .form-text {
+  color: var(--fg-muted);
+}
+
+/* Inputs/selects – ensure they use the dark field styling */
+[data-agama-modal="glass"] .form-control,
+[data-agama-modal="glass"] .form-select {
+  background: #0d1525 !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: var(--fg) !important;
+}
+
+/* Placeholder text readable on dark fields */
+[data-agama-modal="glass"] .form-control::placeholder {
+  color: var(--fg-muted) !important;
+}
+
+/* Softer blurred overlay behind modals */
+.modal-backdrop.show {
+  background: radial-gradient(circle at top, rgba(15, 23, 42, 0.9), rgba(5, 9, 16, 0.98));
+  opacity: 1;
+  backdrop-filter: blur(18px);
+}
+
+
+/* Workspace control tower layout */
+[data-theme="shared"] {
+  --accent: var(--brand-2);
+  --accent-alt: var(--brand-2);
+  --brand: var(--brand-2);
+  --brand-2: var(--brand-2-strong);
+}
+
+.control-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-7);
+}
+
+.control-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.control-grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.control-card {
+  border-radius: 1rem;
+  padding: var(--space-5);
+  min-height: 220px;
+}
+
+.control-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.metric-value {
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: var(--accent-alt);
+}
+
+.theme-icon {
+  color: var(--accent);
+  font-size: 1.5rem;
+  background: rgba(255, 255, 255, .06);
+  border-radius: .75rem;
+  padding: .5rem .65rem;
+}
+
+.theme-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .35rem .8rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  font-weight: 700;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+  font-size: .8rem;
+}
+
+.theme-pill.buyer {
+  border-color: color-mix(in srgb, var(--accent-alt) 35%, transparent);
+  background: color-mix(in srgb, var(--accent-alt) 16%, transparent);
+  color: var(--accent-alt);
+}
+
+.theme-pill.shared {
+  border-color: color-mix(in srgb, var(--brand-2) 35%, transparent);
+  background: color-mix(in srgb, var(--brand-2) 14%, transparent);
+  color: var(--brand-2);
+}
+
+@media (max-width: 991.98px) {
+  .control-header {
+    flex-direction: column;
+  }
+
+  .control-section {
+    margin-bottom: var(--space-6);
+  }
+}

@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <link rel="stylesheet" href="/css/styles.v2.css">
 </head>
-<body class="bg-body">
+<body class="bg-body text-fg">
   <div class="liquid-bg" aria-hidden="true">
     <div class="blob blob-blue"></div>
     <div class="blob blob-teal"></div>
@@ -57,176 +57,140 @@
             <span class="sidebar-label">Docs</span>
           </a>
         </div>
-        <div class="sidebar-section-label" id="orgAdminLabel" style="display:none;">Organisation</div>
-        <div class="sidebar-section" id="orgAdminSection" style="display:none;">
-          <a class="sidebar-link" href="/admin-org.html" id="orgAdminLink">
-            <i class="bi bi-building-gear"></i>
-            <span class="sidebar-label">Org &amp; Members</span>
-          </a>
-        </div>
-        <div class="sidebar-section-label" id="agamaAdminLabel" style="display:none;">Agama</div>
-        <div class="sidebar-section" id="agamaAdminSection" style="display:none;">
-          <a class="sidebar-link" href="/agama-admin.html" id="agamaAdminLink">
-            <i class="bi bi-shield-lock"></i>
-            <span class="sidebar-label">Agama Admin Console</span>
-          </a>
-        </div>
-        <div class="sidebar-section-label">Account &amp; Settings</div>
-        <div class="sidebar-section">
-          <a class="sidebar-link" href="/profile.html">
-            <i class="bi bi-person"></i>
-            <span class="sidebar-label">Profile</span>
-          </a>
-          <a class="sidebar-link" href="/settings.html">
-            <i class="bi bi-gear"></i>
-            <span class="sidebar-label">Settings</span>
-          </a>
-          <a class="sidebar-link" href="/billing.html">
-            <i class="bi bi-credit-card"></i>
-            <span class="sidebar-label">Billing</span>
-          </a>
-        </div>
       </nav>
     </aside>
 
-    <div class="app-content">
+    <main class="app-content w-100">
       <div class="container py-5">
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <header class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
           <div>
-            <span class="eyebrow">Agama workspace</span>
-            <h1 class="h3 mb-0" id="workspaceGreeting">Loading workspace...</h1>
-            <div class="text-fg-3 small" id="orgContext"></div>
+            <span class="eyebrow d-block">Control tower</span>
+            <h1 class="h3 mb-1" id="workspaceGreeting">Loading workspace...</h1>
+            <div class="text-fg-3 small" id="orgContext">Preparing your suites...</div>
           </div>
-          <div class="d-flex gap-2">
-            <a class="btn btn-outline-light" href="/">Back to site</a>
-            <button class="btn btn-primary" id="logoutButton">Logout</button>
+          <div class="d-flex align-items-center gap-2">
+            <span class="pill-soft" id="personaPill">Persona</span>
+            <button class="btn btn-outline-light btn-sm" id="refreshButton" type="button">
+              <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+            </button>
           </div>
-        </div>
+        </header>
 
-        <section class="card glass p-4 mb-3 d-none" id="personaWizard">
-          <h2 class="h6 mb-2">Help us tailor your workspace</h2>
-          <p class="text-fg-3 small mb-3">Which best describes you?</p>
-          <div class="d-flex flex-wrap gap-2">
-            <button class="btn btn-outline-light btn-sm" data-persona="vendor">We sell technology</button>
-            <button class="btn btn-outline-light btn-sm" data-persona="buyer">We buy technology</button>
-            <button class="btn btn-outline-light btn-sm" data-persona="both">Both</button>
-            <button class="btn btn-outline-light btn-sm" data-persona="explorer">I’m just exploring</button>
+        <div class="alert alert-danger d-none" id="statusMessage" role="alert"></div>
+
+        <section class="control-section" id="vendorSection" data-theme="seller">
+          <div class="control-header">
+            <div>
+              <span class="eyebrow d-block">Vendor suite</span>
+              <h2 class="h5 mb-1">RevenueForge command centre</h2>
+              <p class="text-fg-3 mb-0">Track seller-only actions, accounts, and value storytelling signals.</p>
+            </div>
+            <span class="theme-pill seller">Seller</span>
+          </div>
+          <div class="control-grid">
+            <article class="card glass control-card">
+              <div class="control-card-top">
+                <div>
+                  <p class="text-fg-3 small mb-1">Active revenue accounts</p>
+                  <div class="metric-value" id="metricSellerAccounts">0</div>
+                </div>
+                <i class="bi bi-building theme-icon"></i>
+              </div>
+              <p class="text-fg-3 small mb-3">Accounts monitored for health, engagement, and MAP momentum.</p>
+              <div class="d-flex gap-2">
+                <a class="btn btn-primary btn-sm" href="/revenueforge.html">Open RevenueForge</a>
+                <a class="btn btn-outline-light btn-sm" href="/rooms.html">Engagement rooms</a>
+              </div>
+            </article>
+            <article class="card glass control-card">
+              <div class="control-card-top">
+                <div>
+                  <p class="text-fg-3 small mb-1">ValueSphere assessments</p>
+                  <div class="metric-value" id="metricSellerAssessments">0</div>
+                </div>
+                <i class="bi bi-kanban theme-icon"></i>
+              </div>
+              <p class="text-fg-3 small mb-3">Seller-mode assessments ready to publish into rooms.</p>
+              <div class="d-flex gap-2">
+                <a class="btn btn-outline-light btn-sm" href="/valuesphere-tool.html">Launch ValueSphere</a>
+                <a class="btn btn-outline-light btn-sm" href="/valuesphere.html">Draft library</a>
+              </div>
+            </article>
           </div>
         </section>
 
-        <div class="row g-4">
-          <div class="col-lg-8 d-flex flex-column gap-4">
-            <div class="card glass p-4" id="accountCard">
-              <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-2">
-                <div>
-                  <span class="eyebrow">Your account</span>
-                  <h2 class="h5 mb-1" id="accountName">Loading...</h2>
-                  <div class="text-fg-3 small" id="accountEmail"></div>
-                </div>
-                <span class="badge-soft" id="licenseBadge">License</span>
-              </div>
-              <div class="text-fg-2 small mb-3" id="accountNarrative"></div>
-              <div class="d-flex flex-wrap align-items-center gap-2 mb-3" id="businessRequestRow" style="display:none;">
-                <a id="requestBusinessBtn" class="btn btn-outline-light btn-sm" href="#">Request business workspace</a>
-                <div class="text-fg-3 small" id="requestBusinessHint"></div>
-              </div>
-              <div class="d-flex flex-wrap gap-3" id="accountMeta"></div>
+        <section class="control-section" id="buyerSection" data-theme="buyer">
+          <div class="control-header">
+            <div>
+              <span class="eyebrow d-block">Buyer suite</span>
+              <h2 class="h5 mb-1">ProcurePath cockpit</h2>
+              <p class="text-fg-3 mb-0">Procurement records, evaluations, and buyer-only governance.</p>
             </div>
-
-            <div class="card glass p-4" id="suiteCard">
-              <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
-                <div>
-                  <h2 class="h5 mb-1">Your suites</h2>
-                  <p class="text-fg-3 small mb-0">See which Agama suites are active for your account.</p>
-                </div>
-                <span class="badge-soft" id="suiteCount"></span>
-              </div>
-              <div class="row g-3" id="suiteList"></div>
-            </div>
-
-            <div class="card glass p-4" id="nextStepsCard">
-              <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
-                <div>
-                  <h2 class="h6 mb-1">Next steps</h2>
-                  <p class="text-fg-3 small mb-0">Guided actions tuned to your persona.</p>
-                </div>
-                <span class="badge-soft" id="nextStepsPersona"></span>
-              </div>
-              <div class="d-flex flex-column gap-3" id="nextStepsList"></div>
-              <div class="text-fg-3 small" id="nextStepsEmpty" style="display:none;">We will suggest actions once a persona is set.</div>
-            </div>
-
-            <div class="card glass p-4" id="roomsCard">
-              <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
-                <div>
-                  <h2 class="h5 mb-1">Your rooms</h2>
-                  <p class="text-fg-3 small mb-0">Rooms across your organisations, plus those where you are a guest.</p>
-                </div>
-                <span class="badge-soft" id="roomsCount"></span>
-              </div>
-              <div class="d-flex flex-column gap-4">
-                <div>
-                  <div class="d-flex align-items-center gap-2 mb-2">
-                    <i class="bi bi-buildings text-brand"></i>
-                    <h3 class="h6 mb-0">Rooms in your organisation(s)</h3>
-                  </div>
-                  <div class="d-flex flex-column gap-3" id="orgRooms"></div>
-                  <div class="text-fg-3 small" id="orgRoomsEmpty">No rooms yet.</div>
-                </div>
-                <div>
-                  <div class="d-flex align-items-center gap-2 mb-2">
-                    <i class="bi bi-person-badge text-brand"></i>
-                    <h3 class="h6 mb-0">Rooms where you are a guest</h3>
-                  </div>
-                  <div class="d-flex flex-column gap-3" id="guestRooms"></div>
-                  <div class="text-fg-3 small" id="guestRoomsEmpty">No guest rooms.</div>
-                </div>
-              </div>
-            </div>
+            <span class="theme-pill buyer">Buyer</span>
           </div>
-
-          <div class="col-lg-4 d-flex flex-column gap-4">
-            <div class="card glass p-4">
-              <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
-                <h2 class="h6 mb-0">Quick profile</h2>
-                <span class="badge-soft" id="profileLicenseBadge"></span>
+          <div class="control-grid">
+            <article class="card glass control-card">
+              <div class="control-card-top">
+                <div>
+                  <p class="text-fg-3 small mb-1">Vendors under management</p>
+                  <div class="metric-value" id="metricBuyerVendors">0</div>
+                </div>
+                <i class="bi bi-diagram-3 theme-icon"></i>
               </div>
-              <form id="profileForm" class="d-flex flex-column gap-3">
+              <p class="text-fg-3 small mb-3">Vendor records, risk flags, and sourcing context.</p>
+              <div class="d-flex gap-2">
+                <a class="btn btn-primary btn-sm" href="/procurepath.html">Open ProcurePath</a>
+                <a class="btn btn-outline-light btn-sm" href="/rooms.html">Room evaluations</a>
+              </div>
+            </article>
+            <article class="card glass control-card">
+              <div class="control-card-top">
                 <div>
-                  <label class="form-label" for="profileName">Name</label>
-                  <input type="text" class="form-control" id="profileName" name="name" autocomplete="name">
+                  <p class="text-fg-3 small mb-1">Buyer ValueSphere</p>
+                  <div class="metric-value" id="metricBuyerAssessments">0</div>
                 </div>
-                <div>
-                  <label class="form-label" for="profileEmail">Email</label>
-                  <input type="email" class="form-control" id="profileEmail" name="email" autocomplete="email" readonly>
-                </div>
-                <div>
-                  <label class="form-label" for="profileCompany">Organisation</label>
-                  <input type="text" class="form-control" id="profileCompany" name="company" autocomplete="organization">
-                </div>
-                <div>
-                  <label class="form-label" for="profileRole">Role</label>
-                  <input type="text" class="form-control" id="profileRole" name="role" autocomplete="organization-title">
-                </div>
-                <div>
-                  <label class="form-label" for="profileIndustry">Industry</label>
-                  <input type="text" class="form-control" id="profileIndustry" name="industry">
-                </div>
-                <button type="submit" class="btn btn-outline-light" id="profileSubmit">Save profile</button>
-                <div class="form-text" id="profileFeedback"></div>
-              </form>
-            </div>
-            <div class="card glass p-4">
-              <h2 class="h6 mb-3">Danger zone</h2>
-              <p class="text-fg-3 small">Deleting your account removes all licensing selections and access. You can recreate an account at any time.</p>
-              <button class="btn btn-outline-danger w-100" id="deleteAccount">Delete account</button>
-            </div>
+                <i class="bi bi-clipboard-data theme-icon"></i>
+              </div>
+              <p class="text-fg-3 small mb-3">Structured value models powering sourcing decisions.</p>
+              <div class="d-flex gap-2">
+                <a class="btn btn-outline-light btn-sm" href="/valuesphere-tool.html">Assessment workspace</a>
+                <a class="btn btn-outline-light btn-sm" href="/valuesphere-completed.html">Completed models</a>
+              </div>
+            </article>
           </div>
-        </div>
+        </section>
+
+        <section class="control-section" id="sharedSection" data-theme="shared">
+          <div class="control-header">
+            <div>
+              <span class="eyebrow d-block">Shared suite</span>
+              <h2 class="h5 mb-1">Engagement room visibility</h2>
+              <p class="text-fg-3 mb-0">Shared collaboration signals with strict seller/buyer boundaries.</p>
+            </div>
+            <span class="theme-pill shared">Shared</span>
+          </div>
+          <div class="control-grid">
+            <article class="card glass control-card">
+              <div class="control-card-top">
+                <div>
+                  <p class="text-fg-3 small mb-1">Engagement rooms</p>
+                  <div class="metric-value" id="metricRooms">0</div>
+                </div>
+                <i class="bi bi-people theme-icon"></i>
+              </div>
+              <p class="text-fg-3 small mb-3">Rooms spanning vendor-only, buyer-only, and shared panels.</p>
+              <div class="d-flex gap-2">
+                <a class="btn btn-primary btn-sm" href="/rooms.html">Open rooms</a>
+                <a class="btn btn-outline-light btn-sm" href="/engagement-room.html">Create room</a>
+              </div>
+            </article>
+          </div>
+        </section>
       </div>
-    </div>
+    </main>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/js/workspace.js"></script>
 </body>
 </html>
