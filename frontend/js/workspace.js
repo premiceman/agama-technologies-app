@@ -60,6 +60,14 @@ function renderHeader(context) {
   applyTheme(context?.themeHints);
 }
 
+function initGlobalSearch() {
+  const input = document.getElementById('globalSearchInput');
+  const results = document.getElementById('globalSearchResults');
+  if (input && results && window.SearchUI) {
+    window.SearchUI.bindSearchField({ input, resultsContainer: results, contextLabel: 'Workspace scope' });
+  }
+}
+
 function renderVendorSection(overview, entitlements) {
   const section = document.getElementById('vendorSection');
   const allowed = Boolean(entitlements?.vendorSuite && overview?.vendor);
@@ -135,5 +143,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (refreshButton) {
     refreshButton.addEventListener('click', () => loadWorkspace());
   }
+  initGlobalSearch();
   loadWorkspace();
 });

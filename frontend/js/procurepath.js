@@ -75,6 +75,19 @@ function ensureBuyerAccess(context, alertId) {
   return allowed;
 }
 
+function bindProcurepathSearch() {
+  const input = document.getElementById('procurepathSearchInput');
+  const results = document.getElementById('procurepathSearchResults');
+  if (input && results && window.SearchUI) {
+    window.SearchUI.bindSearchField({
+      input,
+      resultsContainer: results,
+      scope: 'procurement_vendor',
+      contextLabel: 'ProcurePath scope'
+    });
+  }
+}
+
 function formatScore(vendor) {
   const score = vendor?.scorecard?.overallScore ?? vendor?.healthScore;
   if (score === undefined || score === null) return 'Score: —';
@@ -410,6 +423,7 @@ async function init() {
     const context = await fetchJson('/api/me/context');
     state.context = context;
     applyBuyerTheme(context);
+    bindProcurepathSearch();
     const page = document.body.dataset.page;
     if (!ensureBuyerAccess(context, page === 'procurepath-detail' ? 'procurepathDetailAlert' : 'procurepathAlert')) {
       return;

@@ -452,11 +452,29 @@
     }
   }
 
+  function bindValuesphereSearch(context) {
+    const input = document.getElementById('valuesphereSearchInput');
+    const results = document.getElementById('valuesphereSearchResults');
+    if (input && results && window.SearchUI) {
+      const badge = document.getElementById('valuesphereSearchBadge');
+      if (badge && context?.themeHints?.primary) {
+        badge.textContent = `${context.themeHints.primary} visibility`;
+      }
+      window.SearchUI.bindSearchField({
+        input,
+        resultsContainer: results,
+        scope: 'valuesphere_assessment',
+        contextLabel: 'ValueSphere scope'
+      });
+    }
+  }
+
   async function loadContext() {
     try {
       const ctx = await fetchJson('/api/me/context');
       state.context = ctx;
       applyTheme(ctx);
+      bindValuesphereSearch(ctx);
     } catch (err) {
       showStatus(err.message, 'error');
     }
