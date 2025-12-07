@@ -8,8 +8,8 @@ const OrganizationMembershipSchema = new Schema(
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     role: {
       type: String,
-      enum: ['owner', 'admin', 'member', 'viewer'],
-      default: 'member'
+      enum: ['org_owner', 'org_admin', 'vendor_user', 'buyer_user', 'guest'],
+      default: 'guest'
     },
     status: {
       type: String,
@@ -18,9 +18,9 @@ const OrganizationMembershipSchema = new Schema(
     },
     roleOrigin: { type: String, enum: ['app', 'idp'], default: 'app' },
     invitedEmail: { type: String, trim: true },
-    sellerSuiteProvisioned: { type: Boolean, default: false },
-    buyerSuiteProvisioned: { type: Boolean, default: false },
-    engagementRoomsProvisioned: { type: Boolean, default: false }
+    vendorSuiteEnabled: { type: Boolean, default: false },
+    buyerSuiteEnabled: { type: Boolean, default: false },
+    sharedSuiteEnabled: { type: Boolean, default: false }
   },
   { timestamps: true }
 );

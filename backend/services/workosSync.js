@@ -146,7 +146,11 @@ async function syncWorkOSOrganization(workosOrg) {
         platformAccess: ['valuesphere'],
         productAccess: ['valuesphere'],
         domains,
-        seatLimit: 10
+        seatLimit: 10,
+        vendorSuiteEnabled: true,
+        buyerSuiteEnabled: true,
+        sharedSuiteEnabled: true,
+        seatLimits: { vendorSuite: 10, buyerSuite: 10, sharedSuite: 10 }
       });
     } else {
       const before = {
@@ -185,10 +189,13 @@ async function syncWorkOSOrganization(workosOrg) {
 }
 
 function mapWorkOSRoleSlugToOrgRole(slug) {
-  if (!slug) return 'member';
-  const normalised = slug.toLowerCase();
-  if (['owner', 'admin', 'member', 'viewer'].includes(normalised)) return normalised;
-  return 'member';
+  if (!slug) return 'vendor_user';
+  const normalised = String(slug).toLowerCase();
+  if (normalised === 'owner') return 'org_owner';
+  if (normalised === 'admin') return 'org_admin';
+  if (normalised === 'viewer') return 'guest';
+  if (normalised === 'buyer') return 'buyer_user';
+  return 'vendor_user';
 }
 
 function mapMembershipStatus(status) {
@@ -245,6 +252,15 @@ async function syncWorkOSOrganizationMembership(workosMembership) {
   membership.role = mapWorkOSRoleSlugToOrgRole(workosMembership.role?.slug || workosMembership.role);
   membership.status = mapMembershipStatus(workosMembership.status);
   membership.roleOrigin = 'idp';
+  if (membership.vendorSuiteEnabled === undefined) {
+    membership.vendorSuiteEnabled = Boolean(organization.vendorSuiteEnabled);
+  }
+  if (membership.buyerSuiteEnabled === undefined) {
+    membership.buyerSuiteEnabled = Boolean(organization.buyerSuiteEnabled);
+  }
+  if (membership.sharedSuiteEnabled === undefined) {
+    membership.sharedSuiteEnabled = Boolean(organization.sharedSuiteEnabled);
+  }
 
   await membership.save();
   return membership;

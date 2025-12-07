@@ -27,7 +27,7 @@ const UserSchema = new Schema(
     valueAssessmentLimit: { type: Number, default: 3 },
     billingProfile: { type: Schema.Types.Mixed, default: {} },
     platformAccess: { type: [String], default: ['valuesphere'] },
-    persona: { type: String, enum: ['vendor', 'buyer', 'both', 'explorer', 'unknown', 'consultant'], default: 'unknown' },
+    persona: { type: String, enum: ['vendor', 'buyer', 'dual'], default: 'dual' },
     valuesphereMode: { type: String, enum: ['vendor', 'buyer'], default: 'vendor' },
     defaultOrganization: { type: Schema.Types.ObjectId, ref: 'Organization', default: null },
     lastLoginAt: { type: Date }
@@ -46,7 +46,7 @@ UserSchema.methods.public = function() {
     role: this.role,
     industry: this.industry,
     licenseTier: this.licenseTier,
-    persona: this.persona || 'unknown',
+    persona: this.persona || 'dual',
     valuesphereMode: this.valuesphereMode || 'vendor',
     emailVerified: this.emailVerified,
     status: this.status,

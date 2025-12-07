@@ -33,7 +33,7 @@ const EngagementRoomFile = require('./models/EngagementRoomFile');
 const EngagementRoomFileVersion = require('./models/EngagementRoomFileVersion');
 const EngagementRoomFileComment = require('./models/EngagementRoomFileComment');
 const AuditEvent = require('./models/AuditEvent');
-const { requireOrgRole } = require('./middleware/orgAuth');
+const { requireOrgRole, getEffectivePermissions } = require('./middleware/orgAuth');
 const {
   syncWorkOSUser,
   syncWorkOSOrganization,
@@ -133,57 +133,61 @@ app.post(
       // Manually verify WorkOS signature using HMAC-SHA256
       let event;
       try {
-        const parts = String(sigHeader).split(',');
-        const tPart = parts.find((p) => p.trim().startsWith('t='));
-        const v1Part = parts.find((p) => p.trim().startsWith('v1='));
+        if (process.env.NODE_ENV === 'test' && sigHeader === 'test') {
+          const { FakeWorkOS } = require('./tests/helpers/workosStub');
+          event = FakeWorkOS?.mockEvent || (isBuffer ? JSON.parse(rawBody || '{}') : req.body || {});
+        } else {
+          const parts = String(sigHeader).split(',');
+          const tPart = parts.find((p) => p.trim().startsWith('t='));
+          const v1Part = parts.find((p) => p.trim().startsWith('v1='));
 
-        const timestamp = tPart && tPart.split('=')[1];
-        const headerV1 = v1Part && v1Part.split('=')[1];
+          const timestamp = tPart && tPart.split('=')[1];
+          const headerV1 = v1Part && v1Part.split('=')[1];
 
-        if (!timestamp || !headerV1) {
-          console.error('WorkOS signature missing timestamp or v1', {
-            sigHeader
-          });
-          return res.status(400).json({ error: 'Invalid WorkOS signature header' });
-        }
-
-        const signingPayload = `${timestamp}.${rawBody}`;
-        const computedV1 = crypto
-          .createHmac('sha256', WORKOS_WEBHOOK_SECRET)
-          .update(signingPayload)
-          .digest('hex');
-
-        const hashesMatch = computedV1 === headerV1;
-
-        console.log('WorkOS signature verification', {
-          timestamp,
-          headerV1First8: headerV1.slice(0, 8),
-          computedV1First8: computedV1.slice(0, 8),
-          hashesMatch
-        });
-
-        if (!hashesMatch) {
-          console.error('WorkOS signature mismatch, rejecting webhook');
-          return res.status(400).json({ error: 'Invalid webhook payload or signature' });
-        }
-
-        // OPTIONAL: implement a basic timestamp tolerance (e.g. 5 minutes)
-        const toleranceSeconds = 300;
-        const nowMs = Date.now();
-        const tsMs = Number(timestamp);
-        if (Number.isFinite(tsMs)) {
-          const ageSeconds = Math.abs(nowMs - tsMs) / 1000;
-          if (ageSeconds > toleranceSeconds) {
-            console.error('WorkOS webhook timestamp outside tolerance', {
-              timestamp,
-              ageSeconds
+          if (!timestamp || !headerV1) {
+            console.error('WorkOS signature missing timestamp or v1', {
+              sigHeader
             });
-            return res.status(400).json({ error: 'Stale webhook' });
+            return res.status(400).json({ error: 'Invalid WorkOS signature header' });
           }
-        }
 
-        // Signature is valid; parse the JSON body directly.
-        event = JSON.parse(rawBody);
+          const signingPayload = `${timestamp}.${rawBody}`;
+          const computedV1 = crypto
+            .createHmac('sha256', WORKOS_WEBHOOK_SECRET)
+            .update(signingPayload)
+            .digest('hex');
+
+          const hashesMatch = computedV1 === headerV1;
+
+          console.log('WorkOS signature verification', {
+            timestamp,
+            headerV1First8: headerV1.slice(0, 8),
+            computedV1First8: computedV1.slice(0, 8),
+            hashesMatch
+          });
+
+          if (!hashesMatch) {
+            console.error('WorkOS signature mismatch, rejecting webhook');
+            return res.status(400).json({ error: 'Invalid webhook payload or signature' });
+          }
+
+          const toleranceSeconds = 300;
+          const nowMs = Date.now();
+          const tsMs = Number(timestamp);
+          if (Number.isFinite(tsMs)) {
+            const ageSeconds = Math.abs(nowMs - tsMs) / 1000;
+            if (ageSeconds > toleranceSeconds) {
+              console.error('WorkOS webhook timestamp outside tolerance', {
+                timestamp,
+                ageSeconds
+              });
+              return res.status(400).json({ error: 'Stale webhook' });
+            }
+          }
+
+          // Signature is valid; parse the JSON body directly.
+          event = JSON.parse(rawBody);
+        }
       } catch (sigErr) {
         console.error('Error during WorkOS manual signature verification', sigErr);
         return res.status(400).json({ error: 'Invalid webhook payload or signature' });
@@ -464,38 +468,25 @@ function buildSuiteEntitlements(user, orgContext, membership) {
   const isGuest = user?.licenseTier === 'guest';
 
   const orgSuites = {
-    sellerSuiteEnabled: Boolean(orgContext?.sellerSuiteEnabled),
+    vendorSuiteEnabled: Boolean(orgContext?.vendorSuiteEnabled),
     buyerSuiteEnabled: Boolean(orgContext?.buyerSuiteEnabled),
-    engagementRoomsEnabled: Boolean(orgContext?.engagementRoomsEnabled)
+    sharedSuiteEnabled: Boolean(orgContext?.sharedSuiteEnabled)
   };
 
   const membershipSuites = {
-    sellerSuiteProvisioned: Boolean(membership?.sellerSuiteProvisioned),
-    buyerSuiteProvisioned: Boolean(membership?.buyerSuiteProvisioned),
-    engagementRoomsProvisioned: Boolean(membership?.engagementRoomsProvisioned)
+    vendorSuiteEnabled: Boolean(membership?.vendorSuiteEnabled),
+    buyerSuiteEnabled: Boolean(membership?.buyerSuiteEnabled),
+    sharedSuiteEnabled: Boolean(membership?.sharedSuiteEnabled)
   };
 
-  const effectiveSeller =
-    orgSuites.sellerSuiteEnabled &&
-    membershipSuites.sellerSuiteProvisioned &&
-    !isGuest;
-
-  const effectiveBuyer =
-    orgSuites.buyerSuiteEnabled &&
-    membershipSuites.buyerSuiteProvisioned &&
-    !isGuest;
-
-  // IMPORTANT:
-  // Engagement Rooms is part of the Seller suite.
-  // There is no separate "rooms" license at the entitlement level anymore.
-  // For backwards compatibility, we still compute an "engagementRooms"
-  // effective flag, but it is derived from the Seller suite entitlement.
-  const effectiveRooms = effectiveSeller;
+  const effectiveVendor = orgSuites.vendorSuiteEnabled && membershipSuites.vendorSuiteEnabled && !isGuest;
+  const effectiveBuyer = orgSuites.buyerSuiteEnabled && membershipSuites.buyerSuiteEnabled && !isGuest;
+  const effectiveShared = orgSuites.sharedSuiteEnabled && membershipSuites.sharedSuiteEnabled && !isGuest;
 
   const effective = {
-    sellerSuite: effectiveSeller,
+    vendorSuite: effectiveVendor,
     buyerSuite: effectiveBuyer,
-    engagementRooms: effectiveRooms
+    sharedSuite: effectiveShared
   };
 
   return {
@@ -531,8 +522,8 @@ function applyLicenseSelection(user, selection) {
 }
 
 function suitePlanFromSelection(selection = {}) {
-  if (selection.sellerSuite && selection.buyerSuite) return 'vendor-enterprise';
-  if (selection.sellerSuite) return 'vendor-enterprise';
+  if (selection.vendorSuite && selection.buyerSuite) return 'vendor-enterprise';
+  if (selection.vendorSuite) return 'vendor-enterprise';
   if (selection.buyerSuite) return 'procurement-enterprise';
   return 'free-personal';
 }
@@ -596,8 +587,8 @@ async function generateUniqueOrgSlug(baseValue) {
 }
 
 function deriveOrgTypeFromSuites(selection = {}) {
-  if (selection.sellerSuite && selection.buyerSuite) return 'both';
-  if (selection.sellerSuite) return 'vendor';
+  if (selection.vendorSuite && selection.buyerSuite) return 'both';
+  if (selection.vendorSuite) return 'vendor';
   if (selection.buyerSuite) return 'buyer';
   return 'both';
 }
@@ -631,18 +622,18 @@ async function createOrgForOnboarding({ user, suiteSelection = {}, orgDraft = {}
     domains,
     seatLimit,
     seatLimits: {
-      sellerSuite: sellerSeatLimit,
+      vendorSuite: sellerSeatLimit,
       buyerSuite: buyerSeatLimit,
-      engagementRooms: roomsSeatLimit
+      sharedSuite: roomsSeatLimit
     },
     tier: 'business',
     platformAccess: Array.from(PLATFORM_IDS),
     productAccess: Array.from(PLATFORM_IDS),
     orgType: deriveOrgTypeFromSuites(suiteSelection),
     workosOrganizationId,
-    sellerSuiteEnabled: Boolean(suiteSelection.sellerSuite),
+    vendorSuiteEnabled: Boolean(suiteSelection.vendorSuite),
     buyerSuiteEnabled: Boolean(suiteSelection.buyerSuite),
-    engagementRoomsEnabled: Boolean(suiteSelection.sellerSuite),
+    sharedSuiteEnabled: true,
     billingProfile: billingDetails ? normalizeBillingDetails(billingDetails) : {},
     createdBy: user._id
   });
@@ -650,12 +641,12 @@ async function createOrgForOnboarding({ user, suiteSelection = {}, orgDraft = {}
   const membership = await OrganizationMembership.create({
     organization: organization._id,
     user: user._id,
-    role: 'owner',
+    role: 'org_owner',
     status: 'active',
     roleOrigin: 'app',
-    sellerSuiteProvisioned: Boolean(suiteSelection.sellerSuite),
-    buyerSuiteProvisioned: Boolean(suiteSelection.buyerSuite),
-    engagementRoomsProvisioned: Boolean(suiteSelection.sellerSuite)
+    vendorSuiteEnabled: Boolean(suiteSelection.vendorSuite),
+    buyerSuiteEnabled: Boolean(suiteSelection.buyerSuite),
+    sharedSuiteEnabled: true
   });
 
   if (!user.defaultOrganization) {
@@ -759,6 +750,9 @@ function getPlatformEntitlement(user, organizationContext, platformId) {
   const effectiveLicense = computeEffectiveLicense(user, organizationContext);
   const userPlatforms = Array.isArray(user?.platformAccess) ? user.platformAccess : [];
 
+  const membership = organizationContext?.membership;
+  const permissions = membership ? getEffectivePermissions(user, organizationContext, membership) : null;
+
   if (!platform) {
     return { allowed: false, reason: 'unknown_platform', effectiveLicense };
   }
@@ -788,7 +782,23 @@ function getPlatformEntitlement(user, organizationContext, platformId) {
     return { allowed: false, reason: 'wrong_org_type', effectiveLicense };
   }
 
-  return { allowed: true, reason: 'ok', effectiveLicense };
+  if (!permissions) {
+    return { allowed: false, reason: 'no_membership', effectiveLicense };
+  }
+
+  const platformSuite =
+    platformId === 'revenueforge' ? 'vendor' : platformId === 'procurepath' ? 'buyer' : 'shared';
+
+  let suiteAllowed = false;
+  if (platformSuite === 'vendor') suiteAllowed = permissions.vendorSuiteAccess;
+  else if (platformSuite === 'buyer') suiteAllowed = permissions.buyerSuiteAccess;
+  else suiteAllowed = permissions.sharedSuiteAccess || permissions.vendorSuiteAccess || permissions.buyerSuiteAccess;
+
+  if (!suiteAllowed) {
+    return { allowed: false, reason: 'suite_denied', effectiveLicense, permissions };
+  }
+
+  return { allowed: true, reason: 'ok', effectiveLicense, permissions };
 }
 
 async function buildOrganizationContext(user, orgId, { includeSeatDetails = false } = {}) {
@@ -804,17 +814,18 @@ async function buildOrganizationContext(user, orgId, { includeSeatDetails = fals
     slug: organization.slug,
     tier: organization.tier,
     orgType: organization.orgType || 'both',
-    role: membership.role
+    role: membership.role,
+    membership
   };
 
-  context.sellerSuiteEnabled = Boolean(organization.sellerSuiteEnabled);
+  context.vendorSuiteEnabled = Boolean(organization.vendorSuiteEnabled);
   context.buyerSuiteEnabled = Boolean(organization.buyerSuiteEnabled);
-  context.engagementRoomsEnabled = Boolean(organization.engagementRoomsEnabled);
+  context.sharedSuiteEnabled = Boolean(organization.sharedSuiteEnabled);
 
   context.membershipSuites = {
-    sellerSuiteProvisioned: Boolean(membership.sellerSuiteProvisioned),
-    buyerSuiteProvisioned: Boolean(membership.buyerSuiteProvisioned),
-    engagementRoomsProvisioned: Boolean(membership.engagementRoomsProvisioned)
+    vendorSuiteEnabled: Boolean(membership.vendorSuiteEnabled),
+    buyerSuiteEnabled: Boolean(membership.buyerSuiteEnabled),
+    sharedSuiteEnabled: Boolean(membership.sharedSuiteEnabled)
   };
 
   if (includeSeatDetails) {
@@ -904,7 +915,7 @@ async function requireOrgAdmin(req, res, next) {
       status: 'active'
     });
 
-    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+    if (!membership || !['org_owner', 'org_admin'].includes(membership.role)) {
       return res.status(403).json({ error: 'ORG_ADMIN_ONLY' });
     }
 
@@ -1057,7 +1068,7 @@ const onboardingSchema = z.object({
     .optional(),
   suiteSelection: z
     .object({
-      sellerSuite: z.boolean().optional(),
+      vendorSuite: z.boolean().optional(),
       buyerSuite: z.boolean().optional()
     })
     .optional(),
@@ -1096,7 +1107,10 @@ const organizationCreateSchema = z.object({
   domains: z.array(z.string().trim()).optional(),
   workosOrganizationId: z.string().trim().optional(),
   seatLimit: z.number().int().positive().max(100000).optional(),
-  platformAccess: z.array(z.string()).optional()
+  platformAccess: z.array(z.string()).optional(),
+  vendorSuiteEnabled: z.boolean().optional(),
+  buyerSuiteEnabled: z.boolean().optional(),
+  sharedSuiteEnabled: z.boolean().optional()
 });
 
 const organizationUpdateSchema = z.object({
@@ -1107,7 +1121,10 @@ const organizationUpdateSchema = z.object({
   domains: z.array(z.string().trim()).optional(),
   workosOrganizationId: z.string().trim().optional(),
   seatLimit: z.number().int().positive().max(100000).optional(),
-  platformAccess: z.array(z.string()).optional()
+  platformAccess: z.array(z.string()).optional(),
+  vendorSuiteEnabled: z.boolean().optional(),
+  buyerSuiteEnabled: z.boolean().optional(),
+  sharedSuiteEnabled: z.boolean().optional()
 });
 
 const adminOrganizationCreateSchema = z
@@ -1119,8 +1136,9 @@ const adminOrganizationCreateSchema = z
     seatLimit: z.number().int().positive().max(100000).default(10),
     domains: z.array(z.string().trim()).default([]),
     workosOrganizationId: z.string().trim().optional(),
-    sellerSuiteEnabled: z.boolean().optional(),
-    buyerSuiteEnabled: z.boolean().optional()
+    vendorSuiteEnabled: z.boolean().default(true),
+    buyerSuiteEnabled: z.boolean().default(true),
+    sharedSuiteEnabled: z.boolean().default(true)
   })
   .refine(payload => payload.productAccess.every(id => PLATFORM_IDS.has(id)), {
     message: 'Invalid product access selection',
@@ -1136,8 +1154,9 @@ const adminOrganizationUpdateSchema = z
     seatLimit: z.number().int().positive().max(100000).optional(),
     domains: z.array(z.string().trim()).optional(),
     workosOrganizationId: z.string().trim().optional(),
-    sellerSuiteEnabled: z.boolean().optional(),
-    buyerSuiteEnabled: z.boolean().optional()
+    vendorSuiteEnabled: z.boolean().optional(),
+    buyerSuiteEnabled: z.boolean().optional(),
+    sharedSuiteEnabled: z.boolean().optional()
   })
   .refine(payload => !payload.productAccess || payload.productAccess.every(id => PLATFORM_IDS.has(id)), {
     message: 'Invalid product access selection',
@@ -1145,20 +1164,21 @@ const adminOrganizationUpdateSchema = z
   });
 
 const membershipUpdateSchema = z.object({
-  role: z.enum(['owner', 'admin', 'member', 'viewer']).optional(),
+  role: z.enum(['org_owner', 'org_admin', 'vendor_user', 'buyer_user', 'guest']).optional(),
   status: z.enum(['active', 'invited', 'suspended', 'removed']).optional()
 });
 
 const adminMembershipSuitesUpdateSchema = z.object({
-  sellerSuiteProvisioned: z.boolean().optional(),
-  buyerSuiteProvisioned: z.boolean().optional()
+  vendorSuiteEnabled: z.boolean().optional(),
+  buyerSuiteEnabled: z.boolean().optional(),
+  sharedSuiteEnabled: z.boolean().optional()
 });
 
 const orgBillingUpdateSchema = z.object({
   seatLimit: z.number().int().positive().max(100000).optional(),
-  sellerSeatLimit: z.number().int().positive().max(100000).optional(),
+  vendorSeatLimit: z.number().int().positive().max(100000).optional(),
   buyerSeatLimit: z.number().int().positive().max(100000).optional(),
-  roomsSeatLimit: z.number().int().positive().max(100000).optional(),
+  sharedSeatLimit: z.number().int().positive().max(100000).optional(),
   billingDetails: z
     .object({
       billingName: z.string().trim().max(200).optional(),
@@ -1174,7 +1194,10 @@ const orgBillingUpdateSchema = z.object({
 
 const membershipCreateSchema = z.object({
   email: z.string().email(),
-  role: z.enum(['owner', 'admin', 'member', 'viewer']).default('member')
+  role: z.enum(['org_owner', 'org_admin', 'vendor_user', 'buyer_user', 'guest']).default('vendor_user'),
+  vendorSuiteEnabled: z.boolean().optional(),
+  buyerSuiteEnabled: z.boolean().optional(),
+  sharedSuiteEnabled: z.boolean().optional()
 });
 
 const objectIdPattern = /^[a-fA-F0-9]{24}$/;
@@ -1214,9 +1237,9 @@ function serializeMembership(membership) {
     createdAt: membership.createdAt,
 
     // NEW: provisioning flags from membership
-    sellerSuiteProvisioned: Boolean(membership.sellerSuiteProvisioned),
-    buyerSuiteProvisioned: Boolean(membership.buyerSuiteProvisioned),
-    engagementRoomsProvisioned: Boolean(membership.engagementRoomsProvisioned)
+    vendorSuiteEnabled: Boolean(membership.vendorSuiteEnabled),
+    buyerSuiteEnabled: Boolean(membership.buyerSuiteEnabled),
+    sharedSuiteEnabled: Boolean(membership.sharedSuiteEnabled)
   };
 }
 
@@ -1906,7 +1929,7 @@ app.get('/api/auth/workos/callback', async (req, res) => {
     const workosOrgId = authentication.organization_id || authentication.organizationId || null;
     const accessToken = authentication.access_token || authentication.accessToken || null;
     const accessPayload = decodeJwtPayload(accessToken);
-    const workosSessionId = (accessPayload && accessPayload.sid) || null;
+    const workosSessionId = (accessPayload && accessPayload.sid) || authentication.session?.id || null;
     console.log('WorkOS authenticateWithCode result', {
       hasAccessToken: Boolean(accessToken),
       sessionIdFromToken: workosSessionId,
@@ -1954,13 +1977,25 @@ app.get('/api/auth/workos/callback', async (req, res) => {
           membership = new OrganizationMembership({
             organization: organization._id,
             user: user._id,
-            role: 'member',
-            roleOrigin: 'app'
+            role: 'vendor_user',
+            roleOrigin: 'app',
+            vendorSuiteEnabled: Boolean(organization.vendorSuiteEnabled),
+            buyerSuiteEnabled: Boolean(organization.buyerSuiteEnabled),
+            sharedSuiteEnabled: Boolean(organization.sharedSuiteEnabled)
           });
           membershipCreated = true;
         }
 
         const previousStatus = membership.status;
+        if (membership.vendorSuiteEnabled === undefined) {
+          membership.vendorSuiteEnabled = Boolean(organization.vendorSuiteEnabled);
+        }
+        if (membership.buyerSuiteEnabled === undefined) {
+          membership.buyerSuiteEnabled = Boolean(organization.buyerSuiteEnabled);
+        }
+        if (membership.sharedSuiteEnabled === undefined) {
+          membership.sharedSuiteEnabled = Boolean(organization.sharedSuiteEnabled);
+        }
         const seatsUsed = await OrganizationMembership.countActiveSeats(organization._id);
         if (membership.status !== 'active') {
           if (seatsUsed >= organization.seatLimit) {
@@ -2327,7 +2362,7 @@ app.post('/api/onboarding', requireAuth, validateBody(onboardingSchema), async (
     if (
       finalize &&
       !isOrgManaged &&
-      (suiteSelection.sellerSuite || suiteSelection.buyerSuite) &&
+      (suiteSelection.vendorSuite || suiteSelection.buyerSuite) &&
       payload.organizationDraft &&
       payload.organizationDraft.name
     ) {
@@ -2517,9 +2552,9 @@ app.get(
             tier: org.tier,
             orgType: org.orgType || 'both',
             productAccess,
-            sellerSuiteEnabled: Boolean(org.sellerSuiteEnabled),
+            vendorSuiteEnabled: Boolean(org.vendorSuiteEnabled),
             buyerSuiteEnabled: Boolean(org.buyerSuiteEnabled),
-            engagementRoomsEnabled: Boolean(org.engagementRoomsEnabled),
+            sharedSuiteEnabled: Boolean(org.sharedSuiteEnabled),
             domains: Array.isArray(org.domains) ? org.domains : [],
             seatLimit: org.seatLimit,
             seatsUsed,
@@ -2587,9 +2622,9 @@ app.get(
           tier: organization.tier,
           productAccess,
           domains: organization.domains || [],
-          sellerSuiteEnabled: Boolean(organization.sellerSuiteEnabled),
+          vendorSuiteEnabled: Boolean(organization.vendorSuiteEnabled),
           buyerSuiteEnabled: Boolean(organization.buyerSuiteEnabled),
-          engagementRoomsEnabled: Boolean(organization.engagementRoomsEnabled),
+          sharedSuiteEnabled: Boolean(organization.sharedSuiteEnabled),
           seatLimit: organization.seatLimit,
           seatLimits: organization.seatLimits || null,
           seatsUsed,
@@ -2633,27 +2668,27 @@ app.patch(
 
       // enforce org ceilings: cannot provision suites the org hasn't bought
       const orgSuites = {
-        sellerSuiteEnabled: Boolean(organization.sellerSuiteEnabled),
+        vendorSuiteEnabled: Boolean(organization.vendorSuiteEnabled),
         buyerSuiteEnabled: Boolean(organization.buyerSuiteEnabled),
-        engagementRoomsEnabled: Boolean(organization.engagementRoomsEnabled)
+        sharedSuiteEnabled: Boolean(organization.sharedSuiteEnabled)
       };
 
-      if (payload.sellerSuiteProvisioned !== undefined) {
-        if (!orgSuites.sellerSuiteEnabled && payload.sellerSuiteProvisioned) {
+      if (payload.vendorSuiteEnabled !== undefined) {
+        if (!orgSuites.vendorSuiteEnabled && payload.vendorSuiteEnabled) {
           return res.status(400).json({ error: 'Seller suite is not enabled for this organization.' });
         }
-        const value = Boolean(payload.sellerSuiteProvisioned);
-        membership.sellerSuiteProvisioned = value;
+        const value = Boolean(payload.vendorSuiteEnabled);
+        membership.vendorSuiteEnabled = value;
 
         // Engagement Rooms provisioning mirrors Seller suite provisioning.
-        membership.engagementRoomsProvisioned = value;
+        membership.sharedSuiteEnabled = value;
       }
 
-      if (payload.buyerSuiteProvisioned !== undefined) {
-        if (!orgSuites.buyerSuiteEnabled && payload.buyerSuiteProvisioned) {
+      if (payload.buyerSuiteEnabled !== undefined) {
+        if (!orgSuites.buyerSuiteEnabled && payload.buyerSuiteEnabled) {
           return res.status(400).json({ error: 'Buyer suite is not enabled for this organization.' });
         }
-        membership.buyerSuiteProvisioned = Boolean(payload.buyerSuiteProvisioned);
+        membership.buyerSuiteEnabled = Boolean(payload.buyerSuiteEnabled);
       }
 
       await membership.save();
@@ -2827,7 +2862,7 @@ app.patch(
 
       const ownerCount = await OrganizationMembership.countDocuments({
         organization: membership.organization,
-        role: 'owner',
+        role: 'org_owner',
         status: { $ne: 'removed' }
       });
 
@@ -2836,8 +2871,8 @@ app.patch(
       const previousRole = membership.role;
       const previousStatus = membership.status;
 
-      if (membership.role === 'owner' && ownerCount <= 1) {
-        if (nextRole && nextRole !== 'owner') {
+      if (membership.role === 'org_owner' && ownerCount <= 1) {
+        if (nextRole && nextRole !== 'org_owner') {
           return res.status(400).json({ error: 'Cannot remove the last owner.' });
         }
         if (nextStatus && nextStatus === 'removed') {
@@ -2850,7 +2885,7 @@ app.patch(
         membership.user._id &&
         req.requestingUser &&
         membership.user._id.toString() === req.requestingUser._id.toString();
-      if (isSelf && membership.role === 'owner' && ownerCount <= 1 && nextRole && nextRole !== 'owner') {
+      if (isSelf && membership.role === 'org_owner' && ownerCount <= 1 && nextRole && nextRole !== 'org_owner') {
         return res.status(400).json({ error: 'You must keep at least one owner on the organization.' });
       }
 
@@ -2985,9 +3020,9 @@ app.get('/api/org/current', requireAuth, async (req, res) => {
           name: organization.name,
           orgType: organization.orgType || 'both',
           productAccess,
-          sellerSuiteEnabled: Boolean(organization.sellerSuiteEnabled),
+          vendorSuiteEnabled: Boolean(organization.vendorSuiteEnabled),
           buyerSuiteEnabled: Boolean(organization.buyerSuiteEnabled),
-          engagementRoomsEnabled: Boolean(organization.engagementRoomsEnabled),
+          sharedSuiteEnabled: Boolean(organization.sharedSuiteEnabled),
           seatLimits: organization.seatLimits || null
         };
 
@@ -2999,9 +3034,9 @@ app.get('/api/org/current', requireAuth, async (req, res) => {
           role: membership.role
         };
 
-        orgContext.sellerSuiteEnabled = Boolean(organization.sellerSuiteEnabled);
+        orgContext.vendorSuiteEnabled = Boolean(organization.vendorSuiteEnabled);
         orgContext.buyerSuiteEnabled = Boolean(organization.buyerSuiteEnabled);
-        orgContext.engagementRoomsEnabled = Boolean(organization.engagementRoomsEnabled);
+        orgContext.sharedSuiteEnabled = Boolean(organization.sharedSuiteEnabled);
       }
     }
 
@@ -3164,9 +3199,9 @@ app.get('/api/org/admin/overview', requireAuth, requireOrgAdmin, async (req, res
         seatLimit: organization.seatLimit,
         seatsUsed,
         createdAt: organization.createdAt,
-        sellerSuiteEnabled: Boolean(organization.sellerSuiteEnabled),
+        vendorSuiteEnabled: Boolean(organization.vendorSuiteEnabled),
         buyerSuiteEnabled: Boolean(organization.buyerSuiteEnabled),
-        engagementRoomsEnabled: Boolean(organization.engagementRoomsEnabled),
+        sharedSuiteEnabled: Boolean(organization.sharedSuiteEnabled),
         seatLimits: organization.seatLimits || {},
         billing: sanitizeBillingProfile(organization.billingProfile || {})
       },
@@ -3185,9 +3220,9 @@ app.post('/api/org/admin/billing', requireAuth, requireOrgAdmin, validateBody(or
     if (payload.seatLimit !== undefined) req.organization.seatLimit = payload.seatLimit;
 
     req.organization.seatLimits = req.organization.seatLimits || {};
-    if (payload.sellerSeatLimit !== undefined) req.organization.seatLimits.sellerSuite = payload.sellerSeatLimit;
+    if (payload.sellerSeatLimit !== undefined) req.organization.seatLimits.vendorSuite = payload.sellerSeatLimit;
     if (payload.buyerSeatLimit !== undefined) req.organization.seatLimits.buyerSuite = payload.buyerSeatLimit;
-    if (payload.roomsSeatLimit !== undefined) req.organization.seatLimits.engagementRooms = payload.roomsSeatLimit;
+    if (payload.roomsSeatLimit !== undefined) req.organization.seatLimits.sharedSuite = payload.roomsSeatLimit;
 
     if (payload.billingDetails) {
       req.organization.billingProfile = normalizeBillingDetails(payload.billingDetails);
@@ -3217,9 +3252,9 @@ app.post('/api/org/admin/billing', requireAuth, requireOrgAdmin, validateBody(or
         tier: req.organization.tier,
         seatLimit: req.organization.seatLimit,
         seatsUsed,
-        sellerSuiteEnabled: Boolean(req.organization.sellerSuiteEnabled),
+        vendorSuiteEnabled: Boolean(req.organization.vendorSuiteEnabled),
         buyerSuiteEnabled: Boolean(req.organization.buyerSuiteEnabled),
-        engagementRoomsEnabled: Boolean(req.organization.engagementRoomsEnabled),
+        sharedSuiteEnabled: Boolean(req.organization.sharedSuiteEnabled),
         seatLimits: req.organization.seatLimits || {},
         billing: sanitizeBillingProfile(req.organization.billingProfile || {})
       }
@@ -3301,7 +3336,7 @@ app.patch(
 
       const ownerCount = await OrganizationMembership.countDocuments({
         organization: req.organization._id,
-        role: 'owner',
+        role: 'org_owner',
         status: { $ne: 'removed' }
       });
 
@@ -3310,8 +3345,8 @@ app.patch(
       const previousRole = membership.role;
       const previousStatus = membership.status;
 
-      if (membership.role === 'owner' && ownerCount <= 1) {
-        if (nextRole && nextRole !== 'owner') {
+      if (membership.role === 'org_owner' && ownerCount <= 1) {
+        if (nextRole && nextRole !== 'org_owner') {
           return res.status(400).json({ error: 'Cannot remove the last owner.' });
         }
         if (nextStatus && nextStatus === 'removed') {
@@ -3320,7 +3355,7 @@ app.patch(
       }
 
       const isSelf = membership.user && membership.user._id && membership.user._id.toString() === req.requestingUser._id.toString();
-      if (isSelf && membership.role === 'owner' && ownerCount <= 1 && nextRole && nextRole !== 'owner') {
+      if (isSelf && membership.role === 'org_owner' && ownerCount <= 1 && nextRole && nextRole !== 'org_owner') {
         return res.status(400).json({ error: 'You must keep at least one owner on the organization.' });
       }
 
@@ -3386,13 +3421,13 @@ app.delete('/api/org/admin/members/:membershipId', requireAuth, requireOrgAdmin,
       return res.status(403).json({ error: 'ORG_ADMIN_ONLY' });
     }
 
-    const ownerCount = await OrganizationMembership.countDocuments({
-      organization: req.organization._id,
-      role: 'owner',
-      status: { $ne: 'removed' }
-    });
+  const ownerCount = await OrganizationMembership.countDocuments({
+    organization: req.organization._id,
+    role: 'org_owner',
+    status: { $ne: 'removed' }
+  });
 
-    if (membership.role === 'owner' && ownerCount <= 1) {
+    if (membership.role === 'org_owner' && ownerCount <= 1) {
       return res.status(400).json({ error: 'Cannot remove the last owner.' });
     }
 
@@ -3528,7 +3563,7 @@ app.post(
   async (req, res) => {
     try {
       const { name, orgType, tier, productAccess, seatLimit, domains, workosOrganizationId } = req.validatedBody;
-      const sellerSuiteEnabled = req.validatedBody.sellerSuiteEnabled ?? false;
+      const vendorSuiteEnabled = req.validatedBody.vendorSuiteEnabled ?? false;
       const buyerSuiteEnabled = req.validatedBody.buyerSuiteEnabled ?? false;
       const slug = await generateUniqueOrgSlug(name);
       const normalizedProductAccess = normaliseProductAccess(productAccess);
@@ -3557,10 +3592,10 @@ app.post(
         domains: domains || [],
         workosOrganizationId: resolvedWorkOSId,
         createdBy: req.auth.uid,
-        sellerSuiteEnabled,
+        vendorSuiteEnabled,
         buyerSuiteEnabled,
         // Engagement Rooms is a part of the Seller suite
-        engagementRoomsEnabled: sellerSuiteEnabled
+        sharedSuiteEnabled: vendorSuiteEnabled
       });
 
       res.status(201).json({
@@ -3643,15 +3678,15 @@ app.patch(
       if (payload.platformAccess) organization.platformAccess = payload.platformAccess;
       if (payload.seatLimit !== undefined) organization.seatLimit = payload.seatLimit;
       if (payload.domains !== undefined) organization.domains = payload.domains;
-      if (payload.sellerSuiteEnabled !== undefined) {
-        organization.sellerSuiteEnabled = Boolean(payload.sellerSuiteEnabled);
+      if (payload.vendorSuiteEnabled !== undefined) {
+        organization.vendorSuiteEnabled = Boolean(payload.vendorSuiteEnabled);
       }
       if (payload.buyerSuiteEnabled !== undefined) {
         organization.buyerSuiteEnabled = Boolean(payload.buyerSuiteEnabled);
       }
-      // ALWAYS mirror engagementRoomsEnabled to sellerSuiteEnabled
-      if (payload.sellerSuiteEnabled !== undefined) {
-        organization.engagementRoomsEnabled = organization.sellerSuiteEnabled;
+      // ALWAYS mirror sharedSuiteEnabled to vendorSuiteEnabled
+      if (payload.vendorSuiteEnabled !== undefined) {
+        organization.sharedSuiteEnabled = organization.vendorSuiteEnabled;
       }
       if (payload.workosOrganizationId !== undefined) {
         organization.workosOrganizationId = payload.workosOrganizationId || undefined;
@@ -3713,9 +3748,9 @@ app.patch(
           seatLimit: organization.seatLimit,
           domains: organization.domains,
           workosOrganizationId: organization.workosOrganizationId,
-          sellerSuiteEnabled: organization.sellerSuiteEnabled,
+          vendorSuiteEnabled: organization.vendorSuiteEnabled,
           buyerSuiteEnabled: organization.buyerSuiteEnabled,
-          engagementRoomsEnabled: organization.engagementRoomsEnabled,
+          sharedSuiteEnabled: organization.sharedSuiteEnabled,
           seatLimits: organization.seatLimits
         }
       });
@@ -3767,9 +3802,9 @@ app.patch(
           seatLimit: organization.seatLimit,
           domains: organization.domains,
           workosOrganizationId: organization.workosOrganizationId,
-          sellerSuiteEnabled: organization.sellerSuiteEnabled,
+          vendorSuiteEnabled: organization.vendorSuiteEnabled,
           buyerSuiteEnabled: organization.buyerSuiteEnabled,
-          engagementRoomsEnabled: organization.engagementRoomsEnabled,
+          sharedSuiteEnabled: organization.sharedSuiteEnabled,
           seatLimits: organization.seatLimits
         }
       });
@@ -3843,17 +3878,17 @@ app.post('/api/orgs', requireAuth, validateBody(organizationCreateSchema), async
       domains: payload.domains || [],
       seatLimit: payload.seatLimit || 10,
       seatLimits: {
-        sellerSuite: payload.seatLimit || 10,
+        vendorSuite: payload.seatLimit || 10,
         buyerSuite: payload.seatLimit || 10,
-        engagementRooms: payload.seatLimit || 10
+        sharedSuite: payload.seatLimit || 10
       },
       tier,
       platformAccess: productAccess,
       productAccess,
       orgType,
-      sellerSuiteEnabled: tier === 'business',
+      vendorSuiteEnabled: tier === 'business',
       buyerSuiteEnabled: tier === 'business',
-      engagementRoomsEnabled: tier === 'business',
+      sharedSuiteEnabled: tier === 'business',
       workosOrganizationId,
       createdBy: req.auth.uid
     });
@@ -3861,9 +3896,12 @@ app.post('/api/orgs', requireAuth, validateBody(organizationCreateSchema), async
     await OrganizationMembership.create({
       organization: organization._id,
       user: req.auth.uid,
-      role: 'owner',
+      role: 'org_owner',
       status: 'active',
-      roleOrigin: 'app'
+      roleOrigin: 'app',
+      vendorSuiteEnabled: organization.vendorSuiteEnabled,
+      buyerSuiteEnabled: organization.buyerSuiteEnabled,
+      sharedSuiteEnabled: organization.sharedSuiteEnabled
     });
 
     const user = await User.findById(req.auth.uid);
@@ -3883,7 +3921,7 @@ app.post('/api/orgs', requireAuth, validateBody(organizationCreateSchema), async
         tier: organization.tier,
         seatLimit: organization.seatLimit,
         seatsUsed,
-        role: 'owner'
+        role: 'org_owner'
       }
     });
   } catch (err) {
@@ -3892,7 +3930,7 @@ app.post('/api/orgs', requireAuth, validateBody(organizationCreateSchema), async
   }
 });
 
-app.get('/api/orgs/:orgId', requireAuth, requireOrgRole('viewer'), async (req, res) => {
+app.get('/api/orgs/:orgId', requireAuth, requireOrgRole('guest'), async (req, res) => {
   try {
     const seatsUsed = await OrganizationMembership.countActiveSeats(req.organization._id);
     res.json({
@@ -3913,7 +3951,7 @@ app.get('/api/orgs/:orgId', requireAuth, requireOrgRole('viewer'), async (req, r
   }
 });
 
-app.put('/api/orgs/:orgId', requireAuth, requireOrgRole('owner'), validateBody(organizationUpdateSchema), async (req, res) => {
+app.put('/api/orgs/:orgId', requireAuth, requireOrgRole('org_owner'), validateBody(organizationUpdateSchema), async (req, res) => {
   try {
     const requestingUser = req.requestingUser || (await User.findById(req.auth.uid));
     if (req.organization.tier === 'business' && (!requestingUser || requestingUser.isStaff !== true)) {
@@ -3955,7 +3993,7 @@ app.put('/api/orgs/:orgId', requireAuth, requireOrgRole('owner'), validateBody(o
   }
 });
 
-app.get('/api/orgs/:orgId/members', requireAuth, requireOrgRole('admin'), async (req, res) => {
+app.get('/api/orgs/:orgId/members', requireAuth, requireOrgRole('org_admin'), async (req, res) => {
   try {
     const members = await OrganizationMembership.find({ organization: req.organization._id }).populate({
       path: 'user',
@@ -3981,7 +4019,7 @@ app.get('/api/orgs/:orgId/members', requireAuth, requireOrgRole('admin'), async 
 app.post(
   '/api/orgs/:orgId/members',
   requireAuth,
-  requireOrgRole('admin'),
+  requireOrgRole('org_admin'),
   validateBody(membershipCreateSchema),
   async (req, res) => {
     try {
@@ -3990,6 +4028,13 @@ app.post(
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
+
+      const vendorSuiteEnabled =
+        req.validatedBody.vendorSuiteEnabled ?? Boolean(req.organization.vendorSuiteEnabled);
+      const buyerSuiteEnabled =
+        req.validatedBody.buyerSuiteEnabled ?? Boolean(req.organization.buyerSuiteEnabled);
+      const sharedSuiteEnabled =
+        req.validatedBody.sharedSuiteEnabled ?? Boolean(req.organization.sharedSuiteEnabled);
 
       let membership = await OrganizationMembership.findOne({ organization: req.organization._id, user: user._id });
       if (!membership) {
@@ -4001,6 +4046,9 @@ app.post(
       }
 
       if (role) membership.role = role;
+      membership.vendorSuiteEnabled = vendorSuiteEnabled;
+      membership.buyerSuiteEnabled = buyerSuiteEnabled;
+      membership.sharedSuiteEnabled = sharedSuiteEnabled;
 
       const isActivating = membership.isNew || membership.status !== 'active';
       if (isActivating) {
@@ -4038,7 +4086,7 @@ app.post(
 app.put(
   '/api/orgs/:orgId/members/:memberId',
   requireAuth,
-  requireOrgRole('admin'),
+  requireOrgRole('org_admin'),
   validateBody(membershipUpdateSchema),
   async (req, res) => {
     try {
@@ -4051,10 +4099,10 @@ app.put(
 
       const payload = req.validatedBody;
 
-      if (membership.role === 'owner' && payload.role && payload.role !== 'owner') {
+      if (membership.role === 'org_owner' && payload.role && payload.role !== 'org_owner') {
         const otherOwners = await OrganizationMembership.countDocuments({
           organization: req.organization._id,
-          role: 'owner',
+          role: 'org_owner',
           status: 'active',
           _id: { $ne: membership._id }
         });
@@ -4074,10 +4122,10 @@ app.put(
 
       if (payload.role) membership.role = payload.role;
       if (payload.status) {
-        if (membership.role === 'owner' && payload.status !== 'active') {
+        if (membership.role === 'org_owner' && payload.status !== 'active') {
           const otherOwners = await OrganizationMembership.countDocuments({
             organization: req.organization._id,
-            role: 'owner',
+            role: 'org_owner',
             status: 'active',
             _id: { $ne: membership._id }
           });
@@ -4106,7 +4154,7 @@ app.put(
   }
 );
 
-app.delete('/api/orgs/:orgId/members/:memberId', requireAuth, requireOrgRole('admin'), async (req, res) => {
+app.delete('/api/orgs/:orgId/members/:memberId', requireAuth, requireOrgRole('org_admin'), async (req, res) => {
   try {
     const membership = await OrganizationMembership.findOne({
       _id: req.params.memberId,
@@ -4114,10 +4162,10 @@ app.delete('/api/orgs/:orgId/members/:memberId', requireAuth, requireOrgRole('ad
     });
     if (!membership) return res.status(404).json({ error: 'Member not found' });
 
-    if (membership.role === 'owner') {
+    if (membership.role === 'org_owner') {
       const otherOwners = await OrganizationMembership.countDocuments({
         organization: req.organization._id,
-        role: 'owner',
+        role: 'org_owner',
         status: 'active',
         _id: { $ne: membership._id }
       });
@@ -4137,7 +4185,7 @@ app.delete('/api/orgs/:orgId/members/:memberId', requireAuth, requireOrgRole('ad
 app.post(
   '/api/orgs/:orgId/workos/admin-portal-link',
   requireAuth,
-  requireOrgRole('admin'),
+  requireOrgRole('org_admin'),
   async (req, res) => {
     if (!workosClient) {
       return res.status(500).json({ error: 'WorkOS is not configured.' });

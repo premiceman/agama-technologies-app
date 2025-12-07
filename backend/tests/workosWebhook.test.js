@@ -168,7 +168,7 @@ describe('WorkOS webhook endpoint', () => {
     expect(org).toBeTruthy();
     expect(user).toBeTruthy();
     expect(membership).toBeTruthy();
-    expect(membership.role).toBe('admin');
+    expect(membership.role).toBe('org_admin');
     expect(membership.status).toBe('active');
     expect(membership.roleOrigin).toBe('idp');
   });
@@ -229,7 +229,7 @@ describe('WorkOS webhook endpoint', () => {
     const user = await User.findOne({ workosUserId: 'user_update' });
     const membership = await OrganizationMembership.findOne({ organization: org._id, user: user._id });
 
-    expect(membership.role).toBe('viewer');
+    expect(membership.role).toBe('guest');
     expect(membership.status).toBe('active');
     expect(membership.roleOrigin).toBe('idp');
   });
