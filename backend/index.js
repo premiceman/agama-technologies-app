@@ -496,6 +496,25 @@ function buildSuiteEntitlements(user, orgContext, membership) {
   };
 }
 
+function deriveActivePersona(user, permissions) {
+  const basePersona = user?.persona || 'dual';
+
+  if (basePersona === 'vendor') return 'seller';
+  if (basePersona === 'buyer') return 'buyer';
+
+  if (permissions?.buyerSuiteAccess && permissions?.vendorSuiteAccess) return 'shared';
+  if (permissions?.buyerSuiteAccess) return 'buyer';
+  if (permissions?.vendorSuiteAccess) return 'seller';
+
+  return 'shared';
+}
+
+function deriveThemeHints(activePersona) {
+  if (activePersona === 'buyer') return { primary: 'buyer', persona: 'buyer' };
+  if (activePersona === 'seller') return { primary: 'seller', persona: 'seller' };
+  return { primary: 'shared', persona: 'shared' };
+}
+
 function recommendLicensePlan(persona, goals = []) {
   if (persona === 'consultant') return 'consulting-enterprise';
   if (persona === 'vendor' || persona === 'both') return 'vendor-enterprise';
@@ -2192,6 +2211,82 @@ app.post('/api/auth/logout', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('POST logout error', err);
     return res.status(500).json({ error: 'Unable to logout' });
+  }
+});
+
+app.get('/api/me/context', requireAuth, async (req, res) => {
+  try {
+    const user = req.requestingUser || (await User.findById(req.auth.uid));
+    if (!user) return res.status(404).json({ error: 'Not found' });
+
+    const requestedOrgId = req.query.orgId || req.auth.orgId || user.defaultOrganization;
+    let organization = null;
+    let membership = null;
+
+    if (requestedOrgId) {
+      organization = await Organization.findById(requestedOrgId);
+
+      if (organization) {
+        membership = await OrganizationMembership.findOne({
+          organization: organization._id,
+          user: user._id,
+          status: 'active'
+        });
+
+        if (!membership) {
+          return res.status(403).json({ error: 'No active membership for this organization.' });
+        }
+      }
+    }
+
+    const effectivePermissions = organization && membership
+      ? getEffectivePermissions(user, organization, membership)
+      : null;
+
+    const suiteEntitlements = effectivePermissions
+      ? effectivePermissions.entitlements
+      : { vendorSuite: false, buyerSuite: false, sharedSuite: false };
+
+    const activePersona = deriveActivePersona(user, effectivePermissions);
+    const themeHints = deriveThemeHints(activePersona);
+
+    const activeOrganization =
+      organization && membership
+        ? {
+            id: organization._id.toString(),
+            name: organization.name,
+            slug: organization.slug,
+            tier: organization.tier,
+            orgType: organization.orgType || 'both',
+            role: membership.role,
+            suites: {
+              organization: {
+                vendorSuiteEnabled: Boolean(organization.vendorSuiteEnabled),
+                buyerSuiteEnabled: Boolean(organization.buyerSuiteEnabled),
+                sharedSuiteEnabled: Boolean(organization.sharedSuiteEnabled)
+              },
+              membership: {
+                vendorSuiteEnabled: Boolean(membership.vendorSuiteEnabled),
+                buyerSuiteEnabled: Boolean(membership.buyerSuiteEnabled),
+                sharedSuiteEnabled: Boolean(membership.sharedSuiteEnabled)
+              }
+            }
+          }
+        : null;
+
+    return res.json({
+      ok: true,
+      user: user.public(),
+      activeOrganization,
+      orgRole: membership?.role || null,
+      suiteEntitlements,
+      effectivePermissions,
+      activePersona,
+      themeHints
+    });
+  } catch (err) {
+    console.error('Context fetch error', err);
+    return res.status(500).json({ error: 'Unable to load context' });
   }
 });
 

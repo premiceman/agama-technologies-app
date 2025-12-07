@@ -46,15 +46,17 @@ async function requireAuth(req, res, next) {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
-    const shouldRefresh = !decoded.exp || decoded.exp * 1000 - Date.now() < SESSION_MS / 2;
+    const orgId = decoded.orgId || (user.defaultOrganization ? user.defaultOrganization.toString() : null);
+    const shouldRefresh =
+      !decoded.exp || decoded.exp * 1000 - Date.now() < SESSION_MS / 2 || decoded.orgId !== orgId;
     if (shouldRefresh) {
       issueTokenCookie(res, {
         uid: decoded.uid,
-        orgId: decoded.orgId || null
+        orgId
       });
     }
 
-    req.auth = decoded;
+    req.auth = { ...decoded, orgId };
     req.requestingUser = user;
     return next();
   } catch (err) {
