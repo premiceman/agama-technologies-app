@@ -209,16 +209,48 @@
               </div>
               <form id="billingForm" class="row g-3">
                 <div class="col-md-4">
-                  <label class="form-label" for="seatLimitInput">Total seats</label>
-                  <input class="form-control" type="number" min="1" id="seatLimitInput" />
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label" for="sellerSeatInput">Seller seats</label>
-                  <input class="form-control" type="number" min="0" id="sellerSeatInput" />
+                  <label class="form-label" for="vendorSeatInput">Vendor seats</label>
+                  <div class="input-group">
+                    <span class="input-group-text">$150/seat</span>
+                    <input class="form-control" type="number" min="0" id="vendorSeatInput" />
+                  </div>
                 </div>
                 <div class="col-md-4">
                   <label class="form-label" for="buyerSeatInput">Buyer seats</label>
-                  <input class="form-control" type="number" min="0" id="buyerSeatInput" />
+                  <div class="input-group">
+                    <span class="input-group-text">$190/seat</span>
+                    <input class="form-control" type="number" min="0" id="buyerSeatInput" />
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" for="bothSeatInput">Both seats</label>
+                  <div class="input-group">
+                    <span class="input-group-text">$250/seat</span>
+                    <input class="form-control" type="number" min="0" id="bothSeatInput" />
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="glass p-3 rounded-3 h-100">
+                    <div class="d-flex justify-content-between mb-1">
+                      <div class="text-fg-3">Total seats</div>
+                      <strong id="totalSeatCount">0</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                      <div class="text-fg-3">Total monthly amount</div>
+                      <strong id="totalMonthlyAmount">$0</strong>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div id="contactSalesNotice" class="alert alert-warning h-100 d-none" role="alert">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                      <div>
+                        <div class="fw-semibold">More than 200 seats</div>
+                        <div class="small mb-2">Contact our sales team to finalize larger seat allocations.</div>
+                      </div>
+                      <button class="btn btn-outline-warning btn-sm" type="button" id="requestSalesContact">Request Sales Contact</button>
+                    </div>
+                  </div>
                 </div>
                 <div class="col-md-8">
                   <label class="form-label" for="billingNameInput">Billing contact</label>
@@ -250,7 +282,7 @@
                 </div>
                 <div class="col-12 d-flex justify-content-between align-items-center">
                   <div class="small text-fg-3" id="billingFeedback">Monthly billing is applied to all suites.</div>
-                  <button class="btn btn-primary" type="submit">Save</button>
+                  <button class="btn btn-primary" id="billingSaveButton" type="submit">Save</button>
                 </div>
               </form>
             </div>

@@ -7,13 +7,25 @@ async function fetchOrgOverview() {
 
 async function updateOrgBilling(payload) {
   const res = await fetch('/api/org/admin/billing', {
-    method: 'POST',
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
     body: JSON.stringify(payload)
   });
   if (!res.ok) throw new Error('Unable to update billing');
   return res.json();
+}
+
+async function requestSalesContact() {
+  try {
+    await fetch('/api/org/admin/billing/contact-sales', { method: 'POST', credentials: 'include' });
+    const notice = document.getElementById('contactSalesNotice');
+    if (notice) notice.classList.add('alert-success');
+    const feedback = document.getElementById('billingFeedback');
+    if (feedback) feedback.textContent = 'We have logged your request. Our sales team will contact you soon.';
+  } catch (err) {
+    console.error('Unable to request sales contact', err);
+  }
 }
 
 function setText(id, text) {
@@ -34,7 +46,11 @@ function formatDate(value) {
 }
 
 function formatSeatLabel(organization) {
-  const total = organization.seatLimit || 0;
+  const total = (organization.seatLimits?.vendorSuite || 0)
+    + (organization.seatLimits?.buyerSuite || 0)
+    + (organization.seatLimits?.bothSuites || 0)
+    || organization.seatLimit
+    || 0;
   const used = organization.seatsUsed || 0;
   return `${used} / ${total} seats`;
 }
@@ -55,14 +71,15 @@ function populateOverview(data) {
   document.getElementById('seatUsage').textContent = formatSeatLabel(org);
   document.getElementById('suiteBadge').textContent = formatSuiteStatus(org);
 
-  const sellerLimit = org.seatLimits?.sellerSuite || org.seatLimit || 0;
-  const buyerLimit = org.seatLimits?.buyerSuite || org.seatLimit || 0;
-  setText('billingSeatMix', `${sellerLimit} seller • ${buyerLimit} buyer`);
+  const vendorLimit = org.seatLimits?.vendorSuite || 0;
+  const buyerLimit = org.seatLimits?.buyerSuite || 0;
+  const bothLimit = org.seatLimits?.bothSuites || 0;
+  setText('billingSeatMix', `${vendorLimit} vendor • ${buyerLimit} buyer • ${bothLimit} both`);
   setText('billingSeatHint', 'Seat mix across suites');
 
-  document.getElementById('seatLimitInput').value = org.seatLimit || 10;
-  document.getElementById('sellerSeatInput').value = org.seatLimits?.sellerSuite || org.seatLimit || 0;
-  document.getElementById('buyerSeatInput').value = org.seatLimits?.buyerSuite || org.seatLimit || 0;
+  document.getElementById('vendorSeatInput').value = vendorLimit;
+  document.getElementById('buyerSeatInput').value = buyerLimit;
+  document.getElementById('bothSeatInput').value = bothLimit;
 
   const billing = org.billing || {};
   document.getElementById('billingNameInput').value = billing.billingName || '';
@@ -84,6 +101,8 @@ function populateOverview(data) {
   const payable = billing.totalPayable ?? billing.outstandingBalance ?? billing.currentBalance;
   setText('totalAmountDue', formatCurrency(payable));
   setText('totalAmountHint', payable ? 'Includes taxes & adjustments' : 'No outstanding balance');
+
+  updateBillingSummary();
 }
 
 function toggleAccess(isAllowed) {
@@ -114,16 +133,69 @@ function bindLogout() {
   });
 }
 
+function getSeatValues() {
+  return {
+    vendorSeats: Number(document.getElementById('vendorSeatInput').value || 0),
+    buyerSeats: Number(document.getElementById('buyerSeatInput').value || 0),
+    bothSeats: Number(document.getElementById('bothSeatInput').value || 0)
+  };
+}
+
+function updateBillingSummary() {
+  const { vendorSeats, buyerSeats, bothSeats } = getSeatValues();
+  const totalSeats = vendorSeats + buyerSeats + bothSeats;
+  const totalMonthlyUSD = vendorSeats * 150 + buyerSeats * 190 + bothSeats * 250;
+
+  setText('totalSeatCount', totalSeats);
+  setText('totalMonthlyAmount', formatCurrency(totalMonthlyUSD));
+
+  const saveButton = document.getElementById('billingSaveButton');
+  const contactNotice = document.getElementById('contactSalesNotice');
+  const feedback = document.getElementById('billingFeedback');
+
+  if (!saveButton || !feedback || !contactNotice) return;
+
+  saveButton.disabled = false;
+  saveButton.classList.remove('d-none');
+  contactNotice.classList.add('d-none');
+
+  if (totalSeats === 0) {
+    saveButton.disabled = true;
+    feedback.textContent = 'Add at least one seat to continue.';
+  } else if (totalSeats > 200) {
+    saveButton.classList.add('d-none');
+    contactNotice.classList.remove('d-none');
+    feedback.textContent = 'Over 200 seats require assistance from our sales team.';
+  } else {
+    feedback.textContent = 'Monthly billing is applied to all suites.';
+  }
+}
+
 function bindBillingForm() {
   const form = document.getElementById('billingForm');
   if (!form) return;
   const feedback = document.getElementById('billingFeedback');
   form.addEventListener('submit', async event => {
     event.preventDefault();
+    const { vendorSeats, buyerSeats, bothSeats } = getSeatValues();
+    const totalSeats = vendorSeats + buyerSeats + bothSeats;
+
+    if (totalSeats === 0) {
+      feedback.textContent = 'Add at least one seat to continue.';
+      return;
+    }
+
+    if (totalSeats > 200) {
+      feedback.textContent = 'Over 200 seats? Contact sales to proceed.';
+      return;
+    }
+
     const payload = {
-      seatLimit: Number(document.getElementById('seatLimitInput').value || 0),
-      sellerSeatLimit: Number(document.getElementById('sellerSeatInput').value || 0),
-      buyerSeatLimit: Number(document.getElementById('buyerSeatInput').value || 0),
+      seatLimits: {
+        vendorSuite: vendorSeats,
+        buyerSuite: buyerSeats,
+        bothSuites: bothSeats
+      },
       billingDetails: {
         billingName: document.getElementById('billingNameInput').value,
         email: document.getElementById('billingEmailInput').value,
@@ -145,6 +217,17 @@ function bindBillingForm() {
       feedback.textContent = 'Could not update billing right now.';
     }
   });
+
+  const seatInputs = ['vendorSeatInput', 'buyerSeatInput', 'bothSeatInput'];
+  seatInputs.forEach(id => {
+    const input = document.getElementById(id);
+    if (input) {
+      input.addEventListener('input', updateBillingSummary);
+    }
+  });
+
+  const contactButton = document.getElementById('requestSalesContact');
+  if (contactButton) contactButton.addEventListener('click', requestSalesContact);
 }
 
 async function init() {
