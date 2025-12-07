@@ -2330,6 +2330,16 @@ app.get('/api/auth/workos/callback', async (req, res) => {
     }
     let shouldSave = false;
 
+    if (user.persona === null || user.persona === undefined) {
+      user.persona = 'both';
+      shouldSave = true;
+    }
+
+    if (user.persona === 'dual') {
+      user.persona = 'both';
+      shouldSave = true;
+    }
+
     const normalizedPersona = normalizePersona(user.persona);
     if (user.persona !== normalizedPersona) {
       user.persona = normalizedPersona;
