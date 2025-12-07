@@ -33,6 +33,7 @@ const EngagementRoomFile = require('./models/EngagementRoomFile');
 const EngagementRoomFileVersion = require('./models/EngagementRoomFileVersion');
 const EngagementRoomFileComment = require('./models/EngagementRoomFileComment');
 const AuditEvent = require('./models/AuditEvent');
+const RoomEvent = require('./models/RoomEvent');
 const { getDashboardOverview } = require('./services/dashboard');
 const { requireOrgRole, getEffectivePermissions } = require('./middleware/orgAuth');
 const {
@@ -85,6 +86,8 @@ async function purgeUserOwnedData(user) {
     EngagementRoomIssueComment.deleteMany({ author: userId }),
     AuditEvent.deleteMany({ actorUser: userId }),
     AuditEvent.deleteMany({ targetUser: userId }),
+    RoomEvent.deleteMany({ actorUser: userId }),
+    RoomEvent.deleteMany({ targetUser: userId }),
     RevenueAccount.deleteMany({ userId }),
     ProcurementVendor.deleteMany({ userId })
   ]);
@@ -678,6 +681,12 @@ async function createOrgForOnboarding({ user, suiteSelection = {}, orgDraft = {}
 
 const AGAMA_ADMIN_UNLOCK_COOKIE = 'agama_admin_unlocked';
 const AGAMA_ADMIN_UNLOCK_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours per session
+const ROOM_LIFECYCLE_TRANSITIONS = {
+  draft: ['active', 'archived'],
+  active: ['closed', 'archived'],
+  closed: ['archived'],
+  archived: []
+};
 
 function isAgamaStaff(user) {
   if (!user) return false;
@@ -732,6 +741,102 @@ async function recordAuditEvent({
     console.error('Audit log failed', err);
     return null;
   }
+}
+
+function deriveRoomVisibility(room, membership, explicitVisibility) {
+  if (explicitVisibility) return explicitVisibility;
+  const orgId = membership?.organization?._id || membership?.organization || null;
+  if (room?.vendorOrg && orgId && room.vendorOrg.toString() === orgId.toString()) {
+    return 'vendor_only';
+  }
+  if (room?.buyerOrg && orgId && room.buyerOrg.toString() === orgId.toString()) {
+    return 'buyer_only';
+  }
+  return 'shared';
+}
+
+async function recordRoomEvent({
+  type,
+  room,
+  actorUser,
+  actorOrganization = null,
+  targetUser = null,
+  targetOrganization = null,
+  visibility = 'shared',
+  metadata = {}
+}) {
+  try {
+    if (!type || !room || !actorUser) return null;
+    return await RoomEvent.create({
+      type,
+      room,
+      actorUser,
+      actorOrganization,
+      targetUser,
+      targetOrganization,
+      visibility,
+      metadata
+    });
+  } catch (err) {
+    console.error('Room event log failed', err);
+    return null;
+  }
+}
+
+async function logRoomMutation({
+  type,
+  room,
+  membership = null,
+  actorUser,
+  targetUser = null,
+  targetOrganization = null,
+  visibility = null,
+  metadata = {}
+}) {
+  const actorOrganization = membership?.organization?._id || membership?.organization || null;
+  const roomId = room?._id || room;
+  const resolvedVisibility = deriveRoomVisibility(room, membership, visibility);
+
+  await Promise.all([
+    recordAuditEvent({
+      type,
+      actorUser,
+      actorOrganization,
+      targetUser,
+      targetOrganization,
+      targetRoom: roomId,
+      metadata
+    }),
+    recordRoomEvent({
+      type,
+      room: roomId,
+      actorUser,
+      actorOrganization,
+      targetUser,
+      targetOrganization,
+      visibility: resolvedVisibility,
+      metadata
+    })
+  ]);
+}
+
+async function transitionRoomStatus(room, nextStatus, actorUser, membership) {
+  const previousStatus = room.status || 'draft';
+  if (previousStatus === nextStatus) return room;
+  const allowed = ROOM_LIFECYCLE_TRANSITIONS[previousStatus] || [];
+  if (!allowed.includes(nextStatus)) {
+    throw new Error('INVALID_ROOM_STATUS_TRANSITION');
+  }
+  room.status = nextStatus;
+  await room.save();
+  await logRoomMutation({
+    type: 'room.lifecycle.changed',
+    room,
+    membership,
+    actorUser,
+    metadata: { from: previousStatus, to: nextStatus }
+  });
+  return room;
 }
 
 function serializeAuditEvent(event) {
@@ -4439,11 +4544,10 @@ app.post('/api/rooms', requireAuth, validateBody(roomCreateSchema), async (req, 
       revenueAccount: payload.revenueAccount,
       procurementVendor: payload.procurementVendor,
       createdBy: req.auth.uid,
-      status: 'active',
       lastActivityAt: new Date()
     });
 
-    await EngagementRoomMembership.create({
+    const creatorMembership = await EngagementRoomMembership.create({
       room: room._id,
       user: req.auth.uid,
       organization: membershipOrg._id,
@@ -4451,11 +4555,11 @@ app.post('/api/rooms', requireAuth, validateBody(roomCreateSchema), async (req, 
       isGuest: user && user.licenseTier === 'guest'
     });
 
-    await recordAuditEvent({
+    await logRoomMutation({
       type: 'room.created',
+      room,
+      membership: creatorMembership,
       actorUser: req.auth.uid,
-      actorOrganization: membershipOrg._id,
-      targetRoom: room._id,
       targetOrganization: membershipOrg._id,
       metadata: {
         title: room.title,
@@ -4463,6 +4567,8 @@ app.post('/api/rooms', requireAuth, validateBody(roomCreateSchema), async (req, 
         buyerOrg: buyerOrg._id
       }
     });
+
+    await transitionRoomStatus(room, 'active', req.auth.uid, creatorMembership);
 
     res.status(201).json({
       ok: true,
@@ -4537,6 +4643,14 @@ app.post('/api/rooms/:roomId/issues', requireAuth, validateBody(issueCreateSchem
     room.lastActivityAt = new Date();
     await room.save();
 
+    await logRoomMutation({
+      type: 'room.issue.created',
+      room,
+      membership,
+      actorUser: req.auth.uid,
+      metadata: { issueId: issue._id, status: issue.status, title: issue.title }
+    });
+
     res.status(201).json({ ok: true, issue: serializeIssue(issue) });
   } catch (err) {
     console.error('Create issue error', err);
@@ -4577,6 +4691,14 @@ app.patch('/api/rooms/:roomId/issues/:issueId', requireAuth, validateBody(issueU
 
     room.lastActivityAt = new Date();
     await room.save();
+
+    await logRoomMutation({
+      type: 'room.issue.updated',
+      room,
+      membership,
+      actorUser: req.auth.uid,
+      metadata: { issueId: issue._id, status: issue.status, title: issue.title }
+    });
 
     res.json({ ok: true, issue: serializeIssue(issue) });
   } catch (err) {
@@ -4622,6 +4744,14 @@ app.post(
 
       room.lastActivityAt = new Date();
       await room.save();
+
+      await logRoomMutation({
+        type: 'room.message.created',
+        room,
+        membership,
+        actorUser: req.auth.uid,
+        metadata: { messageId: message._id, messageType: message.type }
+      });
 
       res.status(201).json({ ok: true, message: serializeMessage(message) });
     } catch (err) {
@@ -4692,6 +4822,14 @@ app.post(
       room.lastActivityAt = new Date();
       await room.save();
 
+      await logRoomMutation({
+        type: 'room.deliverable.created',
+        room,
+        membership,
+        actorUser: req.auth.uid,
+        metadata: { deliverableId: deliverable._id, status: deliverable.status, title: deliverable.title }
+      });
+
       res.status(201).json({ ok: true, deliverable: serializeDeliverable(deliverable) });
     } catch (err) {
       console.error('Create deliverable error', err);
@@ -4759,6 +4897,14 @@ app.patch(
       room.lastActivityAt = new Date();
       await room.save();
 
+      await logRoomMutation({
+        type: 'room.deliverable.updated',
+        room,
+        membership,
+        actorUser: req.auth.uid,
+        metadata: { deliverableId: deliverable._id, status: deliverable.status, title: deliverable.title }
+      });
+
       res.json({ ok: true, deliverable: serializeDeliverable(deliverable) });
     } catch (err) {
       console.error('Update deliverable error', err);
@@ -4798,6 +4944,14 @@ app.post(
 
       room.lastActivityAt = new Date();
       await room.save();
+
+      await logRoomMutation({
+        type: 'room.issue.comment.created',
+        room,
+        membership,
+        actorUser: req.auth.uid,
+        metadata: { issueId: issue._id, commentId: comment._id }
+      });
 
       res.status(201).json({ ok: true, comment: serializeIssueComment(comment) });
     } catch (err) {
@@ -4862,6 +5016,14 @@ app.post('/api/rooms/:roomId/files', requireAuth, validateBody(fileCreateSchema)
 
     room.lastActivityAt = new Date();
     await room.save();
+
+    await logRoomMutation({
+      type: 'room.file.created',
+      room,
+      membership,
+      actorUser: req.auth.uid,
+      metadata: { fileId: file._id, versionId: version._id, name: file.name }
+    });
 
     res.status(201).json({ ok: true, file: serializeFile(file, version) });
   } catch (err) {
@@ -4977,6 +5139,14 @@ app.post(
 
       room.lastActivityAt = new Date();
       await room.save();
+
+      await logRoomMutation({
+        type: 'room.file.comment.created',
+        room,
+        membership,
+        actorUser: req.auth.uid,
+        metadata: { fileId: file._id, commentId: comment._id, versionId: version ? version._id : null }
+      });
 
       res.status(201).json({ ok: true, comment: serializeFileComment(comment) });
     } catch (err) {
@@ -5114,6 +5284,16 @@ app.post(
       roomMembership.isGuest = targetUser.licenseTier === 'guest';
       await roomMembership.save();
 
+      await logRoomMutation({
+        type: isNew ? 'room.member.added' : 'room.member.updated',
+        room,
+        membership,
+        actorUser: req.auth.uid,
+        targetUser: targetUser._id,
+        targetOrganization: payload.organization,
+        metadata: { memberId: roomMembership._id, role: roomMembership.role, isGuest: roomMembership.isGuest }
+      });
+
       res.status(isNew ? 201 : 200).json({ ok: true, member: serializeRoomMembership(roomMembership) });
     } catch (err) {
       console.error('Add room member error', err);
@@ -5154,6 +5334,16 @@ app.delete('/api/rooms/:roomId/members/:userId', requireAuth, async (req, res) =
     }
 
     await targetMembership.deleteOne();
+
+    await logRoomMutation({
+      type: 'room.member.removed',
+      room,
+      membership,
+      actorUser: req.auth.uid,
+      targetUser: targetMembership.user,
+      targetOrganization: targetMembership.organization,
+      metadata: { memberId: targetMembership._id, role: targetMembership.role }
+    });
     res.json({ ok: true });
   } catch (err) {
     console.error('Remove room member error', err);
@@ -5210,6 +5400,20 @@ app.post(
         isGuestInvite: Boolean(payload.isGuestInvite)
       });
 
+      await logRoomMutation({
+        type: 'room.invite.created',
+        room,
+        membership,
+        actorUser: req.auth.uid,
+        targetOrganization: payload.organization,
+        metadata: {
+          inviteId: invite._id,
+          email: invite.email,
+          role: invite.role,
+          isGuestInvite: invite.isGuestInvite
+        }
+      });
+
       res.status(201).json({ ok: true, invite: serializeRoomInvite(invite) });
     } catch (err) {
       console.error('Create room invite error', err);
@@ -5263,6 +5467,16 @@ app.post('/api/room-invites/:token/accept', requireAuth, async (req, res) => {
 
     invite.status = 'accepted';
     await invite.save();
+
+    await logRoomMutation({
+      type: 'room.invite.accepted',
+      room,
+      membership,
+      actorUser: user._id,
+      targetOrganization: invite.organization,
+      targetUser: user._id,
+      metadata: { inviteId: invite._id, role: membership.role, isGuestInvite: invite.isGuestInvite }
+    });
 
     res.json({ ok: true, membership: serializeRoomMembership(membership) });
   } catch (err) {
