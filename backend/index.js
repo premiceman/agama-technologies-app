@@ -341,13 +341,12 @@ const PLATFORM_DEFINITIONS = [
 
 const PLATFORM_IDS = new Set(PLATFORM_DEFINITIONS.map(platform => platform.id));
 const PERSONAL_ALLOWED_PLATFORMS = new Set(['valuesphere']);
-const LICENSE_OPTIONS = ['personal', 'business', 'guest'];
 const LICENSE_PLANS = ['free-personal', 'vendor-enterprise', 'procurement-enterprise', 'consulting-enterprise'];
 const FREE_ASSESSMENT_LIMIT = 3;
 
 function computeAssessmentLimit(user) {
   if (!user) return null;
-  if (user.licenseTier === 'personal') return user.valueAssessmentLimit || FREE_ASSESSMENT_LIMIT;
+  if (!user.defaultOrganization) return user.valueAssessmentLimit || FREE_ASSESSMENT_LIMIT;
   return null;
 }
 
@@ -468,18 +467,22 @@ function decodeJwtPayload(token) {
 
 function computeEffectiveLicense(user, organizationContext) {
   if (!user) return { tier: 'guest', homeOrg: null };
-  if (user.licenseTier === 'guest') return { tier: 'guest', homeOrg: null };
 
-  if (user.licenseTier === 'business' && organizationContext && organizationContext.tier === 'business') {
-    const { id, name, tier, orgType, role } = organizationContext;
-    return { tier: 'business', homeOrg: { id, name, tier, orgType, role } };
+  if (organizationContext && organizationContext.role === 'guest') {
+    return { tier: 'guest', homeOrg: null };
+  }
+
+  if (user.isStaff || (organizationContext && organizationContext.role)) {
+    const { id, name, tier, orgType, role } = organizationContext || {};
+    const homeOrg = id ? { id, name, tier, orgType, role } : null;
+    return { tier: 'business', homeOrg };
   }
 
   return { tier: 'personal', homeOrg: null };
 }
 
 function buildSuiteEntitlements(user, orgContext, membership) {
-  const isGuest = user?.licenseTier === 'guest';
+  const isGuest = membership?.role === 'guest';
 
   const orgSuites = {
     vendorSuiteEnabled: Boolean(orgContext?.vendorSuiteEnabled),
@@ -547,16 +550,14 @@ function applyLicenseSelection(user, selection) {
   const chosen = LICENSE_PLANS.includes(selection) ? selection : 'free-personal';
   user.licensePlan = chosen;
   if (chosen === 'free-personal') {
-    user.licenseTier = 'personal';
     user.valueAssessmentLimit = FREE_ASSESSMENT_LIMIT;
     user.platformAccess = ['valuesphere'];
     return;
   }
 
-  user.licenseTier = 'business';
   user.valueAssessmentLimit = null;
   const desiredPlatforms = user.platformAccess && user.platformAccess.length ? user.platformAccess : Array.from(PLATFORM_IDS);
-  const normalised = normalisePlatformAccess(user.licenseTier, desiredPlatforms);
+  const normalised = normalisePlatformAccess({ isGuest: false }, desiredPlatforms);
   user.platformAccess = normalised.error ? Array.from(PLATFORM_IDS) : normalised.platformAccess;
 }
 
@@ -1220,29 +1221,18 @@ async function requireOrgAdmin(req, res, next) {
   }
 }
 
-function normalisePlatformAccess(licenseTier, requested) {
-  if (!LICENSE_OPTIONS.includes(licenseTier)) {
-    return { error: 'Unknown license tier.' };
-  }
+function normalisePlatformAccess({ isGuest }, requested) {
   const selections = Array.isArray(requested)
     ? Array.from(new Set(requested.map(value => String(value))))
     : [];
 
-  if (licenseTier === 'guest') {
-    return { platformAccess: ['valuesphere'] };
-  }
-
-  if (licenseTier === 'personal') {
-    const disallowed = selections.filter(id => id && !PERSONAL_ALLOWED_PLATFORMS.has(id));
-    if (disallowed.length > 0) {
-      return { error: 'Personal licenses only include ValueSphere Consulting.' };
-    }
+  if (isGuest) {
     return { platformAccess: ['valuesphere'] };
   }
 
   const filtered = selections.filter(id => PLATFORM_IDS.has(id));
   if (filtered.length === 0) {
-    return { error: 'Select at least one platform for your business license.' };
+    return { platformAccess: ['valuesphere'] };
   }
   return { platformAccess: filtered };
 }
@@ -1283,7 +1273,6 @@ const signupSchema = z.object({
   company: z.string().trim().max(160).optional(),
   role: z.string().trim().max(160).optional(),
   industry: z.string().trim().max(160).optional(),
-  licenseTier: z.enum(LICENSE_OPTIONS).default('personal'),
   platformAccess: z.array(z.string()).optional()
 });
 
@@ -1370,7 +1359,6 @@ const profileUpdateSchema = z.object({
   company: z.string().trim().max(160).optional(),
   role: z.string().trim().max(160).optional(),
   industry: z.string().trim().max(160).optional(),
-  licenseTier: z.enum(LICENSE_OPTIONS).optional(),
   platformAccess: z.array(z.string()).optional()
 });
 
@@ -1525,7 +1513,6 @@ function serializeMembership(membership) {
     email: user.email || membership.invitedEmail || null,
     role: membership.role,
     status,
-    licenseTier: user.licenseTier || null,
     lastLoginAt: user.lastLoginAt || null,
     createdAt: membership.createdAt,
 
@@ -1941,7 +1928,6 @@ function serializeRoomMembership(membership) {
     userId: membership.user ? membership.user._id.toString() : null,
     name: membership.user ? membership.user.name : null,
     email: membership.user ? membership.user.email : null,
-    licenseTier: membership.user ? membership.user.licenseTier : null,
     organization: membership.organization ? membership.organization.toString() : null,
     role: membership.role,
     isGuest: Boolean(membership.isGuest)
@@ -2246,9 +2232,9 @@ app.get('/api/auth/workos/signup', (req, res) => startWorkOSAuthorization(req, r
 
 app.post('/api/auth/signup', validateBody(signupSchema), async (req, res) => {
   try {
-    const { name, email, password, company, role, industry, licenseTier, platformAccess } = req.validatedBody;
+    const { name, email, password, company, role, industry, platformAccess } = req.validatedBody;
 
-    const normalised = normalisePlatformAccess(licenseTier, platformAccess || ['valuesphere']);
+    const normalised = normalisePlatformAccess({ isGuest: false }, platformAccess || ['valuesphere']);
     if (normalised.error) {
       return res.status(400).json({ error: normalised.error });
     }
@@ -2265,10 +2251,9 @@ app.post('/api/auth/signup', validateBody(signupSchema), async (req, res) => {
       company,
       role,
       industry,
-      licenseTier,
       platformAccess: normalised.platformAccess,
-      licensePlan: licenseTier === 'business' ? 'consulting-enterprise' : 'free-personal',
-      valueAssessmentLimit: licenseTier === 'personal' ? FREE_ASSESSMENT_LIMIT : null
+      licensePlan: 'free-personal',
+      valueAssessmentLimit: FREE_ASSESSMENT_LIMIT
     });
 
     const token = issueTokenCookie(res, {
@@ -2412,11 +2397,6 @@ app.get('/api/auth/workos/callback', async (req, res) => {
 
         await membership.save();
         membershipStatusChanged = previousStatus !== membership.status;
-
-        if (organization.tier === 'business' && user.licenseTier !== 'business') {
-          user.licenseTier = 'business';
-          shouldSave = true;
-        }
 
         if (!user.defaultOrganization) {
           user.defaultOrganization = organization._id;
@@ -2934,7 +2914,7 @@ app.post('/api/onboarding', requireAuth, validateBody(onboardingSchema), async (
     const suiteSelection = payload.suiteSelection || nextResponses.suiteSelection || {};
     const finalize = payload.finalize === true || payload.status === 'completed';
 
-    let isOrgManaged = user.licenseTier === 'business';
+    let isOrgManaged = Boolean(user.defaultOrganization);
     if (user.defaultOrganization) {
       const defaultOrg = await Organization.findById(user.defaultOrganization);
       const membership = defaultOrg
@@ -2981,7 +2961,6 @@ app.post('/api/onboarding', requireAuth, validateBody(onboardingSchema), async (
         applyLicenseSelection(user, selection);
       } else if (selection !== 'free-personal') {
         user.licensePlan = selection;
-        user.licenseTier = 'business';
         user.valueAssessmentLimit = null;
         user.platformAccess = Array.from(PLATFORM_IDS);
       }
@@ -3182,7 +3161,7 @@ app.get(
         status: { $ne: 'removed' }
       }).populate({
         path: 'user',
-        select: 'name email licenseTier lastLoginAt'
+        select: 'name email lastLoginAt'
       });
 
       const memberCount = members.length;
@@ -3284,7 +3263,7 @@ app.patch(
       await membership.save();
 
       const updated = await OrganizationMembership.findById(memberId)
-        .populate({ path: 'user', select: 'name email licenseTier lastLoginAt' });
+        .populate({ path: 'user', select: 'name email lastLoginAt' });
 
       return res.json({
         ok: true,
@@ -3387,7 +3366,6 @@ app.post(
       if (!user) {
         user = await User.create({
           email: normalizedEmail,
-          licenseTier: 'guest',
           platformAccess: []
         });
       }
@@ -3413,7 +3391,7 @@ app.post(
         });
       }
 
-      await membership.populate({ path: 'user', select: 'name email licenseTier lastLoginAt' });
+      await membership.populate({ path: 'user', select: 'name email lastLoginAt' });
       await recordAuditEvent({
         type: 'org.member.added',
         actorUser: req.requestingUser?._id || req.auth.uid,
@@ -3440,7 +3418,7 @@ app.patch(
     try {
       const membership = await OrganizationMembership.findById(req.params.membershipId).populate({
         path: 'user',
-        select: 'name email licenseTier lastLoginAt'
+        select: 'name email lastLoginAt'
       });
       if (!membership) {
         return res.status(404).json({ error: 'Membership not found' });
@@ -3517,7 +3495,7 @@ app.post(
     try {
       const membership = await OrganizationMembership.findById(req.params.membershipId).populate({
         path: 'user',
-        select: 'name email licenseTier lastLoginAt'
+        select: 'name email lastLoginAt'
       });
       if (!membership) {
         return res.status(404).json({ error: 'Membership not found' });
@@ -3713,7 +3691,6 @@ app.get('/api/org/current', requireAuth, async (req, res) => {
       }
     }
 
-    const licenseTier = user.licenseTier || 'personal';
     const effectiveLicense = computeEffectiveLicense(user, orgContext);
 
     let suiteEntitlements = null;
@@ -3732,8 +3709,7 @@ app.get('/api/org/current', requireAuth, async (req, res) => {
       user: {
         id: user._id.toString(),
         email: user.email,
-        name: user.name,
-        licenseTier
+        name: user.name
       },
       effectiveLicenseTier: effectiveLicense.tier,
       homeOrganization: effectiveLicense.homeOrg,
@@ -3803,10 +3779,6 @@ app.get('/api/org/users/search', requireAuth, async (req, res) => {
     const user = await User.findById(req.auth.uid);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    if (user.licenseTier === 'guest') {
-      return res.status(403).json({ error: 'Guest users cannot access the directory.' });
-    }
-
     const orgId = req.auth.orgId || user.defaultOrganization;
     if (!orgId) {
       return res.status(400).json({ error: 'No organization selected' });
@@ -3817,10 +3789,14 @@ app.get('/api/org/users/search', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Not a member of this organization.' });
     }
 
+    if (membership.role === 'guest') {
+      return res.status(403).json({ error: 'Guest users cannot access the directory.' });
+    }
+
     const query = String(req.query.q || '').trim().toLowerCase();
     const orgMembers = await OrganizationMembership.find({ organization: orgId, status: 'active' }).populate({
       path: 'user',
-      select: 'name email licenseTier'
+      select: 'name email'
     });
 
     const matches = orgMembers.filter(member => {
@@ -3835,8 +3811,7 @@ app.get('/api/org/users/search', requireAuth, async (req, res) => {
       users: matches.slice(0, 25).map(member => ({
         id: member.user._id.toString(),
         name: member.user.name,
-        email: member.user.email,
-        licenseTier: member.user.licenseTier
+        email: member.user.email
       }))
     });
   } catch (err) {
@@ -4015,7 +3990,7 @@ app.get('/api/org/admin/overview', requireAuth, requireOrgAdmin, async (req, res
     const members = await OrganizationMembership.find({
       organization: organization._id,
       status: { $ne: 'removed' }
-    }).populate({ path: 'user', select: 'name email licenseTier lastLoginAt' });
+    }).populate({ path: 'user', select: 'name email lastLoginAt' });
 
     res.json({
       ok: true,
@@ -4104,7 +4079,6 @@ app.post('/api/org/admin/members', requireAuth, requireOrgAdmin, validateBody(me
     if (!user) {
       user = await User.create({
         email: normalizedEmail,
-        licenseTier: 'guest',
         platformAccess: []
       });
     }
@@ -4130,7 +4104,7 @@ app.post('/api/org/admin/members', requireAuth, requireOrgAdmin, validateBody(me
       });
     }
 
-    await membership.populate({ path: 'user', select: 'name email licenseTier lastLoginAt' });
+    await membership.populate({ path: 'user', select: 'name email lastLoginAt' });
     await recordAuditEvent({
       type: 'org.member.added',
       actorUser: req.requestingUser?._id || req.auth.uid,
@@ -4155,7 +4129,7 @@ app.patch(
     try {
       const membership = await OrganizationMembership.findById(req.params.membershipId).populate({
         path: 'user',
-        select: 'name email licenseTier lastLoginAt'
+        select: 'name email lastLoginAt'
       });
       if (!membership) {
         return res.status(404).json({ error: 'Membership not found' });
@@ -4222,7 +4196,7 @@ app.post('/api/org/admin/members/:membershipId/resend-invite', requireAuth, requ
   try {
     const membership = await OrganizationMembership.findById(req.params.membershipId).populate({
       path: 'user',
-      select: 'name email licenseTier lastLoginAt'
+      select: 'name email lastLoginAt'
     });
     if (!membership) {
       return res.status(404).json({ error: 'Membership not found' });
@@ -4378,9 +4352,8 @@ app.put('/api/auth/me', requireAuth, validateBody(profileUpdateSchema), async (r
     if (!user) return res.status(404).json({ error: 'Not found' });
 
     const payload = req.validatedBody;
-    const nextLicenseTier = payload.licenseTier || user.licenseTier;
     const desiredPlatforms = payload.platformAccess || user.platformAccess;
-    const normalised = normalisePlatformAccess(nextLicenseTier, desiredPlatforms);
+    const normalised = normalisePlatformAccess({ isGuest: false }, desiredPlatforms);
     if (normalised.error) {
       return res.status(400).json({ error: normalised.error });
     }
@@ -4391,7 +4364,6 @@ app.put('/api/auth/me', requireAuth, validateBody(profileUpdateSchema), async (r
       }
     });
 
-    user.licenseTier = nextLicenseTier;
     user.platformAccess = normalised.platformAccess;
     await user.save();
     res.json({ ok: true, user: user.public(), platforms: PLATFORM_DEFINITIONS });
@@ -4416,7 +4388,6 @@ app.delete('/api/auth/me/data', requireAuth, async (req, res) => {
     user.onboardingStatus = 'pending';
     user.onboardingResponses = {};
     user.platformAccess = ['valuesphere'];
-    user.licenseTier = 'personal';
     user.licensePlan = 'free-personal';
     user.valueAssessmentLimit = FREE_ASSESSMENT_LIMIT;
     user.billingProfile = {};
@@ -4612,21 +4583,15 @@ app.patch(
       const activeMemberships = await OrganizationMembership.find({
         organization: organization._id,
         status: 'active'
-      }).populate({ path: 'user', select: 'platformAccess licenseTier' });
+      }).populate({ path: 'user', select: 'platformAccess' });
 
       await Promise.all(
         activeMemberships.map(async membership => {
           if (!membership.user) return;
 
           const user = membership.user;
-          const licenseTier = user.licenseTier || 'personal';
-          let nextAccess = orgAccess;
-
-          if (licenseTier === 'personal') {
-            nextAccess = orgAccess.filter(id => PERSONAL_ALLOWED_PLATFORMS.has(id));
-          } else if (licenseTier === 'guest') {
-            nextAccess = [];
-          }
+          const isGuest = membership.role === 'guest';
+          const nextAccess = isGuest ? [] : orgAccess;
 
           const uniqueNextAccess = Array.from(new Set(nextAccess));
           const currentAccess = Array.isArray(user.platformAccess) ? user.platformAccess : [];
@@ -4759,8 +4724,7 @@ app.post('/api/orgs', requireAuth, validateBody(organizationCreateSchema), async
       payload.orgType && ['vendor', 'buyer', 'both'].includes(payload.orgType) ? payload.orgType : 'both';
     const slug = await generateUniqueOrgSlug(payload.slug || payload.name || '');
 
-    const creator = req.requestingUser || (await User.findById(req.auth.uid));
-    const tier = creator && creator.licenseTier === 'business' ? 'business' : 'personal';
+    const tier = payload.tier || 'personal';
 
     let workosOrganizationId = payload.workosOrganizationId || null;
     if (!workosOrganizationId) {
@@ -5219,12 +5183,14 @@ app.post('/api/rooms', requireAuth, validateBody(roomCreateSchema), async (req, 
       lastActivityAt: new Date()
     });
 
+    const isGuestUser = membershipContext?.role === 'guest';
+
     const creatorMembership = await EngagementRoomMembership.create({
       room: room._id,
       user: req.auth.uid,
       organization: membershipOrg._id,
       role: 'room_admin',
-      isGuest: user && user.licenseTier === 'guest'
+      isGuest: isGuestUser
     });
 
       await logRoomMutation({
@@ -5249,7 +5215,7 @@ app.post('/api/rooms', requireAuth, validateBody(roomCreateSchema), async (req, 
         room: serializeRoom(room, {
           role: 'room_admin',
         organization: membershipOrg,
-        isGuest: user && user.licenseTier === 'guest'
+        isGuest: isGuestUser
       })
     });
   } catch (err) {
@@ -5909,7 +5875,7 @@ app.get('/api/rooms/:roomId/members', requireAuth, async (req, res) => {
 
     const members = await EngagementRoomMembership.find({ room: room._id })
       .sort({ createdAt: 1 })
-      .populate('user', 'name email licenseTier');
+      .populate('user', 'name email');
 
     res.json({ ok: true, members: members.map(serializeRoomMembership) });
   } catch (err) {
@@ -5955,7 +5921,7 @@ app.post(
 
       roomMembership.role = payload.role;
       roomMembership.organization = payload.organization;
-      roomMembership.isGuest = targetUser.licenseTier === 'guest';
+      roomMembership.isGuest = payload.role === 'guest';
       await roomMembership.save();
 
       await logRoomMutation({
@@ -6124,11 +6090,6 @@ app.post('/api/room-invites/:token/accept', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invite organization does not match room.' });
     }
 
-    if (invite.isGuestInvite && user.licenseTier !== 'guest') {
-      user.licenseTier = 'guest';
-      await user.save();
-    }
-
     let membership = await EngagementRoomMembership.findOne({ room: room._id, user: user._id });
     if (!membership) {
       membership = new EngagementRoomMembership({ room: room._id, user: user._id, organization: invite.organization });
@@ -6136,7 +6097,7 @@ app.post('/api/room-invites/:token/accept', requireAuth, async (req, res) => {
 
     membership.role = invite.role;
     membership.organization = invite.organization;
-    membership.isGuest = user.licenseTier === 'guest' || invite.isGuestInvite;
+    membership.isGuest = invite.isGuestInvite || invite.role === 'guest';
     await membership.save();
 
     invite.status = 'accepted';
@@ -6443,7 +6404,7 @@ async function loadBuyerContext(req, res) {
 
   const effectiveLicense = computeEffectiveLicense(user, orgContext);
   const entitlement = getPlatformEntitlement(user, orgContext, 'valuesphere');
-  const canUseBuyerMode = user.licenseTier !== 'guest' && entitlement.allowed;
+  const canUseBuyerMode = orgContext?.membership?.role !== 'guest' && entitlement.allowed;
   const productAccess = Array.isArray(organization?.productAccess)
     ? organization.productAccess
     : Array.isArray(organization?.platformAccess)
