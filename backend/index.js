@@ -13,6 +13,11 @@ const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
 const { WorkOS } = require('@workos-inc/node');
 
+const VENDOR_SEAT_PRICE_USD = 150;
+const BUYER_SEAT_PRICE_USD = 190;
+const BOTH_SEAT_PRICE_USD = 250;
+const CONTACT_SALES_SEAT_THRESHOLD = 200;
+
 const { requireAuth, issueTokenCookie, clearTokenCookie } = require('./middleware/auth');
 const { validateBody } = require('./middleware/validation');
 const User = require('./models/User');
