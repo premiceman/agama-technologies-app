@@ -1152,6 +1152,51 @@ async function computeSeatUsageForOrg(orgId) {
   return { vendorUsed, buyerUsed, bothUsed, totalUsed };
 }
 
+function getMembershipSuiteCategory({ vendorSuiteEnabled, buyerSuiteEnabled, role, status, user }) {
+  if (!user || user.status !== 'active') return null;
+  if (status !== 'active') return null;
+  if (role === 'guest') return null;
+
+  const vendorEnabled = Boolean(vendorSuiteEnabled);
+  const buyerEnabled = Boolean(buyerSuiteEnabled);
+
+  if (!vendorEnabled && !buyerEnabled) return null;
+  if (vendorEnabled && buyerEnabled) return 'both';
+  if (vendorEnabled) return 'vendor';
+  if (buyerEnabled) return 'buyer';
+
+  return null;
+}
+
+function projectSeatUsage(currentUsage, previousCategory, nextCategory) {
+  const projected = { ...currentUsage };
+
+  const adjust = (category, delta) => {
+    if (category === 'vendor') projected.vendorUsed += delta;
+    if (category === 'buyer') projected.buyerUsed += delta;
+    if (category === 'both') projected.bothUsed += delta;
+  };
+
+  adjust(previousCategory, -1);
+  adjust(nextCategory, 1);
+
+  projected.totalUsed = projected.vendorUsed + projected.buyerUsed + projected.bothUsed;
+
+  return projected;
+}
+
+function findSeatLimitViolation(usage, seatLimits = {}) {
+  const vendorLimit = Number.isFinite(seatLimits.vendorSuite) ? seatLimits.vendorSuite : Infinity;
+  const buyerLimit = Number.isFinite(seatLimits.buyerSuite) ? seatLimits.buyerSuite : Infinity;
+  const bothLimit = Number.isFinite(seatLimits.bothSuites) ? seatLimits.bothSuites : Infinity;
+
+  if (usage.vendorUsed > vendorLimit) return 'vendor';
+  if (usage.buyerUsed > buyerLimit) return 'buyer';
+  if (usage.bothUsed > bothLimit) return 'both';
+
+  return null;
+}
+
 function requirePlatformAccess(platformId) {
   return async function(req, res, next) {
     try {
@@ -3303,26 +3348,53 @@ app.patch(
 
       const user = membership.user;
 
+      const previousCategory = getMembershipSuiteCategory({
+        vendorSuiteEnabled: membership.vendorSuiteEnabled,
+        buyerSuiteEnabled: membership.buyerSuiteEnabled,
+        role: membership.role,
+        status: membership.status,
+        user
+      });
+
       // enforce org ceilings: cannot provision suites the org hasn't bought
       const orgSuites = {
         vendorSuiteEnabled: Boolean(organization.vendorSuiteEnabled),
         buyerSuiteEnabled: Boolean(organization.buyerSuiteEnabled)
       };
 
+      let nextVendorSuiteEnabled = membership.vendorSuiteEnabled;
+      let nextBuyerSuiteEnabled = membership.buyerSuiteEnabled;
+
       if (payload.vendorSuiteEnabled !== undefined) {
         if (!orgSuites.vendorSuiteEnabled && payload.vendorSuiteEnabled) {
           return res.status(400).json({ error: 'Seller suite is not enabled for this organization.' });
         }
-        const value = Boolean(payload.vendorSuiteEnabled);
-        membership.vendorSuiteEnabled = value;
+        nextVendorSuiteEnabled = Boolean(payload.vendorSuiteEnabled);
       }
 
       if (payload.buyerSuiteEnabled !== undefined) {
         if (!orgSuites.buyerSuiteEnabled && payload.buyerSuiteEnabled) {
           return res.status(400).json({ error: 'Buyer suite is not enabled for this organization.' });
         }
-        membership.buyerSuiteEnabled = Boolean(payload.buyerSuiteEnabled);
+        nextBuyerSuiteEnabled = Boolean(payload.buyerSuiteEnabled);
       }
+
+      const currentUsage = await computeSeatUsageForOrg(orgId);
+      const projectedCategory = getMembershipSuiteCategory({
+        vendorSuiteEnabled: nextVendorSuiteEnabled,
+        buyerSuiteEnabled: nextBuyerSuiteEnabled,
+        role: membership.role,
+        status: membership.status,
+        user
+      });
+      const projectedUsage = projectSeatUsage(currentUsage, previousCategory, projectedCategory);
+      const seatLimitViolation = findSeatLimitViolation(projectedUsage, organization.seatLimits || {});
+      if (seatLimitViolation) {
+        return res.status(400).json({ error: 'seat_limit_exceeded', details: { suite: seatLimitViolation } });
+      }
+
+      membership.vendorSuiteEnabled = nextVendorSuiteEnabled;
+      membership.buyerSuiteEnabled = nextBuyerSuiteEnabled;
 
       await membership.save();
 
@@ -4915,11 +4987,36 @@ app.post(
         });
       }
 
-      if (role) membership.role = role;
+      const previousCategory = getMembershipSuiteCategory({
+        vendorSuiteEnabled: membership.vendorSuiteEnabled,
+        buyerSuiteEnabled: membership.buyerSuiteEnabled,
+        role: membership.role,
+        status: membership.status,
+        user
+      });
+
+      const nextRole = role || membership.role || 'vendor_user';
+      const isActivating = membership.isNew || membership.status !== 'active';
+      const intendedStatus = isActivating ? 'active' : membership.status;
+
+      const currentUsage = await computeSeatUsageForOrg(req.organization._id);
+      const projectedCategory = getMembershipSuiteCategory({
+        vendorSuiteEnabled,
+        buyerSuiteEnabled,
+        role: nextRole,
+        status: intendedStatus,
+        user
+      });
+      const projectedUsage = projectSeatUsage(currentUsage, previousCategory, projectedCategory);
+      const seatLimitViolation = findSeatLimitViolation(projectedUsage, req.organization.seatLimits || {});
+      if (seatLimitViolation) {
+        return res.status(400).json({ error: 'seat_limit_exceeded', details: { suite: seatLimitViolation } });
+      }
+
+      membership.role = nextRole;
       membership.vendorSuiteEnabled = vendorSuiteEnabled;
       membership.buyerSuiteEnabled = buyerSuiteEnabled;
 
-      const isActivating = membership.isNew || membership.status !== 'active';
       if (isActivating) {
         const seatsUsed = await OrganizationMembership.countActiveSeats(req.organization._id);
         if (seatsUsed >= req.organization.seatLimit) {
