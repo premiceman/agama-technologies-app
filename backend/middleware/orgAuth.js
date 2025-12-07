@@ -6,16 +6,25 @@ const ORG_ROLE_ORDER = ['guest', 'buyer_user', 'vendor_user', 'org_admin', 'org_
 function buildEffectiveEntitlements(membership, organization) {
   const orgVendor = Boolean(organization?.vendorSuiteEnabled);
   const orgBuyer = Boolean(organization?.buyerSuiteEnabled);
-  const orgShared = Boolean(organization?.sharedSuiteEnabled);
 
   const memberVendor = Boolean(membership?.vendorSuiteEnabled);
   const memberBuyer = Boolean(membership?.buyerSuiteEnabled);
-  const memberShared = Boolean(membership?.sharedSuiteEnabled);
+
+  const isGuest = (membership?.role || '').toLowerCase() === 'guest';
 
   return {
-    vendorSuite: orgVendor && memberVendor,
-    buyerSuite: orgBuyer && memberBuyer,
-    sharedSuite: orgShared && memberShared,
+    organization: {
+      vendorSuiteEnabled: orgVendor,
+      buyerSuiteEnabled: orgBuyer,
+    },
+    membership: {
+      vendorSuiteEnabled: memberVendor,
+      buyerSuiteEnabled: memberBuyer,
+    },
+    effective: {
+      vendorSuite: orgVendor && memberVendor && !isGuest,
+      buyerSuite: orgBuyer && memberBuyer && !isGuest,
+    },
   };
 }
 
@@ -24,10 +33,14 @@ function getEffectivePermissions(user, organization, membership) {
   const entitlements = buildEffectiveEntitlements(membership, organization);
   const isOrgOwner = role === 'org_owner';
   const isOrgAdmin = role === 'org_admin';
+  const isStaff = Boolean(user?.isStaff);
 
-  const vendorSuiteAccess = entitlements.vendorSuite && ['org_owner', 'org_admin', 'vendor_user'].includes(role);
-  const buyerSuiteAccess = entitlements.buyerSuite && ['org_owner', 'org_admin', 'buyer_user'].includes(role);
-  const sharedSuiteAccess = entitlements.sharedSuite && role !== 'guest';
+  const vendorSuiteAccess =
+    (entitlements.effective.vendorSuite && ['org_owner', 'org_admin', 'vendor_user'].includes(role)) ||
+    isStaff;
+  const buyerSuiteAccess =
+    (entitlements.effective.buyerSuite && ['org_owner', 'org_admin', 'buyer_user'].includes(role)) ||
+    isStaff;
 
   return {
     role,
@@ -37,7 +50,6 @@ function getEffectivePermissions(user, organization, membership) {
     canManageOrg: isOrgOwner || isOrgAdmin,
     vendorSuiteAccess,
     buyerSuiteAccess,
-    sharedSuiteAccess,
   };
 }
 
