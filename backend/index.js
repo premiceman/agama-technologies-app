@@ -529,6 +529,13 @@ function deriveThemeHints(activePersona) {
   return { primary: 'shared', persona: 'shared' };
 }
 
+function normalizePersona(persona) {
+  const normalized = typeof persona === 'string' ? persona.trim().toLowerCase() : '';
+  if (normalized === 'dual') return 'both';
+  if (['vendor', 'buyer', 'both'].includes(normalized)) return normalized;
+  return 'both';
+}
+
 function recommendLicensePlan(persona, goals = []) {
   if (persona === 'consultant') return 'consulting-enterprise';
   if (persona === 'vendor' || persona === 'both') return 'vendor-enterprise';
@@ -2324,6 +2331,12 @@ app.get('/api/auth/workos/callback', async (req, res) => {
     }
     let shouldSave = false;
 
+    const normalizedPersona = normalizePersona(user.persona);
+    if (user.persona !== normalizedPersona) {
+      user.persona = normalizedPersona;
+      shouldSave = true;
+    }
+
     let organization = null;
     let membership = null;
     let membershipCreated = false;
@@ -2415,6 +2428,50 @@ app.get('/api/auth/workos/callback', async (req, res) => {
           });
         }
       }
+    }
+
+    if (!membership && !user.isStaff) {
+      const existingMembership = await OrganizationMembership.findOne({
+        user: user._id,
+        status: { $ne: 'removed' }
+      });
+
+      if (existingMembership) {
+        membership = existingMembership;
+        organization = await Organization.findById(existingMembership.organization);
+      } else {
+        const emailDomain = (user.email || '').split('@')[1];
+        const orgName = emailDomain ? `${emailDomain} workspace` : `${user.name || 'New'} workspace`;
+        const slug = await generateUniqueOrgSlug(orgName);
+
+        organization = new Organization({
+          name: orgName,
+          slug,
+          orgType: 'both',
+          tier: 'business',
+          platformAccess: ['valuesphere'],
+          productAccess: ['valuesphere'],
+          vendorSuiteEnabled: true,
+          buyerSuiteEnabled: false,
+          createdBy: user._id
+        });
+        await organization.save();
+
+        membership = new OrganizationMembership({
+          organization: organization._id,
+          user: user._id,
+          role: 'org_owner',
+          roleOrigin: 'app',
+          vendorSuiteEnabled: true,
+          buyerSuiteEnabled: false
+        });
+        await membership.save();
+      }
+    }
+
+    if (!user.defaultOrganization && membership && membership.organization) {
+      user.defaultOrganization = membership.organization;
+      shouldSave = true;
     }
 
     if (!user.emailVerified) {
@@ -2631,65 +2688,52 @@ app.get('/api/me/context', requireAuth, async (req, res) => {
     let membership = null;
 
     if (requestedOrgId) {
-      organization = await Organization.findById(requestedOrgId);
+      membership = await OrganizationMembership.findOne({
+        organization: requestedOrgId,
+        user: user._id,
+        status: 'active'
+      });
 
-      if (organization) {
-        membership = await OrganizationMembership.findOne({
-          organization: organization._id,
-          user: user._id,
-          status: 'active'
-        });
-
-        if (!membership) {
-          return res.status(403).json({ error: 'No active membership for this organization.' });
-        }
+      if (membership) {
+        organization = await Organization.findById(membership.organization);
+      } else {
+        return res.status(403).json({ error: 'No active membership for this organization.' });
       }
     }
 
-    const effectivePermissions = organization && membership
-      ? getEffectivePermissions(user, organization, membership)
-      : null;
+    if (!membership) {
+      membership = await OrganizationMembership.findOne({ user: user._id, status: 'active' }).sort({ createdAt: 1 });
+      if (membership) {
+        organization = await Organization.findById(membership.organization);
+      }
+    }
 
-    const suiteEntitlements = effectivePermissions
-      ? effectivePermissions.entitlements
-      : { vendorSuite: false, buyerSuite: false, sharedSuite: false };
+    const persona = normalizePersona(user.persona);
+    const themeHint = persona === 'vendor' ? 'seller' : persona === 'buyer' ? 'buyer' : 'shared';
 
-    const activePersona = deriveActivePersona(user, effectivePermissions);
-    const themeHints = deriveThemeHints(activePersona);
+    const suites = {
+      vendor: Boolean(membership?.vendorSuiteEnabled),
+      buyer: Boolean(membership?.buyerSuiteEnabled)
+    };
 
-    const activeOrganization =
+    const activeOrg =
       organization && membership
         ? {
             id: organization._id.toString(),
             name: organization.name,
             slug: organization.slug,
-            tier: organization.tier,
-            orgType: organization.orgType || 'both',
-            role: membership.role,
-            suites: {
-              organization: {
-                vendorSuiteEnabled: Boolean(organization.vendorSuiteEnabled),
-                buyerSuiteEnabled: Boolean(organization.buyerSuiteEnabled),
-                sharedSuiteEnabled: Boolean(organization.sharedSuiteEnabled)
-              },
-              membership: {
-                vendorSuiteEnabled: Boolean(membership.vendorSuiteEnabled),
-                buyerSuiteEnabled: Boolean(membership.buyerSuiteEnabled),
-                sharedSuiteEnabled: Boolean(membership.sharedSuiteEnabled)
-              }
-            }
+            orgType: organization.orgType || 'both'
           }
         : null;
 
     return res.json({
       ok: true,
       user: user.public(),
-      activeOrganization,
+      activeOrg,
       orgRole: membership?.role || null,
-      suiteEntitlements,
-      effectivePermissions,
-      activePersona,
-      themeHints
+      suites,
+      persona,
+      themeHint
     });
   } catch (err) {
     console.error('Context fetch error', err);
