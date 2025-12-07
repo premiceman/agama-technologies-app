@@ -479,6 +479,21 @@ function computeEffectiveLicense(user, organizationContext) {
   return { tier: 'personal', homeOrg: null };
 }
 
+function computeAccessState(user, organizationContext) {
+  if (user?.isStaff) return 'active';
+
+  if (!organizationContext) return 'needs_onboarding';
+
+  const seatLimits = organizationContext.seatLimits || {};
+  const totalSeats =
+    (seatLimits.vendorSuite || 0) + (seatLimits.buyerSuite || 0) + (seatLimits.bothSuites || 0);
+
+  if (totalSeats <= 0) return 'needs_onboarding';
+  if (user?.onboardingStatus !== 'completed') return 'needs_onboarding';
+
+  return 'active';
+}
+
 function buildSuiteEntitlements(user, orgContext, membership) {
   const isGuest = membership?.role === 'guest';
 
@@ -1082,7 +1097,8 @@ async function buildOrganizationContext(user, orgId, { includeSeatDetails = fals
     tier: organization.tier,
     orgType: organization.orgType || 'both',
     role: membership.role,
-    membership
+    membership,
+    seatLimits: organization.seatLimits || {}
   };
 
   context.vendorSuiteEnabled = Boolean(organization.vendorSuiteEnabled);
@@ -2442,11 +2458,42 @@ app.get('/api/auth/workos/callback', async (req, res) => {
       orgId: user.defaultOrganization ? user.defaultOrganization.toString() : null
     });
     persistWorkOSSession(res, workosSessionId);
-    if (wantsJson) {
-      return res.json({ ok: true, user: user.public(), token, redirect: redirectUrl });
+
+    let organizationContext = null;
+    const defaultOrgId =
+      user.defaultOrganization || (organization?._id ? organization._id.toString() : null);
+    if (defaultOrgId) {
+      organizationContext = await buildOrganizationContext(user, defaultOrgId, { includeSeatDetails: true });
+
+      if (!organizationContext && organization) {
+        organizationContext = {
+          id: organization._id.toString(),
+          name: organization.name,
+          slug: organization.slug,
+          tier: organization.tier,
+          orgType: organization.orgType || 'both',
+          role: membership?.role,
+          membership,
+          vendorSuiteEnabled: Boolean(organization.vendorSuiteEnabled),
+          buyerSuiteEnabled: Boolean(organization.buyerSuiteEnabled),
+          membershipSuites: {
+            vendorSuiteEnabled: Boolean(membership?.vendorSuiteEnabled),
+            buyerSuiteEnabled: Boolean(membership?.buyerSuiteEnabled)
+          },
+          seatLimits: organization.seatLimits || {}
+        };
+      }
     }
 
-    return res.redirect(redirectUrl);
+    const accessState = computeAccessState(user, organizationContext);
+    const onboardingRedirect = `${APP_BASE_URL}/onboarding.html`;
+    const finalRedirect = accessState === 'needs_onboarding' ? onboardingRedirect : redirectUrl;
+
+    if (wantsJson) {
+      return res.json({ ok: true, user: user.public(), token, redirect: finalRedirect });
+    }
+
+    return res.redirect(finalRedirect);
   } catch (err) {
     console.error('WorkOS callback error', err);
     if (wantsJson) {
@@ -2668,15 +2715,59 @@ app.get('/api/me/context', requireAuth, async (req, res) => {
       buyer: Boolean(membership?.buyerSuiteEnabled)
     };
 
-    const activeOrg =
+    const organizationContext =
       organization && membership
         ? {
             id: organization._id.toString(),
             name: organization.name,
             slug: organization.slug,
-            orgType: organization.orgType || 'both'
+            tier: organization.tier,
+            orgType: organization.orgType || 'both',
+            role: membership.role,
+            membership,
+            vendorSuiteEnabled: Boolean(organization.vendorSuiteEnabled),
+            buyerSuiteEnabled: Boolean(organization.buyerSuiteEnabled),
+            membershipSuites: {
+              vendorSuiteEnabled: Boolean(membership.vendorSuiteEnabled),
+              buyerSuiteEnabled: Boolean(membership.buyerSuiteEnabled)
+            },
+            seatLimits: organization.seatLimits || {}
           }
         : null;
+
+    const activeOrg =
+      organizationContext
+        ? {
+            id: organizationContext.id,
+            name: organizationContext.name,
+            slug: organizationContext.slug,
+            orgType: organizationContext.orgType
+          }
+        : null;
+
+    const effectiveLicense = computeEffectiveLicense(user, organizationContext);
+
+    const memberships = await OrganizationMembership.find({
+      user: user._id,
+      status: { $ne: 'removed' }
+    }).populate('organization');
+
+    const membershipsPayload = memberships
+      .filter(membership => membership.organization)
+      .map(membership => ({
+        id: membership._id.toString(),
+        organizationId: membership.organization._id.toString(),
+        organizationName: membership.organization.name,
+        organizationTier: membership.organization.tier,
+        organizationOrgType: membership.organization.orgType || 'both',
+        role: membership.role,
+        status: membership.status,
+        isHome:
+          !!user.defaultOrganization &&
+          membership.organization._id.toString() === user.defaultOrganization.toString()
+      }));
+
+    const accessState = computeAccessState(user, organizationContext);
 
     return res.json({
       ok: true,
@@ -2685,7 +2776,11 @@ app.get('/api/me/context', requireAuth, async (req, res) => {
       orgRole: membership?.role || null,
       suites,
       persona,
-      themeHint
+      themeHint,
+      organizationContext,
+      effectiveLicense,
+      memberships: membershipsPayload,
+      accessState
     });
   } catch (err) {
     console.error('Context fetch error', err);
@@ -2774,6 +2869,28 @@ app.get('/api/dashboard/overview', requireAuth, async (req, res) => {
 
     if (!membership) {
       return res.status(403).json({ error: 'No active membership for this organization.' });
+    }
+
+    const organizationContext = {
+      id: organization._id.toString(),
+      name: organization.name,
+      slug: organization.slug,
+      tier: organization.tier,
+      orgType: organization.orgType || 'both',
+      role: membership.role,
+      membership,
+      vendorSuiteEnabled: Boolean(organization.vendorSuiteEnabled),
+      buyerSuiteEnabled: Boolean(organization.buyerSuiteEnabled),
+      membershipSuites: {
+        vendorSuiteEnabled: Boolean(membership.vendorSuiteEnabled),
+        buyerSuiteEnabled: Boolean(membership.buyerSuiteEnabled)
+      },
+      seatLimits: organization.seatLimits || {}
+    };
+
+    const accessState = computeAccessState(user, organizationContext);
+    if (accessState !== 'active') {
+      return res.status(403).json({ error: 'license_required', accessState });
     }
 
     const permissions = getEffectivePermissions(user, organization, membership);
