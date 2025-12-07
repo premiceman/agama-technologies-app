@@ -28,7 +28,7 @@ async function getDashboardOverview({ organization, user, permissions }) {
 
   if (permissions?.buyerSuiteAccess) {
     const [procurementVendorCount, buyerAssessmentsCount] = await Promise.all([
-      ProcurementVendor.countDocuments({ organization: organization._id }),
+      ProcurementVendor.countDocuments({ orgId: organization._id }),
       BuyerValueAssessment.countDocuments({ organization: organization._id })
     ]);
 

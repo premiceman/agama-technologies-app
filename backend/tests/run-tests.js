@@ -16,6 +16,7 @@ class Suite {
 }
 
 const rootSuite = new Suite();
+const TEST_PATTERN = (process.env.TEST_PATTERN || '').trim();
 let currentSuite = rootSuite;
 
 function wrapHookRegistration(targetArray, fn) {
@@ -148,7 +149,9 @@ function collectTests(dir) {
     if (entry.isDirectory()) {
       collectTests(fullPath);
     } else if (entry.isFile() && entry.name.endsWith('.test.js')) {
-      require(fullPath);
+      if (!TEST_PATTERN || entry.name.includes(TEST_PATTERN)) {
+        require(fullPath);
+      }
     }
   });
 }

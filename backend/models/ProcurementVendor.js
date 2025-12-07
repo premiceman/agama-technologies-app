@@ -1,9 +1,11 @@
 const mongoose = require('mongoose');
 
-const ObjectiveSchema = new mongoose.Schema(
+const { Schema } = mongoose;
+
+const ObjectiveSchema = new Schema(
   {
     title: { type: String, required: true, trim: true },
-    owner: { type: String, trim: true },
+    ownerUserId: { type: Schema.Types.ObjectId, ref: 'User' },
     targetMetric: { type: String, trim: true },
     targetValue: { type: Number },
     unit: { type: String, trim: true },
@@ -19,33 +21,59 @@ const ObjectiveSchema = new mongoose.Schema(
   { _id: true, timestamps: true }
 );
 
-const TouchpointSchema = new mongoose.Schema(
+const TouchpointSchema = new Schema(
   {
     occurredOn: { type: Date, default: Date.now },
     type: { type: String, trim: true },
     summary: { type: String, trim: true },
     followUp: { type: String, trim: true },
-    sentiment: { type: String, trim: true }
+    sentiment: { type: String, trim: true },
+    recordedBy: { type: Schema.Types.ObjectId, ref: 'User' }
   },
   { _id: true, timestamps: true }
 );
 
-const ProcurementVendorSchema = new mongoose.Schema(
+const ProcurementVendorSchema = new Schema(
   {
-    organization: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true, required: true },
+    orgId: { type: Schema.Types.ObjectId, ref: 'Organization', index: true, required: true },
+    createdByUserId: { type: Schema.Types.ObjectId, ref: 'User', index: true, required: true },
     name: { type: String, required: true, trim: true },
-    category: { type: String, trim: true },
+    domain: { type: String, trim: true },
+    domainCategory: { type: String, trim: true },
+    stage: {
+      type: String,
+      enum: [
+        'intake',
+        'discovery',
+        'rfx_draft',
+        'responding',
+        'evaluation',
+        'shortlist',
+        'decision',
+        'contract_signed',
+        'active',
+        'sunset'
+      ],
+      default: 'intake'
+    },
     tier: { type: String, enum: ['strategic', 'preferred', 'tactical', 'specialist'], default: 'strategic' },
-    businessOwner: { type: String, trim: true },
-    relationshipManager: { type: String, trim: true },
+    businessOwner: { type: Schema.Types.ObjectId, ref: 'User' },
+    relationshipManager: { type: Schema.Types.ObjectId, ref: 'User' },
     annualSpend: { type: Number, default: 0 },
     renewalDate: { type: Date },
     healthScore: { type: Number, min: 0, max: 100, default: 75 },
-    riskLevel: { type: String, enum: ['low', 'medium', 'high'], default: 'low' },
-    status: { type: String, enum: ['active', 'watchlist', 'sunset'], default: 'active' },
+    riskLevel: { type: String, enum: ['low', 'medium', 'high', 'critical'], default: 'medium' },
+    riskSummary: { type: String, trim: true },
+    scorecard: {
+      overallScore: { type: Number, min: 0, max: 100 },
+      weightingNotes: { type: String, trim: true }
+    },
     objectives: { type: [ObjectiveSchema], default: [] },
     touchpoints: { type: [TouchpointSchema], default: [] },
+    linkedRooms: [{ type: Schema.Types.ObjectId, ref: 'EngagementRoom' }],
+    linkedAssessments: [{ type: Schema.Types.ObjectId, ref: 'BuyerValueAssessment' }],
+    linkedRfx: [{ type: Schema.Types.ObjectId, ref: 'Rfx' }],
+    tags: { type: [String], default: [] },
     notes: { type: String, trim: true }
   },
   { timestamps: true }

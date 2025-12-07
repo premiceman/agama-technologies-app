@@ -18,6 +18,9 @@ const { validateBody } = require('./middleware/validation');
 const User = require('./models/User');
 const AdminConfig = require('./models/AdminConfig');
 const ProcurementVendor = require('./models/ProcurementVendor');
+const Rfx = require('./models/Rfx');
+const RfxItem = require('./models/RfxItem');
+const RfxResponse = require('./models/RfxResponse');
 const ValueSphereTemplate = require('./models/ValueSphereTemplate');
 const BuyerValueAssessment = require('./models/BuyerValueAssessment');
 const RevenueAccount = require('./models/RevenueAccount');
@@ -90,7 +93,7 @@ async function purgeUserOwnedData(user) {
     RoomEvent.deleteMany({ actorUser: userId }),
     RoomEvent.deleteMany({ targetUser: userId }),
     RevenueAccount.deleteMany({ userId }),
-    ProcurementVendor.deleteMany({ userId })
+    ProcurementVendor.deleteMany({ createdByUserId: userId })
   ]);
 }
 
@@ -1799,21 +1802,46 @@ function serializeRoomInvite(invite) {
 
 const procurementVendorSchema = z.object({
   name: z.string().trim().min(2).max(200),
-  category: z.string().trim().max(160).optional(),
+  domain: z.string().trim().max(160).optional(),
+  domainCategory: z.string().trim().max(160).optional(),
+  stage: z
+    .enum([
+      'intake',
+      'discovery',
+      'rfx_draft',
+      'responding',
+      'evaluation',
+      'shortlist',
+      'decision',
+      'contract_signed',
+      'active',
+      'sunset'
+    ])
+    .optional(),
   tier: z.enum(['strategic', 'preferred', 'tactical', 'specialist']).optional(),
   businessOwner: z.string().trim().max(160).optional(),
   relationshipManager: z.string().trim().max(160).optional(),
   annualSpend: z.coerce.number().min(0).max(1_000_000_000).optional(),
   renewalDate: z.coerce.date().optional(),
   healthScore: z.coerce.number().min(0).max(100).optional(),
-  riskLevel: z.enum(['low', 'medium', 'high']).optional(),
-  status: z.enum(['active', 'watchlist', 'sunset']).optional(),
-  notes: z.string().trim().max(2000).optional()
+  riskLevel: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+  riskSummary: z.string().trim().max(2000).optional(),
+  scorecard: z
+    .object({
+      overallScore: z.coerce.number().min(0).max(100).optional(),
+      weightingNotes: z.string().trim().max(2000).optional()
+    })
+    .optional(),
+  linkedRooms: z.array(z.string().trim()).optional(),
+  linkedAssessments: z.array(z.string().trim()).optional(),
+  linkedRfx: z.array(z.string().trim()).optional(),
+  tags: z.array(z.string().trim().max(80)).optional(),
+  notes: z.string().trim().max(4000).optional()
 });
 
 const procurementObjectiveSchema = z.object({
   title: z.string().trim().min(4).max(240),
-  owner: z.string().trim().max(160).optional(),
+  ownerUserId: z.string().trim().max(160).optional(),
   targetMetric: z.string().trim().max(200).optional(),
   targetValue: z.coerce.number().optional(),
   unit: z.string().trim().max(40).optional(),
@@ -1828,6 +1856,71 @@ const procurementTouchpointSchema = z.object({
   summary: z.string().trim().min(4).max(800),
   followUp: z.string().trim().max(400).optional(),
   sentiment: z.string().trim().max(120).optional()
+});
+
+const rfxSectionSchema = z.object({
+  title: z.string().trim().min(3).max(240),
+  description: z.string().trim().max(2000).optional(),
+  weight: z.coerce.number().min(0).optional(),
+  order: z.coerce.number().optional(),
+  id: z.string().trim().optional()
+});
+
+const rfxItemSchema = z.object({
+  sectionId: z.string().trim(),
+  prompt: z.string().trim().min(4).max(4000),
+  type: z.enum(['text', 'multi', 'numeric', 'attachment']).optional(),
+  options: z.array(z.string().trim()).optional(),
+  weight: z.coerce.number().min(0).optional(),
+  evaluationRubric: z.string().trim().max(4000).optional(),
+  tags: z.array(z.string().trim().max(120)).optional(),
+  required: z.boolean().optional(),
+  order: z.coerce.number().optional()
+});
+
+const rfxCreateSchema = z.object({
+  topicArea: z.string().trim().min(3).max(240),
+  sourcingEventId: z.string().trim().optional(),
+  overallWeight: z.coerce.number().min(0).optional(),
+  status: z.enum(['draft', 'issued', 'responding', 'evaluation', 'shortlist', 'decision', 'closed']).optional(),
+  issuedAt: z.coerce.date().optional(),
+  closeResponsesAt: z.coerce.date().optional(),
+  sections: z.array(rfxSectionSchema).optional(),
+  items: z.array(rfxItemSchema).optional(),
+  vendorIds: z.array(z.string().trim()).optional()
+});
+
+const rfxResponseSchema = z.object({
+  vendorOrgId: z.string().trim(),
+  roomId: z.string().trim().optional(),
+  responses: z
+    .array(
+      z.object({
+        questionId: z.string().trim(),
+        answerText: z.string().trim().max(8000).optional(),
+        answerNumeric: z.coerce.number().optional(),
+        answerOptions: z.array(z.string().trim()).optional(),
+        attachments: z
+          .array(
+            z.object({
+              fileUrl: z.string().trim(),
+              fileName: z.string().trim()
+            })
+          )
+          .optional(),
+        autoScore: z.coerce.number().min(0).max(100).optional(),
+        reviewScore: z.coerce.number().min(0).max(100).optional(),
+        buyerComments: z
+          .array(
+            z.object({
+              reviewerUserId: z.string().trim(),
+              comment: z.string().trim().max(2000)
+            })
+          )
+          .optional()
+      })
+    )
+    .min(1)
 });
 
 const revenueAccountSchema = z.object({
@@ -5666,14 +5759,37 @@ app.post(
   }
 );
 
-async function loadProcurePathUser(req, res) {
+async function loadProcurePathContext(req, res) {
   const user = req.requestingUser || (await User.findById(req.auth.uid));
   if (!user) {
     res.status(404).json({ error: 'Not found' });
     return null;
   }
 
-  return user;
+  const orgId = req.auth.orgId || user.defaultOrganization;
+  const organizationContext =
+    req.organizationContext || (await buildOrganizationContext(user, orgId, { includeSeatDetails: false }));
+
+  if (!organizationContext || !organizationContext.membership) {
+    res.status(403).json({ error: 'Membership required' });
+    return null;
+  }
+
+  const membership = organizationContext.membership;
+  const allowedRoles = ['org_owner', 'org_admin', 'buyer_user'];
+  const hasBuyerSuite = Boolean(membership.buyerSuiteEnabled) && Boolean(organizationContext.buyerSuiteEnabled);
+
+  if (!hasBuyerSuite) {
+    res.status(403).json({ error: 'BUYER_SUITE_REQUIRED' });
+    return null;
+  }
+
+  if (!allowedRoles.includes(membership.role)) {
+    res.status(403).json({ error: 'FORBIDDEN' });
+    return null;
+  }
+
+  return { user, organizationContext };
 }
 
 async function loadRevenueForgeUser(req, res) {
@@ -5841,7 +5957,7 @@ app.get('/api/valuesphere/buyer/vendors', requireAuth, requirePlatformAccess('va
     if (!ensureBuyerSuiteAccess(context, res)) return;
 
     if (context.isBusinessBuyerWithProcurePath && context.organization) {
-      const vendors = await ProcurementVendor.find({ organization: context.organization._id })
+      const vendors = await ProcurementVendor.find({ orgId: context.organization._id })
         .sort({ updatedAt: -1 })
         .lean();
 
@@ -6087,7 +6203,7 @@ app.post('/api/valuesphere/buyer/assessments', requireAuth, requirePlatformAcces
 
       const procurementVendor = await ProcurementVendor.findOne({
         _id: vendorId,
-        organization: context.organization._id
+        orgId: context.organization._id
       });
 
       if (!procurementVendor) {
@@ -6263,9 +6379,9 @@ app.patch('/api/valuesphere/buyer/assessments/:id', requireAuth, requirePlatform
 
 app.get('/api/procurepath/overview', requireAuth, requirePlatformAccess('procurepath'), async (req, res) => {
   try {
-    const user = await loadProcurePathUser(req, res);
-    if (!user) return;
-    const vendors = await ProcurementVendor.find({ userId: user._id }).lean();
+    const context = await loadProcurePathContext(req, res);
+    if (!context) return;
+    const vendors = await ProcurementVendor.find({ orgId: context.organizationContext.id }).lean();
 
     const totalObjectives = vendors.reduce((acc, vendor) => acc + (vendor.objectives?.length || 0), 0);
     const atRiskVendors = vendors.filter(vendor => vendor.riskLevel === 'high' || vendor.status === 'watchlist').length;
@@ -6293,9 +6409,9 @@ app.get('/api/procurepath/overview', requireAuth, requirePlatformAccess('procure
 
 app.get('/api/procurepath/vendors', requireAuth, requirePlatformAccess('procurepath'), async (req, res) => {
   try {
-    const user = await loadProcurePathUser(req, res);
-    if (!user) return;
-    const vendors = await ProcurementVendor.find({ userId: user._id }).sort({ updatedAt: -1 }).lean();
+    const context = await loadProcurePathContext(req, res);
+    if (!context) return;
+    const vendors = await ProcurementVendor.find({ orgId: context.organizationContext.id }).sort({ updatedAt: -1 }).lean();
     res.json({ ok: true, vendors });
   } catch (err) {
     console.error(err);
@@ -6304,15 +6420,26 @@ app.get('/api/procurepath/vendors', requireAuth, requirePlatformAccess('procurep
 });
 
   app.post(
-    '/api/procurepath/vendors',
-    requireAuth,
-    requirePlatformAccess('procurepath'),
-    validateBody(procurementVendorSchema),
-    async (req, res) => {
-      try {
-        const user = await loadProcurePathUser(req, res);
-        if (!user) return;
-        const vendor = await ProcurementVendor.create({ ...req.validatedBody, userId: user._id });
+      '/api/procurepath/vendors',
+      requireAuth,
+      requirePlatformAccess('procurepath'),
+      validateBody(procurementVendorSchema),
+      async (req, res) => {
+        try {
+        const context = await loadProcurePathContext(req, res);
+        if (!context) return;
+        const vendor = await ProcurementVendor.create({
+          ...req.validatedBody,
+          orgId: context.organizationContext.id,
+          createdByUserId: context.user._id
+        });
+        await recordAuditEvent({
+          type: 'procurepath.vendor.created',
+          actorUser: context.user._id,
+          actorOrganization: context.organizationContext.id,
+          targetOrganization: context.organizationContext.id,
+          metadata: { vendorId: vendor._id }
+        });
         res.status(201).json({ ok: true, vendor });
       } catch (err) {
         console.error(err);
@@ -6322,16 +6449,16 @@ app.get('/api/procurepath/vendors', requireAuth, requirePlatformAccess('procurep
   );
 
   app.put(
-    '/api/procurepath/vendors/:id',
-    requireAuth,
-    requirePlatformAccess('procurepath'),
-    validateBody(procurementVendorSchema.partial()),
-    async (req, res) => {
-      try {
-        const user = await loadProcurePathUser(req, res);
-        if (!user) return;
+      '/api/procurepath/vendors/:id',
+      requireAuth,
+      requirePlatformAccess('procurepath'),
+      validateBody(procurementVendorSchema.partial()),
+      async (req, res) => {
+        try {
+        const context = await loadProcurePathContext(req, res);
+        if (!context) return;
         const vendor = await ProcurementVendor.findOneAndUpdate(
-          { _id: req.params.id, userId: user._id },
+          { _id: req.params.id, orgId: context.organizationContext.id },
           { $set: req.validatedBody },
           { new: true }
         );
@@ -6339,6 +6466,14 @@ app.get('/api/procurepath/vendors', requireAuth, requirePlatformAccess('procurep
         if (!vendor) {
           return res.status(404).json({ error: 'Vendor not found' });
         }
+
+        await recordAuditEvent({
+          type: 'procurepath.vendor.updated',
+          actorUser: context.user._id,
+          actorOrganization: context.organizationContext.id,
+          targetOrganization: context.organizationContext.id,
+          metadata: { vendorId: vendor._id }
+        });
 
         res.json({ ok: true, vendor });
       } catch (err) {
@@ -6355,14 +6490,21 @@ app.post(
   validateBody(procurementObjectiveSchema),
   async (req, res) => {
     try {
-      const user = await loadProcurePathUser(req, res);
-      if (!user) return;
+      const context = await loadProcurePathContext(req, res);
+      if (!context) return;
 
-      const vendor = await ProcurementVendor.findOne({ _id: req.params.id, userId: user._id });
+      const vendor = await ProcurementVendor.findOne({ _id: req.params.id, orgId: context.organizationContext.id });
       if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
 
       vendor.objectives.push(req.validatedBody);
       await vendor.save();
+      await recordAuditEvent({
+        type: 'procurepath.vendor.objective_added',
+        actorUser: context.user._id,
+        actorOrganization: context.organizationContext.id,
+        targetOrganization: context.organizationContext.id,
+        metadata: { vendorId: vendor._id }
+      });
       res.status(201).json({ ok: true, vendor });
     } catch (err) {
       console.error(err);
@@ -6378,14 +6520,21 @@ app.post(
   validateBody(procurementTouchpointSchema),
   async (req, res) => {
     try {
-      const user = await loadProcurePathUser(req, res);
-      if (!user) return;
+      const context = await loadProcurePathContext(req, res);
+      if (!context) return;
 
-      const vendor = await ProcurementVendor.findOne({ _id: req.params.id, userId: user._id });
+      const vendor = await ProcurementVendor.findOne({ _id: req.params.id, orgId: context.organizationContext.id });
       if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
 
-      vendor.touchpoints.push(req.validatedBody);
+      vendor.touchpoints.push({ ...req.validatedBody, recordedBy: context.user._id });
       await vendor.save();
+      await recordAuditEvent({
+        type: 'procurepath.vendor.touchpoint_added',
+        actorUser: context.user._id,
+        actorOrganization: context.organizationContext.id,
+        targetOrganization: context.organizationContext.id,
+        metadata: { vendorId: vendor._id }
+      });
       res.status(201).json({ ok: true, vendor });
     } catch (err) {
       console.error(err);
@@ -6394,10 +6543,223 @@ app.post(
   }
 );
 
+app.post(
+  '/api/procurepath/rfx',
+  requireAuth,
+  requirePlatformAccess('procurepath'),
+  validateBody(rfxCreateSchema),
+  async (req, res) => {
+    try {
+      const context = await loadProcurePathContext(req, res);
+      if (!context) return;
+
+      const sections = (req.validatedBody.sections || []).map(section => {
+        const sectionObjectId =
+          section.id && mongoose.Types.ObjectId.isValid(section.id)
+            ? section.id
+            : new mongoose.Types.ObjectId();
+        return {
+          ...section,
+          _id: sectionObjectId
+        };
+      });
+
+      const rfx = await Rfx.create({
+        topicArea: req.validatedBody.topicArea,
+        sourcingEventId: req.validatedBody.sourcingEventId,
+        overallWeight: req.validatedBody.overallWeight,
+        status: req.validatedBody.status || 'draft',
+        issuedAt: req.validatedBody.issuedAt,
+        closeResponsesAt: req.validatedBody.closeResponsesAt,
+        sections,
+        orgId: context.organizationContext.id,
+        createdByUserId: context.user._id
+      });
+
+      const sectionIdMap = new Map();
+      sections.forEach(sec => {
+        const key = sec.id || sec._id;
+        if (key) sectionIdMap.set(String(key), sec._id);
+        sectionIdMap.set(String(sec._id), sec._id);
+      });
+
+      const itemPayload = (req.validatedBody.items || []).map(item => ({
+        ...item,
+        rfxId: rfx._id,
+        sectionId: sectionIdMap.get(item.sectionId) || item.sectionId
+      }));
+
+      const items = itemPayload.length > 0 ? await RfxItem.insertMany(itemPayload) : [];
+
+      if (Array.isArray(req.validatedBody.vendorIds) && req.validatedBody.vendorIds.length > 0) {
+        await ProcurementVendor.updateMany(
+          { _id: { $in: req.validatedBody.vendorIds }, orgId: context.organizationContext.id },
+          { $addToSet: { linkedRfx: rfx._id } }
+        );
+      }
+
+      await recordAuditEvent({
+        type: 'procurepath.rfx.created',
+        actorUser: context.user._id,
+        actorOrganization: context.organizationContext.id,
+        targetOrganization: context.organizationContext.id,
+        metadata: { rfxId: rfx._id }
+      });
+
+      res.status(201).json({ ok: true, rfx, items });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Unable to create RFX' });
+    }
+  }
+);
+
+app.get(
+  '/api/procurepath/rfx/:id',
+  requireAuth,
+  requirePlatformAccess('procurepath'),
+  async (req, res) => {
+    try {
+      const context = await loadProcurePathContext(req, res);
+      if (!context) return;
+
+      const rfx = await Rfx.findOne({ _id: req.params.id, orgId: context.organizationContext.id });
+      if (!rfx) return res.status(404).json({ error: 'RFX not found' });
+
+      const [items, responses] = await Promise.all([
+        RfxItem.find({ rfxId: rfx._id }).sort({ order: 1 }),
+        RfxResponse.find({ rfxId: rfx._id, buyerOrgId: context.organizationContext.id })
+      ]);
+
+      res.json({ ok: true, rfx, items, responses });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Unable to load RFX' });
+    }
+  }
+);
+
+app.patch(
+  '/api/procurepath/rfx/:id',
+  requireAuth,
+  requirePlatformAccess('procurepath'),
+  validateBody(rfxCreateSchema.partial()),
+  async (req, res) => {
+    try {
+      const context = await loadProcurePathContext(req, res);
+      if (!context) return;
+
+      const rfx = await Rfx.findOne({ _id: req.params.id, orgId: context.organizationContext.id });
+      if (!rfx) return res.status(404).json({ error: 'RFX not found' });
+
+      ['topicArea', 'overallWeight', 'status', 'issuedAt', 'closeResponsesAt', 'sourcingEventId'].forEach(field => {
+        if (req.validatedBody[field] !== undefined) {
+          rfx[field] = req.validatedBody[field];
+        }
+      });
+
+      if (Array.isArray(req.validatedBody.sections)) {
+        rfx.sections = req.validatedBody.sections.map(section => {
+          const sectionObjectId =
+            section.id && mongoose.Types.ObjectId.isValid(section.id)
+              ? section.id
+              : section._id && mongoose.Types.ObjectId.isValid(section._id)
+                ? section._id
+                : new mongoose.Types.ObjectId();
+          return {
+            ...section,
+            _id: sectionObjectId
+          };
+        });
+      }
+
+      await rfx.save();
+
+      if (Array.isArray(req.validatedBody.items)) {
+        await RfxItem.deleteMany({ rfxId: rfx._id });
+        const sectionIdMap = new Map();
+        (rfx.sections || []).forEach(sec => {
+          const key = sec.id || sec._id;
+          if (key) sectionIdMap.set(String(key), sec._id);
+          sectionIdMap.set(String(sec._id), sec._id);
+        });
+        const payload = req.validatedBody.items.map(item => ({
+          ...item,
+          rfxId: rfx._id,
+          sectionId: sectionIdMap.get(item.sectionId) || item.sectionId
+        }));
+        if (payload.length > 0) {
+          await RfxItem.insertMany(payload);
+        }
+      }
+
+      await recordAuditEvent({
+        type: 'procurepath.rfx.updated',
+        actorUser: context.user._id,
+        actorOrganization: context.organizationContext.id,
+        targetOrganization: context.organizationContext.id,
+        metadata: { rfxId: rfx._id }
+      });
+
+      res.json({ ok: true, rfx });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Unable to update RFX' });
+    }
+  }
+);
+
+app.post(
+  '/api/procurepath/rfx/:id/responses',
+  requireAuth,
+  requirePlatformAccess('procurepath'),
+  validateBody(rfxResponseSchema),
+  async (req, res) => {
+    try {
+      const context = await loadProcurePathContext(req, res);
+      if (!context) return;
+
+      const rfx = await Rfx.findOne({ _id: req.params.id, orgId: context.organizationContext.id });
+      if (!rfx) return res.status(404).json({ error: 'RFX not found' });
+
+      const questionIds = req.validatedBody.responses.map(r => r.questionId);
+      const existingQuestions = await RfxItem.find({ rfxId: rfx._id, _id: { $in: questionIds } });
+      if (existingQuestions.length !== questionIds.length) {
+        return res.status(400).json({ error: 'Invalid question references' });
+      }
+
+      const responses = await RfxResponse.insertMany(
+        req.validatedBody.responses.map(response => ({
+          ...response,
+          rfxId: rfx._id,
+          buyerOrgId: context.organizationContext.id,
+          vendorOrgId: req.validatedBody.vendorOrgId,
+          roomId: req.validatedBody.roomId,
+          submittedByUserId: context.user._id,
+          submittedAt: new Date()
+        }))
+      );
+
+      await recordAuditEvent({
+        type: 'procurepath.rfx.response_recorded',
+        actorUser: context.user._id,
+        actorOrganization: context.organizationContext.id,
+        targetOrganization: context.organizationContext.id,
+        metadata: { rfxId: rfx._id, vendorOrgId: req.validatedBody.vendorOrgId, count: responses.length }
+      });
+
+      res.status(201).json({ ok: true, responses });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Unable to record responses' });
+    }
+  }
+);
+
 app.post('/api/procurepath/ai/playbook', requireAuth, requirePlatformAccess('procurepath'), async (req, res) => {
   try {
-    const user = await loadProcurePathUser(req, res);
-    if (!user) return;
+    const context = await loadProcurePathContext(req, res);
+    if (!context) return;
 
     if (!OPENAI_API_KEY) {
       return res
@@ -6410,7 +6772,7 @@ app.post('/api/procurepath/ai/playbook', requireAuth, requirePlatformAccess('pro
       return res.status(400).json({ error: 'Provide vendorId and goal to generate a playbook.' });
     }
 
-    const vendor = await ProcurementVendor.findOne({ _id: vendorId, userId: user._id });
+    const vendor = await ProcurementVendor.findOne({ _id: vendorId, orgId: context.organizationContext.id });
     if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
 
     const latestObjectives = (vendor.objectives || []).slice(-3);
