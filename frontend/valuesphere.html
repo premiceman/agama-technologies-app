@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ValueSphere Consulting — Agama Technologies</title>
+  <title>ValueSphere — Agama Technologies</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
@@ -25,11 +25,8 @@
       <button class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#nav"><span class="navbar-toggler-icon"></span></button>
       <div class="collapse navbar-collapse" id="nav">
         <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-3">
-          <li class="nav-item"><a href="/" class="nav-link">Back to suite</a></li>
-          <li class="nav-item"><a href="/procurepath.html" class="nav-link">ProcurePath</a></li>
-          <li class="nav-item"><a href="/revenueforge.html" class="nav-link">RevenueForge</a></li>
-          <li class="nav-item"><a href="/api/auth/workos/signup" class="btn btn-primary">Create account</a></li>
-          <li class="nav-item"><a href="/api/auth/workos/login" class="btn btn-outline-light">Client login</a></li>
+          <li class="nav-item"><a href="/workspace.html" class="nav-link">Workspace</a></li>
+          <li class="nav-item"><a href="/valuesphere-tool.html" class="btn btn-primary btn-sm">Launch ValueSphere</a></li>
         </ul>
       </div>
     </div>
@@ -37,59 +34,46 @@
 
   <main class="container py-5" style="max-width: 1080px;">
     <header class="mb-5 text-center">
-      <span class="eyebrow">ValueSphere Consulting</span>
-      <h1 class="display-5 fw-bold">Strategic value consulting built for personal explorers and enterprise catalysts</h1>
-      <p class="text-fg-2 lead">ValueSphere is the compass for leaders translating ambition into measurable, finance-ready outcomes. Two experiences keep everyone aligned on value creation.</p>
+      <span class="eyebrow">ValueSphere</span>
+      <h1 class="display-6 fw-bold">Templates → Assessments → Completion</h1>
+      <p class="text-fg-2 lead">Guided value assessments that respect buyer, seller, and shared visibility rules. Start with a template, run an assessment, and lock outcomes for audit.</p>
+      <div class="d-flex gap-3 justify-content-center flex-wrap">
+        <a class="btn btn-primary" href="/valuesphere-tool.html">Open Navigator</a>
+        <a class="btn btn-outline-light" href="/valuesphere-template-library.html">Template library</a>
+      </div>
     </header>
 
-    <section class="row g-4 mb-5">
+    <section class="row g-4 mb-4">
       <div class="col-lg-6">
         <div class="card glass h-100 p-4">
-          <h2 class="h4 mb-3">Navigator Assessments</h2>
-          <p class="text-fg-3">A guided self-serve journey for individual change-makers and business license holders who want rapid, defensible insight into where value hides.</p>
-          <ul class="text-fg-2 small mb-4">
-            <li>Dynamic maturity scoring with industry benchmarks and ROI lenses.</li>
-            <li>Persona-led discovery prompts that turn into executive briefings.</li>
-            <li>Downloadable narratives and value maps ready for board packs.</li>
+          <h2 class="h5 mb-2">Template-first assessments</h2>
+          <p class="text-fg-3">Author sections, questions, and weights aligned with ValueSphere governance states. Versions and change summaries keep buyer and seller modes in sync.</p>
+          <ul class="text-fg-3 small mb-3">
+            <li>Buyer vs seller themes applied via /api/me/context.</li>
+            <li>Section weights and question types for structured scoring.</li>
+            <li>Library view for current and deprecated versions.</li>
           </ul>
-          <div class="d-flex gap-3 flex-wrap">
-            <a class="btn btn-primary" href="/api/auth/workos/signup">Start with a personal license</a>
-            <a class="btn btn-outline-light" href="/api/auth/workos/login">Preview in workspace</a>
-          </div>
+          <a class="btn btn-outline-light btn-sm" href="/valuesphere-template-new.html">Create template</a>
         </div>
       </div>
       <div class="col-lg-6">
         <div class="card glass h-100 p-4">
-          <h2 class="h4 mb-3">Catalyst Advisory Guilds</h2>
-          <p class="text-fg-3">Dedicated consulting squads for business license clients who need cross-functional execution support and governance.</p>
-          <ul class="text-fg-2 small mb-4">
-            <li>Quarterly value ceremonies with finance, product, and operations stakeholders.</li>
-            <li>Embedded telemetry for observability, cost optimisation, and AI readiness.</li>
-            <li>Board-ready reporting, risk controls, and milestone governance.</li>
+          <h2 class="h5 mb-2">Assessment lifecycle</h2>
+          <p class="text-fg-3">Capture vendors, criteria, scoring models, and stakeholders. Progress through draft → shared → agreed → locked with clear audit states.</p>
+          <ul class="text-fg-3 small mb-3">
+            <li>Assessment detail shows criteria, scoring, and stakeholders.</li>
+            <li>Lock completed assessments for audit and downstream workflows.</li>
+            <li>Empty states and errors handled inline for safer execution.</li>
           </ul>
-          <div class="d-flex gap-3 flex-wrap">
-            <a class="btn btn-primary" href="/api/auth/workos/signup">Upgrade to a business license</a>
-            <a class="btn btn-outline-light" href="mailto:hello@agamasuite.com">Talk to Agama</a>
-          </div>
+          <a class="btn btn-outline-light btn-sm" href="/valuesphere-accounts.html">Manage assessments</a>
         </div>
       </div>
     </section>
 
-    <section class="card glass p-4 mb-5">
-      <h2 class="h4 mb-3">ValueSphere roadmap</h2>
-      <ul class="text-fg-2 small mb-0">
-        <li>Interactive Navigator assessments with benchmarking, persona cards, and measurable goal setting.</li>
-        <li>Catalyst delivery playbooks across finance, security, AI, and observability transformations.</li>
-        <li>Shared workspace to manage licensing, invite collaborators, and view upcoming engagements.</li>
-      </ul>
-    </section>
-
-    <section class="text-center">
-      <p class="text-fg-3 mb-3">Ready to explore ValueSphere?</p>
-      <div class="d-flex gap-3 justify-content-center flex-wrap">
-        <a class="btn btn-primary" href="/api/auth/workos/signup">Create your account</a>
-        <a class="btn btn-outline-light" href="/api/auth/workos/login">Sign in</a>
-      </div>
+    <section class="card glass p-4">
+      <h2 class="h5 mb-3">Completed outcomes</h2>
+      <p class="text-fg-3 mb-3">Locked assessments are visible in the completed view with the correct theming for buyer or seller personas. No cross-role data is exposed.</p>
+      <a class="btn btn-outline-light btn-sm" href="/valuesphere-completed.html">View completed assessments</a>
     </section>
   </main>
 
@@ -101,6 +85,7 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="/js/main.js" type="module"></script>
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+  <script src="/js/valuesphere.js"></script>
 </body>
 </html>

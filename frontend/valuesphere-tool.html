@@ -57,20 +57,6 @@
             <span class="sidebar-label">Docs</span>
           </a>
         </div>
-        <div class="sidebar-section-label" id="orgAdminLabel" style="display:none;">Organisation</div>
-        <div class="sidebar-section" id="orgAdminSection" style="display:none;">
-          <a class="sidebar-link" href="/admin-org.html" id="orgAdminLink">
-            <i class="bi bi-building-gear"></i>
-            <span class="sidebar-label">Org &amp; Members</span>
-          </a>
-        </div>
-        <div class="sidebar-section-label" id="agamaAdminLabel" style="display:none;">Agama</div>
-        <div class="sidebar-section" id="agamaAdminSection" style="display:none;">
-          <a class="sidebar-link" href="/agama-admin.html" id="agamaAdminLink">
-            <i class="bi bi-shield-lock"></i>
-            <span class="sidebar-label">Agama Admin Console</span>
-          </a>
-        </div>
         <div class="sidebar-section-label">Account &amp; Settings</div>
         <div class="sidebar-section">
           <a class="sidebar-link" href="/profile.html">
@@ -99,21 +85,21 @@
           <i class="bi bi-compass"></i>
           <span>Dashboard</span>
         </a>
-        <button class="subnav-link subnav-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#templateSubnav" aria-expanded="true" aria-controls="templateSubnav">
-          <span class="d-flex align-items-center gap-2"><i class="bi bi-kanban"></i> Templates</span>
-          <i class="bi bi-chevron-down small"></i>
-        </button>
-        <div class="collapse show" id="templateSubnav">
-          <a class="subnav-sublink" href="/valuesphere-template-new.html">New Template</a>
-          <a class="subnav-sublink" href="/valuesphere-template-library.html">Template Library</a>
-        </div>
+        <a class="subnav-link" href="/valuesphere-template-new.html">
+          <i class="bi bi-kanban"></i>
+          <span>Create template</span>
+        </a>
+        <a class="subnav-link" href="/valuesphere-template-library.html">
+          <i class="bi bi-collection"></i>
+          <span>Template library</span>
+        </a>
         <a class="subnav-link" href="/valuesphere-accounts.html">
           <i class="bi bi-building"></i>
-          <span>Accounts</span>
+          <span>Assessments</span>
         </a>
         <a class="subnav-link" href="/valuesphere-completed.html">
           <i class="bi bi-clipboard-check"></i>
-          <span>Completed assessments</span>
+          <span>Completed</span>
         </a>
       </nav>
     </aside>
@@ -127,230 +113,83 @@
           </a>
           <div class="d-flex align-items-center gap-2">
             <a class="btn btn-outline-light btn-sm" href="/workspace.html">Back to workspace</a>
-            <button class="btn btn-primary btn-sm" id="logout">Logout</button>
+            <a class="btn btn-primary btn-sm" href="/api/auth/logout">Logout</a>
           </div>
         </div>
       </nav>
 
       <main class="container py-4" style="max-width: 1240px;">
-        <section class="card glass p-3 mb-3">
-          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div id="valuesphereStatus" class="alert alert-info d-none" role="status"></div>
+
+        <header class="card glass p-4 mb-4">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
             <div>
-              <span class="eyebrow d-block mb-1">ValueSphere</span>
-              <strong class="h6 mb-0">Mode</strong>
+              <span class="eyebrow d-block">ValueSphere</span>
+              <h1 class="h4 mb-2">Templates, assessments, and completion tracking</h1>
+              <p class="text-fg-3 mb-0">Assess value collaboratively with the right theme applied for buyer, seller, or shared contexts.</p>
             </div>
-            <div class="btn-group btn-group-sm" role="group" aria-label="ValueSphere mode">
-              <button type="button" class="btn btn-outline-light" id="vsModeVendorBtn">Vendor mode</button>
-              <button type="button" class="btn btn-outline-light" id="vsModeBuyerBtn">Buyer mode</button>
+            <div class="text-end">
+              <div class="badge-soft mb-2" id="personaLabel">Loading context...</div>
+              <div class="d-flex gap-2 flex-wrap">
+                <a class="btn btn-outline-light btn-sm" href="/valuesphere-template-new.html">Build template</a>
+                <a class="btn btn-primary btn-sm" href="/valuesphere-accounts.html">Open assessments</a>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <section class="row g-3 mb-4">
+          <div class="col-md-4">
+            <div class="card glass p-3 h-100">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="text-fg-3">Templates</span>
+                <i class="bi bi-kanban"></i>
+              </div>
+              <div class="display-6 fw-bold" id="templateCount">0</div>
+              <p class="text-fg-3 small mb-0">Structured blueprints for assessments.</p>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card glass p-3 h-100">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="text-fg-3">Assessments</span>
+                <i class="bi bi-clipboard-data"></i>
+              </div>
+              <div class="display-6 fw-bold" id="assessmentCount">0</div>
+              <p class="text-fg-3 small mb-0">Active in-flight evaluations.</p>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card glass p-3 h-100">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="text-fg-3">Completed</span>
+                <i class="bi bi-check2-circle"></i>
+              </div>
+              <div class="display-6 fw-bold" id="completedCount">0</div>
+              <p class="text-fg-3 small mb-0">Locked and audit-ready.</p>
             </div>
           </div>
         </section>
 
-        <section id="vsVendorMode">
-          <header class="card glass p-4 mb-4">
-            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
-              <div>
-                <span class="eyebrow d-block">ValueSphere Navigator</span>
-                <h1 class="h4 mb-2">Enterprise-grade assessments and value paths</h1>
-                <p class="text-fg-3 mb-0">Model maturity templates, capture account signals, and generate AI-ready assessments for consulting teams and their customers.</p>
+        <section class="row g-3">
+          <div class="col-lg-5">
+            <div class="card glass p-3 h-100">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <h2 class="h6 mb-0">Recent assessments</h2>
+                <a class="btn btn-outline-light btn-sm" href="/valuesphere-accounts.html">View all</a>
               </div>
-              <div class="d-flex align-items-center gap-2 flex-wrap">
-                <div class="badge-soft">Consulting &amp; GTM ready</div>
-                <div class="badge-soft">AI-assisted</div>
-              </div>
+              <div id="recentAssessments"></div>
             </div>
-            <div class="mt-3 d-flex flex-wrap gap-3">
-              <div class="glass p-3 flex-grow-1">
-                <div class="d-flex align-items-center gap-3">
-                  <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-kanban"></i></div>
-                  <div>
-                    <strong>Template studio</strong>
-                    <p class="mb-0 small text-fg-3">Design BVC assessments with configurable maturity stages.</p>
-                  </div>
-                </div>
+          </div>
+          <div class="col-lg-7">
+            <div class="card glass p-3 h-100">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <h2 class="h6 mb-0">Templates</h2>
+                <a class="btn btn-outline-light btn-sm" href="/valuesphere-template-library.html">Library</a>
               </div>
-              <div class="glass p-3 flex-grow-1">
-                <div class="d-flex align-items-center gap-3">
-                  <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-building-add"></i></div>
-                  <div>
-                    <strong>Accounts &amp; timelines</strong>
-                    <p class="mb-0 small text-fg-3">Assign templates to accounts and track timestamped assessments.</p>
-                  </div>
-                </div>
-              </div>
-              <div class="glass p-3 flex-grow-1">
-                <div class="d-flex align-items-center gap-3">
-                  <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-graph-up"></i></div>
-                  <div>
-                    <strong>Analytics &amp; objectives</strong>
-                    <p class="mb-0 small text-fg-3">Monitor urgency, maturity and objective completion across cycles.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </header>
-
-          <section class="row g-3 mb-4">
-            <div class="col-md-4">
-              <div class="glass p-3 h-100">
-                <div class="d-flex justify-content-between align-items-start">
-                  <div>
-                    <span class="eyebrow d-block">Templates</span>
-                    <h2 class="h5 mb-1">Reusable playbooks</h2>
-                    <p class="small text-fg-3 mb-2">Create and reuse BVC templates for assessments.</p>
-                    <a class="btn btn-primary btn-sm" href="/valuesphere-template-new.html">Launch studio</a>
-                  </div>
-                  <div class="display-6" id="dashboardTemplateCount">0</div>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-4">
-              <div class="glass p-3 h-100">
-                <div class="d-flex justify-content-between align-items-start">
-                  <div>
-                    <span class="eyebrow d-block">Accounts</span>
-                    <h2 class="h5 mb-1">In-flight engagements</h2>
-                    <p class="small text-fg-3 mb-2">Capture account teams, TCV, and link assessments.</p>
-                    <a class="btn btn-outline-light btn-sm" href="/valuesphere-accounts.html">Manage accounts</a>
-                  </div>
-                  <div class="display-6" id="dashboardAccountCount">0</div>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-4">
-              <div class="glass p-3 h-100">
-                <div class="d-flex justify-content-between align-items-start">
-                  <div>
-                    <span class="eyebrow d-block">Assessments</span>
-                    <h2 class="h5 mb-1">Cycles &amp; outcomes</h2>
-                    <p class="small text-fg-3 mb-2">Timestamped assessments with owners and collaborators.</p>
-                    <a class="btn btn-outline-light btn-sm" href="/valuesphere-completed.html">View history</a>
-                  </div>
-                  <div class="display-6" id="dashboardAssessmentCount">0</div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section class="card glass p-4">
-            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
-              <div>
-                <h2 class="h5 mb-1">Navigator quick links</h2>
-                <p class="small text-fg-3 mb-0">Jump into the areas you need to work on next.</p>
-              </div>
-            </div>
-            <div class="row g-3">
-              <div class="col-md-6">
-                <div class="glass p-3 h-100">
-                  <div class="d-flex align-items-center gap-3">
-                    <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-pencil"></i></div>
-                    <div class="flex-grow-1">
-                      <strong>Create a new template</strong>
-                      <p class="small text-fg-3 mb-2">Model questions, maturity stages, and reusable areas.</p>
-                      <a class="btn btn-outline-light btn-sm" href="/valuesphere-template-new.html">Open template studio</a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="glass p-3 h-100">
-                  <div class="d-flex align-items-center gap-3">
-                    <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-journals"></i></div>
-                    <div class="flex-grow-1">
-                      <strong>Browse template library</strong>
-                      <p class="small text-fg-3 mb-2">Reuse past engagements or company-wide playbooks.</p>
-                      <a class="btn btn-outline-light btn-sm" href="/valuesphere-template-library.html">View library</a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="glass p-3 h-100">
-                  <div class="d-flex align-items-center gap-3">
-                    <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-people"></i></div>
-                    <div class="flex-grow-1">
-                      <strong>Record an assessment</strong>
-                      <p class="small text-fg-3 mb-2">Pick an account, assign a template, and capture collaborators.</p>
-                      <a class="btn btn-outline-light btn-sm" href="/valuesphere-accounts.html">Start from accounts</a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="glass p-3 h-100">
-                  <div class="d-flex align-items-center gap-3">
-                    <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-clipboard-check"></i></div>
-                    <div class="flex-grow-1">
-                      <strong>Review completed cycles</strong>
-                      <p class="small text-fg-3 mb-2">See who contributed, when it happened, and reopen details.</p>
-                      <a class="btn btn-outline-light btn-sm" href="/valuesphere-completed.html">Open assessments</a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="glass p-3 h-100">
-                  <div class="d-flex align-items-center gap-3">
-                    <div class="rounded-circle bg-elevated d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-people"></i></div>
-                    <div class="flex-grow-1">
-                      <strong>Collaborate in a room</strong>
-                      <p class="small text-fg-3 mb-2">Share assessments and findings with customers via Engagement Rooms.</p>
-                      <a class="btn btn-outline-light btn-sm" href="/rooms.html">Open Engagement Rooms</a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        </section>
-
-        <section id="vsBuyerMode" class="d-none">
-          <div class="row g-3">
-            <div class="col-lg-4">
-              <div class="card glass p-3 h-100">
-                <h2 class="h6 mb-2">Vendors</h2>
-                <p class="text-fg-3 small mb-3" id="vsBuyerVendorHelper">
-                  Vendors from ProcurePath will appear here when you’re in a buyer organisation.
-                </p>
-                <div class="list-group small" id="vsBuyerVendorList">
-                  <!-- vendor rows injected here -->
-                </div>
-              </div>
-            </div>
-            <div class="col-lg-8">
-              <div class="card glass p-3 mb-3" id="vsBuyerAssessmentEmpty">
-                <p class="text-fg-3 small mb-0">Select a vendor to start assessing their value.</p>
-              </div>
-              <div class="card glass p-3 d-none" id="vsBuyerAssessmentDetail">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <div>
-                    <span class="eyebrow d-block mb-1">Buyer mode</span>
-                    <strong class="h6 mb-0" id="vsBuyerAssessmentVendorName"></strong>
-                  </div>
-                  <div class="d-flex gap-2">
-                    <a class="btn btn-outline-light btn-sm" id="vsBuyerOpenProcurePath" href="#">Open in ProcurePath</a>
-                    <a class="btn btn-outline-light btn-sm" id="vsBuyerOpenRooms" href="/rooms.html">Open Engagement Rooms</a>
-                  </div>
-                </div>
-                <!-- simple assessment form -->
-                <div class="mb-3">
-                  <label class="form-label small" for="vsBuyerAssessmentTitle">Assessment title</label>
-                  <input class="form-control form-control-sm" id="vsBuyerAssessmentTitle" type="text" placeholder="e.g. 2025 roadmap fit">
-                </div>
-                <div class="mb-3">
-                  <label class="form-label small" for="vsBuyerAssessmentSummary">Summary</label>
-                  <textarea class="form-control form-control-sm" id="vsBuyerAssessmentSummary" rows="3" placeholder="How does this vendor support our outcomes?"></textarea>
-                </div>
-                <!-- tags can be a simple text input for now -->
-                <div class="mb-3">
-                  <label class="form-label small" for="vsBuyerAssessmentTags">Tags (comma-separated)</label>
-                  <input class="form-control form-control-sm" id="vsBuyerAssessmentTags" type="text" placeholder="keep,grow,watch,consolidate">
-                </div>
-                <div class="d-flex justify-content-between align-items-center">
-                  <div class="small text-fg-3" id="vsBuyerAssessmentMeta"></div>
-                  <button class="btn btn-primary btn-sm" id="vsBuyerSaveAssessmentBtn" type="button">Save assessment</button>
-                </div>
-              </div>
+              <div id="templateLibraryList" class="row g-2"></div>
+              <div id="templateLibraryEmpty" class="text-fg-3 small">No templates yet. Create one to get started.</div>
+              <div id="templateLibraryError" class="alert alert-danger d-none mt-2" role="alert"></div>
             </div>
           </div>
         </section>

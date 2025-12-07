@@ -33,46 +33,13 @@
         </a>
         <div class="sidebar-section-label">Applications</div>
         <div class="sidebar-section">
-          <a class="sidebar-link" href="/revenueforge-tool.html">
-            <i class="bi bi-lightning-charge"></i>
-            <span class="sidebar-label">RevenueForge</span>
-          </a>
-          <a class="sidebar-link active" href="/valuesphere-tool.html">
+          <a class="sidebar-link" href="/valuesphere-tool.html">
             <i class="bi bi-kanban"></i>
             <span class="sidebar-label">ValueSphere</span>
           </a>
-          <a class="sidebar-link" href="/procurepath-tool.html">
-            <i class="bi bi-diagram-3"></i>
-            <span class="sidebar-label">ProcurePath</span>
-          </a>
-        </div>
-        <div class="sidebar-section-label" id="orgAdminLabel" style="display:none;">Organisation</div>
-        <div class="sidebar-section" id="orgAdminSection" style="display:none;">
-          <a class="sidebar-link" href="/admin-org.html" id="orgAdminLink">
-            <i class="bi bi-building-gear"></i>
-            <span class="sidebar-label">Org &amp; Members</span>
-          </a>
-        </div>
-        <div class="sidebar-section-label" id="agamaAdminLabel" style="display:none;">Agama</div>
-        <div class="sidebar-section" id="agamaAdminSection" style="display:none;">
-          <a class="sidebar-link" href="/agama-admin.html" id="agamaAdminLink">
-            <i class="bi bi-shield-lock"></i>
-            <span class="sidebar-label">Agama Admin Console</span>
-          </a>
-        </div>
-        <div class="sidebar-section-label">Account &amp; Settings</div>
-        <div class="sidebar-section">
-          <a class="sidebar-link" href="/profile.html">
-            <i class="bi bi-person"></i>
-            <span class="sidebar-label">Profile</span>
-          </a>
-          <a class="sidebar-link" href="/settings.html">
-            <i class="bi bi-gear"></i>
-            <span class="sidebar-label">Settings</span>
-          </a>
-          <a class="sidebar-link" href="/billing.html">
-            <i class="bi bi-credit-card"></i>
-            <span class="sidebar-label">Billing</span>
+          <a class="sidebar-link active" href="/valuesphere-completed.html">
+            <i class="bi bi-clipboard-check"></i>
+            <span class="sidebar-label">Completed</span>
           </a>
         </div>
       </nav>
@@ -81,28 +48,20 @@
     <aside class="app-subnav glass" aria-label="ValueSphere navigation">
       <div class="subnav-header">
         <span class="eyebrow d-block mb-1">ValueSphere</span>
-        <strong>Navigator</strong>
+        <strong>Completed</strong>
       </div>
       <nav class="subnav-nav">
         <a class="subnav-link" href="/valuesphere-tool.html">
           <i class="bi bi-compass"></i>
           <span>Dashboard</span>
         </a>
-        <button class="subnav-link subnav-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#templateSubnav" aria-expanded="true" aria-controls="templateSubnav">
-          <span class="d-flex align-items-center gap-2"><i class="bi bi-kanban"></i> Templates</span>
-          <i class="bi bi-chevron-down small"></i>
-        </button>
-        <div class="collapse show" id="templateSubnav">
-          <a class="subnav-sublink" href="/valuesphere-template-new.html">New Template</a>
-          <a class="subnav-sublink" href="/valuesphere-template-library.html">Template Library</a>
-        </div>
         <a class="subnav-link" href="/valuesphere-accounts.html">
           <i class="bi bi-building"></i>
-          <span>Accounts</span>
+          <span>Assessments</span>
         </a>
         <a class="subnav-link active" href="/valuesphere-completed.html">
           <i class="bi bi-clipboard-check"></i>
-          <span>Completed assessments</span>
+          <span>Completed</span>
         </a>
       </nav>
     </aside>
@@ -116,41 +75,27 @@
           </a>
           <div class="d-flex align-items-center gap-2">
             <a class="btn btn-outline-light btn-sm" href="/workspace.html">Back to workspace</a>
-            <button class="btn btn-primary btn-sm" id="logout">Logout</button>
+            <a class="btn btn-primary btn-sm" href="/api/auth/logout">Logout</a>
           </div>
         </div>
       </nav>
 
-      <main class="container py-4" style="max-width: 1240px;">
+      <main class="container py-4" style="max-width: 1180px;">
+        <div id="valuesphereStatus" class="alert alert-info d-none" role="status"></div>
+
         <header class="card glass p-4 mb-4">
           <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
             <div>
               <span class="eyebrow d-block">Completed assessments</span>
-              <h1 class="h4 mb-1">Replay insights and contributors</h1>
-              <p class="text-fg-3 mb-0">Review who took each assessment, customer collaborators, and when it was recorded.</p>
+              <h1 class="h5 mb-1">Locked outcomes ready for audit and downstream workflows</h1>
+              <p class="text-fg-3 mb-0">Aligned to ValueSphere states: draft → shared → agreed → locked.</p>
             </div>
-            <div class="badge-soft" id="completedAssessmentsCount">0 recorded</div>
+            <div class="badge-soft" id="personaLabel">Loading context...</div>
           </div>
         </header>
 
-        <section class="row g-3 mb-4">
-          <div class="col-lg-6">
-            <div class="card glass p-4 h-100">
-              <div class="d-flex justify-content-between align-items-start mb-3">
-                <div>
-                  <h2 class="h5 mb-1">Assessment history</h2>
-                  <p class="small text-fg-3 mb-0">Open any assessment to view details and collaborator notes.</p>
-                </div>
-              </div>
-              <div id="completedAssessmentsList" class="d-flex flex-column gap-2"></div>
-            </div>
-          </div>
-          <div class="col-lg-6">
-            <div class="card glass p-4 h-100">
-              <div class="mb-3" id="assessmentMeta"></div>
-              <div class="accordion" id="assessmentDetail"></div>
-            </div>
-          </div>
+        <section class="card glass p-3">
+          <div class="list-group" id="completedAssessments"></div>
         </section>
       </main>
     </div>
