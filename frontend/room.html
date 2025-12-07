@@ -146,26 +146,75 @@
           <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
             <div>
               <h2 class="h5 mb-1">Messages</h2>
-              <p class="text-fg-3 small mb-0">Chronological feed of collaboration updates.</p>
+              <p class="text-fg-3 small mb-0">Chronological feed of collaboration updates across contexts.</p>
             </div>
             <span class="badge-soft" id="messageCount">0</span>
           </div>
           <form id="messageForm" class="mb-3">
             <label class="form-label" for="messageBody">Post an update</label>
-            <div class="d-flex gap-2 flex-column flex-md-row">
-              <textarea id="messageBody" class="form-control" rows="2" placeholder="Share an update"></textarea>
-              <button type="submit" class="btn btn-primary">Send</button>
+            <div class="row g-2 align-items-stretch">
+              <div class="col-md-7">
+                <textarea id="messageBody" class="form-control" rows="2" placeholder="Share an update"></textarea>
+              </div>
+              <div class="col-md-3">
+                <select class="form-select" id="messageContext">
+                  <option value="shared">Shared</option>
+                  <option value="seller_only">Seller-only</option>
+                  <option value="buyer_only">Buyer-only</option>
+                </select>
+                <div class="form-text">Context determines visibility.</div>
+              </div>
+              <div class="col-md-2 d-flex align-items-stretch">
+                <button type="submit" class="btn btn-primary w-100">Send</button>
+              </div>
             </div>
             <div class="form-text" id="messageFeedback"></div>
           </form>
-          <div id="messageList" class="d-flex flex-column gap-3"></div>
+          <div class="row g-3" id="messageColumns">
+            <div class="col-lg-4" id="sharedMessageColumn">
+              <div class="card glass h-100" data-theme="shared">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="theme-pill shared">Shared</span>
+                    <div class="text-fg-3 small">Visible to buyers, sellers, and guests</div>
+                  </div>
+                  <span class="badge-soft" id="sharedMessageCount">0</span>
+                </div>
+                <div class="d-flex flex-column gap-2" id="sharedMessageList"></div>
+              </div>
+            </div>
+            <div class="col-lg-4" id="sellerMessageColumn">
+              <div class="card glass h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="theme-pill">Seller-only</span>
+                    <div class="text-fg-3 small">Private to vendor organization</div>
+                  </div>
+                  <span class="badge-soft" id="sellerMessageCount">0</span>
+                </div>
+                <div class="d-flex flex-column gap-2" id="sellerMessageList"></div>
+              </div>
+            </div>
+            <div class="col-lg-4" id="buyerMessageColumn">
+              <div class="card glass h-100" data-theme="buyer">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="theme-pill buyer">Buyer-only</span>
+                    <div class="text-fg-3 small">Private to buyer organization</div>
+                  </div>
+                  <span class="badge-soft" id="buyerMessageCount">0</span>
+                </div>
+                <div class="d-flex flex-column gap-2" id="buyerMessageList"></div>
+              </div>
+            </div>
+          </div>
         </section>
 
         <section id="issues" class="card glass p-4 mb-4">
           <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
             <div>
               <h2 class="h5 mb-1">Project board</h2>
-              <p class="text-fg-3 small mb-0">Track issues, owners, and delivery status.</p>
+              <p class="text-fg-3 small mb-0">Track issues, owners, and delivery status across shared and private boards.</p>
             </div>
             <span class="badge-soft" id="issueCount">0</span>
           </div>
@@ -209,19 +258,65 @@
               <label class="form-label" for="issueNotes">Notes</label>
               <textarea id="issueNotes" class="form-control" rows="1" placeholder="Optional notes"></textarea>
             </div>
+            <div class="col-md-3">
+              <label class="form-label" for="issueContext">Visibility</label>
+              <select id="issueContext" class="form-select">
+                <option value="shared">Shared</option>
+                <option value="seller_only">Seller-only</option>
+                <option value="buyer_only">Buyer-only</option>
+              </select>
+              <div class="form-text">Controls who can see the issue.</div>
+            </div>
             <div class="col-12 d-flex justify-content-end gap-2">
               <button class="btn btn-primary" type="submit" id="issueSubmit">Create issue</button>
             </div>
             <div class="col-12"><div class="form-text" id="issueFeedback"></div></div>
           </form>
-          <div id="issueList" class="d-flex flex-column gap-3"></div>
+          <div class="row g-3">
+            <div class="col-lg-4" id="sharedIssueColumn">
+              <div class="card glass h-100" data-theme="shared">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="theme-pill shared">Shared</span>
+                    <div class="text-fg-3 small">Visible to all room participants</div>
+                  </div>
+                  <span class="badge-soft" id="sharedIssueCount">0</span>
+                </div>
+                <div class="d-flex flex-column gap-2" id="sharedIssueList"></div>
+              </div>
+            </div>
+            <div class="col-lg-4" id="sellerIssueColumn">
+              <div class="card glass h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="theme-pill">Seller board</span>
+                    <div class="text-fg-3 small">Vendor-only execution</div>
+                  </div>
+                  <span class="badge-soft" id="sellerIssueCount">0</span>
+                </div>
+                <div class="d-flex flex-column gap-2" id="sellerIssueList"></div>
+              </div>
+            </div>
+            <div class="col-lg-4" id="buyerIssueColumn">
+              <div class="card glass h-100" data-theme="buyer">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="theme-pill buyer">Buyer board</span>
+                    <div class="text-fg-3 small">Buyer-only evaluation work</div>
+                  </div>
+                  <span class="badge-soft" id="buyerIssueCount">0</span>
+                </div>
+                <div class="d-flex flex-column gap-2" id="buyerIssueList"></div>
+              </div>
+            </div>
+          </div>
         </section>
 
         <section id="deliverables" class="card glass p-4 mb-4">
           <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
             <div>
               <h2 class="h5 mb-1">Deliverables</h2>
-              <p class="text-fg-3 small mb-0">Milestones, owners, and expected outcomes.</p>
+              <p class="text-fg-3 small mb-0">Milestones, owners, and expected outcomes by context.</p>
             </div>
             <span class="badge-soft" id="deliverableCount">0</span>
           </div>
@@ -255,19 +350,65 @@
               <label class="form-label" for="deliverableDescription">Description</label>
               <textarea id="deliverableDescription" class="form-control" rows="2"></textarea>
             </div>
+            <div class="col-md-3">
+              <label class="form-label" for="deliverableContext">Visibility</label>
+              <select id="deliverableContext" class="form-select">
+                <option value="shared">Shared</option>
+                <option value="seller_only">Seller-only</option>
+                <option value="buyer_only">Buyer-only</option>
+              </select>
+              <div class="form-text">Keep deliverables scoped.</div>
+            </div>
             <div class="col-12 d-flex justify-content-end gap-2">
               <button class="btn btn-primary" type="submit" id="deliverableSubmit">Add deliverable</button>
             </div>
             <div class="col-12"><div class="form-text" id="deliverableFeedback"></div></div>
           </form>
-          <div id="deliverableList" class="d-flex flex-column gap-3"></div>
+          <div class="row g-3">
+            <div class="col-lg-4" id="sharedDeliverableColumn">
+              <div class="card glass h-100" data-theme="shared">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="theme-pill shared">Shared</span>
+                    <div class="text-fg-3 small">Visible to all contributors</div>
+                  </div>
+                  <span class="badge-soft" id="sharedDeliverableCount">0</span>
+                </div>
+                <div class="d-flex flex-column gap-2" id="sharedDeliverableList"></div>
+              </div>
+            </div>
+            <div class="col-lg-4" id="sellerDeliverableColumn">
+              <div class="card glass h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="theme-pill">Seller milestones</span>
+                    <div class="text-fg-3 small">Vendor execution only</div>
+                  </div>
+                  <span class="badge-soft" id="sellerDeliverableCount">0</span>
+                </div>
+                <div class="d-flex flex-column gap-2" id="sellerDeliverableList"></div>
+              </div>
+            </div>
+            <div class="col-lg-4" id="buyerDeliverableColumn">
+              <div class="card glass h-100" data-theme="buyer">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="theme-pill buyer">Buyer milestones</span>
+                    <div class="text-fg-3 small">Buyer-only checkpoints</div>
+                  </div>
+                  <span class="badge-soft" id="buyerDeliverableCount">0</span>
+                </div>
+                <div class="d-flex flex-column gap-2" id="buyerDeliverableList"></div>
+              </div>
+            </div>
+          </div>
         </section>
 
         <section id="documents" class="card glass p-4 mb-4">
           <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
             <div>
               <h2 class="h5 mb-1">Documents</h2>
-              <p class="text-fg-3 small mb-0">Upload files, review versions, and capture comments.</p>
+              <p class="text-fg-3 small mb-0">Upload files, review versions, and capture comments with the right visibility.</p>
             </div>
             <span class="badge-soft" id="fileCount">0</span>
           </div>
@@ -280,12 +421,57 @@
               <label class="form-label" for="fileMimeType">Type</label>
               <input type="text" class="form-control" id="fileMimeType" placeholder="application/pdf">
             </div>
+            <div class="col-md-2">
+              <label class="form-label" for="fileContext">Visibility</label>
+              <select id="fileContext" class="form-select">
+                <option value="shared">Shared</option>
+                <option value="seller_only">Seller-only</option>
+                <option value="buyer_only">Buyer-only</option>
+              </select>
+            </div>
             <div class="col-md-2 d-flex align-items-end">
               <button class="btn btn-primary w-100" type="submit">Upload</button>
             </div>
             <div class="col-12"><div class="form-text" id="fileFeedback"></div></div>
           </form>
-          <div id="fileList" class="row g-3 mb-3"></div>
+          <div class="row g-3 mb-3">
+            <div class="col-lg-4" id="sharedFileColumn">
+              <div class="card glass h-100" data-theme="shared">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="theme-pill shared">Shared documents</span>
+                    <div class="text-fg-3 small">Co-authored between buyer and seller</div>
+                  </div>
+                  <span class="badge-soft" id="sharedFileCount">0</span>
+                </div>
+                <div class="d-flex flex-column gap-2" id="sharedFileList"></div>
+              </div>
+            </div>
+            <div class="col-lg-4" id="sellerFileColumn">
+              <div class="card glass h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="theme-pill">Seller workspace</span>
+                    <div class="text-fg-3 small">Internal vendor drafts</div>
+                  </div>
+                  <span class="badge-soft" id="sellerFileCount">0</span>
+                </div>
+                <div class="d-flex flex-column gap-2" id="sellerFileList"></div>
+              </div>
+            </div>
+            <div class="col-lg-4" id="buyerFileColumn">
+              <div class="card glass h-100" data-theme="buyer">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="theme-pill buyer">Buyer workspace</span>
+                    <div class="text-fg-3 small">Private buyer evaluations</div>
+                  </div>
+                  <span class="badge-soft" id="buyerFileCount">0</span>
+                </div>
+                <div class="d-flex flex-column gap-2" id="buyerFileList"></div>
+              </div>
+            </div>
+          </div>
           <div class="card glass p-3" id="fileDetails" hidden>
             <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
               <div>

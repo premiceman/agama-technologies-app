@@ -10,9 +10,13 @@ const state = {
   issues: [],
   deliverables: [],
   files: [],
+  rooms: [],
+  roomFilters: { search: '', status: 'all', participation: 'all', persona: 'all' },
   selectedFileId: null,
   assignees: [],
-  suiteEntitlements: null
+  suiteEntitlements: null,
+  persona: 'shared',
+  eventsInterval: null
 };
 
 async function fetchJson(url, options = {}) {
@@ -130,6 +134,82 @@ function resolveOrgName(orgId) {
   return org?.name || orgId;
 }
 
+function derivePersona(membership, room) {
+  if (membership?.isGuest) return 'guest';
+  const memberOrgId = membership?.organization?.id || membership?.organization?._id || membership?.organization;
+  if (memberOrgId && room?.vendorOrg && memberOrgId === room.vendorOrg) return 'seller';
+  if (memberOrgId && room?.buyerOrg && memberOrgId === room.buyerOrg) return 'buyer';
+  return 'shared';
+}
+
+function allowedContexts() {
+  switch (state.persona) {
+    case 'seller':
+      return ['shared', 'seller_only'];
+    case 'buyer':
+      return ['shared', 'buyer_only'];
+    default:
+      return ['shared'];
+  }
+}
+
+function sanitizeContext(context) {
+  const allowed = allowedContexts();
+  if (allowed.includes(context)) return context;
+  return 'shared';
+}
+
+function isContextVisible(context) {
+  return allowedContexts().includes(context || 'shared');
+}
+
+function groupByContext(items = []) {
+  const groups = { shared: [], seller_only: [], buyer_only: [] };
+  items.forEach(item => {
+    const ctx = item.context || 'shared';
+    if (groups[ctx]) {
+      groups[ctx].push(item);
+    } else {
+      groups.shared.push(item);
+    }
+  });
+  return groups;
+}
+
+function renderContextBadge(context) {
+  if (context === 'seller_only') return '<span class="badge-soft">Seller-only</span>';
+  if (context === 'buyer_only') return '<span class="badge-soft">Buyer-only</span>';
+  return '<span class="badge-soft">Shared</span>';
+}
+
+function enforceContextSelectors() {
+  const allowed = allowedContexts();
+  const selectorIds = ['messageContext', 'issueContext', 'deliverableContext', 'fileContext'];
+  selectorIds.forEach(id => {
+    const select = document.getElementById(id);
+    if (!select) return;
+    Array.from(select.options).forEach(opt => {
+      opt.disabled = !allowed.includes(opt.value);
+    });
+    if (!allowed.includes(select.value)) select.value = allowed[0];
+  });
+}
+
+function toggleContextColumns() {
+  const allowed = allowedContexts();
+  const showSeller = allowed.includes('seller_only');
+  const showBuyer = allowed.includes('buyer_only');
+  const sellerColumns = [
+    'sellerMessageColumn',
+    'sellerIssueColumn',
+    'sellerDeliverableColumn',
+    'sellerFileColumn'
+  ];
+  const buyerColumns = ['buyerMessageColumn', 'buyerIssueColumn', 'buyerDeliverableColumn', 'buyerFileColumn'];
+  sellerColumns.forEach(id => toggle(document.getElementById(id), showSeller));
+  buyerColumns.forEach(id => toggle(document.getElementById(id), showBuyer));
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const path = (window.location && window.location.pathname) || '';
 
@@ -192,8 +272,10 @@ async function initRoomsPage() {
       state.orgContext ? `${state.orgContext.name} • ${state.orgContext.orgType || 'multi-org'}` : 'No organization selected'
     );
     setupCreateRoomHandlers();
+    bindRoomFilters();
     const roomsResp = await fetchJson('/api/rooms');
-    renderRooms(roomsResp.rooms || []);
+    state.rooms = roomsResp.rooms || [];
+    applyRoomFilters();
   } catch (err) {
     setText('roomsOrgContext', err.message || 'Unable to load rooms');
   }
@@ -217,6 +299,66 @@ function renderRooms(rooms) {
 
   renderRoomSection('home', homeRooms);
   renderRoomSection('guest', guestRooms);
+}
+
+function bindRoomFilters() {
+  const search = document.getElementById('roomSearch');
+  const status = document.getElementById('roomStatusFilter');
+  const participation = document.getElementById('roomParticipationFilter');
+  const persona = document.getElementById('roomPersonaFilter');
+  const handlers = [
+    [search, value => (state.roomFilters.search = value.toLowerCase())],
+    [status, value => (state.roomFilters.status = value)],
+    [participation, value => (state.roomFilters.participation = value)],
+    [persona, value => (state.roomFilters.persona = value)]
+  ];
+  handlers.forEach(([el, fn]) => {
+    if (!el || el.dataset.bound === 'true') return;
+    el.dataset.bound = 'true';
+    el.addEventListener('input', () => {
+      fn(el.value || '');
+      applyRoomFilters();
+    });
+    el.addEventListener('change', () => {
+      fn(el.value || '');
+      applyRoomFilters();
+    });
+  });
+}
+
+function applyRoomFilters() {
+  const rooms = state.rooms || [];
+  const filtered = rooms.filter(room => matchesRoomFilters(room));
+  const summaryParts = [];
+  if (state.roomFilters.status !== 'all') summaryParts.push(`Status: ${state.roomFilters.status}`);
+  if (state.roomFilters.participation !== 'all') summaryParts.push(state.roomFilters.participation === 'guest' ? 'Guest rooms' : 'Hosted');
+  if (state.roomFilters.persona !== 'all') summaryParts.push(`Persona: ${state.roomFilters.persona}`);
+  if (state.roomFilters.search) summaryParts.push(`Search: "${state.roomFilters.search}"`);
+  setText('roomsFilterSummary', summaryParts.length ? summaryParts.join(' • ') : 'All rooms');
+  renderRooms(filtered);
+}
+
+function matchesRoomFilters(room) {
+  const membership = room?.yourMembership || room?.membership || {};
+  const persona = roomPersona(membership, room);
+  if (state.roomFilters.status !== 'all' && room.status !== state.roomFilters.status) return false;
+  if (state.roomFilters.participation === 'guest' && membership.isGuest !== true) return false;
+  if (state.roomFilters.participation === 'hosted' && membership.isGuest === true) return false;
+  if (state.roomFilters.persona === 'seller' && persona !== 'seller') return false;
+  if (state.roomFilters.persona === 'buyer' && persona !== 'buyer') return false;
+  if (state.roomFilters.persona === 'shared' && persona !== 'shared' && persona !== 'guest') return false;
+  const q = (state.roomFilters.search || '').toLowerCase();
+  if (!q) return true;
+  const haystack = [room.title, resolveOrgName(room.vendorOrg), resolveOrgName(room.buyerOrg)].join(' ').toLowerCase();
+  return haystack.includes(q);
+}
+
+function roomPersona(membership, room) {
+  if (membership?.isGuest) return 'guest';
+  const memberOrgId = membership?.organization?.id || membership?.organization?._id || membership?.organization;
+  if (memberOrgId && room?.vendorOrg && memberOrgId === room.vendorOrg) return 'seller';
+  if (memberOrgId && room?.buyerOrg && memberOrgId === room.buyerOrg) return 'buyer';
+  return 'shared';
 }
 
 function renderRoomSection(prefix, rooms) {
@@ -378,10 +520,14 @@ async function initRoomDetailPage() {
     state.room = roomResp.room;
     state.roomMembership = state.room?.yourMembership || state.room?.membership;
     state.isRoomGuest = state.roomMembership?.isGuest === true;
+    state.persona = derivePersona(state.roomMembership, state.room);
     renderRoomHeader();
     configureOrgControls();
+    enforceContextSelectors();
+    toggleContextColumns();
     bindAiActions();
     await Promise.all([loadMembers(), loadMessages(), loadIssues(), loadDeliverables(), loadFiles(), loadInvites()]);
+    subscribeToRoomEvents(state.roomId);
   } catch (err) {
     setText('roomMeta', err.message || 'Unable to load room');
   }
@@ -450,6 +596,8 @@ function configureOrgControls() {
 
   bindForms(canEdit, isAdmin);
   populateOrgSelectors();
+  enforceContextSelectors();
+  toggleContextColumns();
 }
 
 function bindForms(canEdit, isAdmin) {
@@ -467,7 +615,7 @@ function bindForms(canEdit, isAdmin) {
       try {
         await fetchJson(`/api/rooms/${state.roomId}/messages`, {
           method: 'POST',
-          body: JSON.stringify({ body: bodyInput.value })
+          body: JSON.stringify({ body: bodyInput.value, context: sanitizeContext(document.getElementById('messageContext')?.value) })
         });
         bodyInput.value = '';
         await loadMessages();
@@ -491,7 +639,8 @@ function bindForms(canEdit, isAdmin) {
         priority: document.getElementById('issuePriority').value,
         notes: document.getElementById('issueNotes').value || undefined,
         dueDate: document.getElementById('issueDueDate').value || undefined,
-        assignees: state.assignees
+        assignees: state.assignees,
+        context: sanitizeContext(document.getElementById('issueContext')?.value)
       };
       try {
         await fetchJson(`/api/rooms/${state.roomId}/issues`, { method: 'POST', body: JSON.stringify(payload) });
@@ -519,7 +668,8 @@ function bindForms(canEdit, isAdmin) {
         owner: document.getElementById('deliverableOwner').value,
         dueDate: document.getElementById('deliverableDueDate').value || undefined,
         description: document.getElementById('deliverableDescription').value || undefined,
-        relatedIssues: Array.from(document.getElementById('deliverableIssues').selectedOptions).map(opt => opt.value)
+        relatedIssues: Array.from(document.getElementById('deliverableIssues').selectedOptions).map(opt => opt.value),
+        context: sanitizeContext(document.getElementById('deliverableContext')?.value)
       };
       try {
         await fetchJson(`/api/rooms/${state.roomId}/deliverables`, { method: 'POST', body: JSON.stringify(payload) });
@@ -550,7 +700,8 @@ function bindForms(canEdit, isAdmin) {
         name: file.name,
         mimeType: document.getElementById('fileMimeType').value || file.type,
         sizeBytes: file.size,
-        base64
+        base64,
+        context: sanitizeContext(document.getElementById('fileContext')?.value)
       };
       try {
         await fetchJson(`/api/rooms/${state.roomId}/files`, { method: 'POST', body: JSON.stringify(payload) });
@@ -714,25 +865,95 @@ function renderAssignees() {
   });
 }
 
+function renderList(containerId, items, renderer, emptyText) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+  if (!items.length) {
+    const empty = document.createElement('div');
+    empty.className = 'text-fg-3 small';
+    empty.textContent = emptyText;
+    container.appendChild(empty);
+    return;
+  }
+  items.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'glass-subtle p-2';
+    row.innerHTML = renderer(item);
+    container.appendChild(row);
+  });
+}
+
+function renderMessageRow(msg) {
+  const author = msg.author || (msg.type === 'system' ? 'System' : 'Update');
+  const ts = msg.createdAt ? new Date(msg.createdAt).toLocaleString() : '';
+  return `
+    <div class="d-flex justify-content-between align-items-center mb-1">
+      <div class="fw-semibold">${author}</div>
+      <div class="d-flex gap-2 align-items-center small text-fg-3">${renderContextBadge(msg.context)}<span>${ts}</span></div>
+    </div>
+    <div>${msg.body}</div>
+  `;
+}
+
+function renderIssueRow(issue) {
+  const due = issue.dueDate ? new Date(issue.dueDate).toLocaleDateString() : 'n/a';
+  const assigneeCount = issue.assignees?.length || 0;
+  return `
+    <div class="d-flex justify-content-between align-items-center mb-1">
+      <div class="fw-semibold">${issue.title}</div>
+      <div class="d-flex gap-2 align-items-center">${renderContextBadge(issue.context)}<span class="badge-soft">${issue.status}</span></div>
+    </div>
+    <div class="text-fg-3 small mb-1">Priority: ${issue.priority || 'medium'} • Due: ${due}</div>
+    <div class="small">Assignees: ${assigneeCount}</div>
+    <div class="text-fg-3 small">${issue.description || issue.notes || ''}</div>
+  `;
+}
+
+function renderDeliverableRow(deliverable) {
+  const due = deliverable.dueDate ? new Date(deliverable.dueDate).toLocaleDateString() : 'n/a';
+  return `
+    <div class="d-flex justify-content-between align-items-center mb-1">
+      <div class="fw-semibold">${deliverable.title}</div>
+      <div class="d-flex gap-2 align-items-center">${renderContextBadge(deliverable.context)}<span class="badge-soft">${deliverable.status}</span></div>
+    </div>
+    <div class="text-fg-3 small mb-1">Owner: ${lookupMember(deliverable.owner)}</div>
+    <div class="text-fg-3 small mb-1">Due: ${due}</div>
+    <div class="small">Related issues: ${deliverable.relatedIssues?.length || 0}</div>
+    <div class="text-fg-3 small">${deliverable.description || ''}</div>
+  `;
+}
+
+function renderFileRow(file) {
+  const updated = file.updatedAt ? new Date(file.updatedAt).toLocaleString() : 'n/a';
+  const sizeKb = (file.currentVersion?.sizeBytes || file.sizeBytes || 0) / 1000;
+  return `
+    <div class="d-flex justify-content-between align-items-start mb-1">
+      <div>
+        <div class="fw-semibold">${file.name}</div>
+        <div class="text-fg-3 small">${file.mimeType || 'file'} • ${sizeKb.toFixed(1)} KB</div>
+      </div>
+      ${renderContextBadge(file.context)}
+    </div>
+    <div class="d-flex justify-content-between align-items-center small text-fg-3">
+      <span>Updated ${updated}</span>
+      <button class="btn btn-outline-light btn-sm" data-file-id="${file.id}">View</button>
+    </div>
+  `;
+}
+
 async function loadMessages() {
   try {
     const res = await fetchJson(`/api/rooms/${state.roomId}/messages`);
-    const list = document.getElementById('messageList');
-    if (!list) return;
-    list.innerHTML = '';
-    setText('messageCount', res.messages.length);
-    res.messages.forEach(msg => {
-      const item = document.createElement('div');
-      item.className = 'card glass p-3';
-      item.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center mb-1">
-          <div class="fw-semibold">${msg.type === 'system' ? 'System' : 'Message'}</div>
-          <div class="text-fg-3 small">${new Date(msg.createdAt).toLocaleString()}</div>
-        </div>
-        <div>${msg.body}</div>
-      `;
-      list.appendChild(item);
-    });
+    const visible = (res.messages || []).filter(msg => isContextVisible(msg.context));
+    const groups = groupByContext(visible);
+    setText('messageCount', visible.length);
+    setText('sharedMessageCount', groups.shared.length);
+    setText('sellerMessageCount', groups.seller_only.length);
+    setText('buyerMessageCount', groups.buyer_only.length);
+    renderList('sharedMessageList', groups.shared, renderMessageRow, 'No shared messages yet.');
+    renderList('sellerMessageList', groups.seller_only, renderMessageRow, 'No seller-only updates.');
+    renderList('buyerMessageList', groups.buyer_only, renderMessageRow, 'No buyer-only updates.');
   } catch (err) {
     setText('messageFeedback', err.message);
   }
@@ -741,26 +962,17 @@ async function loadMessages() {
 async function loadIssues() {
   try {
     const res = await fetchJson(`/api/rooms/${state.roomId}/issues`);
-    state.issues = res.issues;
-    setText('issueCount', res.issues.length);
+    const visible = (res.issues || []).filter(issue => isContextVisible(issue.context));
+    state.issues = visible;
+    setText('issueCount', visible.length);
     populateDeliverableIssueOptions();
-    const list = document.getElementById('issueList');
-    if (!list) return;
-    list.innerHTML = '';
-    res.issues.forEach(issue => {
-      const card = document.createElement('div');
-      card.className = 'card glass p-3';
-      card.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center mb-1">
-          <div class="fw-semibold">${issue.title}</div>
-          <span class="badge-soft">${issue.status}</span>
-        </div>
-        <div class="text-fg-3 small mb-1">Priority: ${issue.priority || 'medium'} | Due: ${issue.dueDate ? new Date(issue.dueDate).toLocaleDateString() : 'n/a'}</div>
-        <div class="small">Assignees: ${issue.assignees?.length || 0}</div>
-        <div class="text-fg-3 small">${issue.description || ''}</div>
-      `;
-      list.appendChild(card);
-    });
+    const groups = groupByContext(visible);
+    setText('sharedIssueCount', groups.shared.length);
+    setText('sellerIssueCount', groups.seller_only.length);
+    setText('buyerIssueCount', groups.buyer_only.length);
+    renderList('sharedIssueList', groups.shared, renderIssueRow, 'No shared issues.');
+    renderList('sellerIssueList', groups.seller_only, renderIssueRow, 'No seller-side issues.');
+    renderList('buyerIssueList', groups.buyer_only, renderIssueRow, 'No buyer-side issues.');
   } catch (err) {
     setText('issueFeedback', err.message);
   }
@@ -769,26 +981,16 @@ async function loadIssues() {
 async function loadDeliverables() {
   try {
     const res = await fetchJson(`/api/rooms/${state.roomId}/deliverables`);
-    state.deliverables = res.deliverables;
-    setText('deliverableCount', res.deliverables.length);
-    const list = document.getElementById('deliverableList');
-    if (!list) return;
-    list.innerHTML = '';
-    res.deliverables.forEach(deliverable => {
-      const card = document.createElement('div');
-      card.className = 'card glass p-3';
-      card.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center mb-1">
-          <div class="fw-semibold">${deliverable.title}</div>
-          <span class="badge-soft">${deliverable.status}</span>
-        </div>
-        <div class="text-fg-3 small mb-1">Owner: ${lookupMember(deliverable.owner)}</div>
-        <div class="text-fg-3 small mb-1">Due: ${deliverable.dueDate ? new Date(deliverable.dueDate).toLocaleDateString() : 'n/a'}</div>
-        <div class="small">Related issues: ${deliverable.relatedIssues?.length || 0}</div>
-        <div class="text-fg-3 small">${deliverable.description || ''}</div>
-      `;
-      list.appendChild(card);
-    });
+    const visible = (res.deliverables || []).filter(deliverable => isContextVisible(deliverable.context));
+    state.deliverables = visible;
+    setText('deliverableCount', visible.length);
+    const groups = groupByContext(visible);
+    setText('sharedDeliverableCount', groups.shared.length);
+    setText('sellerDeliverableCount', groups.seller_only.length);
+    setText('buyerDeliverableCount', groups.buyer_only.length);
+    renderList('sharedDeliverableList', groups.shared, renderDeliverableRow, 'No shared deliverables.');
+    renderList('sellerDeliverableList', groups.seller_only, renderDeliverableRow, 'No seller deliverables.');
+    renderList('buyerDeliverableList', groups.buyer_only, renderDeliverableRow, 'No buyer deliverables.');
   } catch (err) {
     setText('deliverableFeedback', err.message);
   }
@@ -797,27 +999,18 @@ async function loadDeliverables() {
 async function loadFiles() {
   try {
     const res = await fetchJson(`/api/rooms/${state.roomId}/files`);
-    state.files = res.files;
-    setText('fileCount', res.files.length);
-    const list = document.getElementById('fileList');
-    if (!list) return;
-    list.innerHTML = '';
-    res.files.forEach(file => {
-      const col = document.createElement('div');
-      col.className = 'col-md-6 col-xl-4';
-      const card = document.createElement('div');
-      card.className = 'card glass p-3 h-100';
-      card.innerHTML = `
-        <div class="fw-semibold mb-1">${file.name}</div>
-        <div class="text-fg-3 small mb-2">${file.mimeType || 'file'} | ${(file.currentVersion?.sizeBytes || 0) / 1000} KB</div>
-        <div class="d-flex justify-content-between align-items-center">
-          <div class="small">Updated ${file.updatedAt ? new Date(file.updatedAt).toLocaleString() : 'n/a'}</div>
-          <button class="btn btn-outline-light btn-sm" data-file-id="${file.id}">View</button>
-        </div>
-      `;
-      card.querySelector('button').addEventListener('click', () => loadFileDetails(file.id));
-      col.appendChild(card);
-      list.appendChild(col);
+    const visible = (res.files || []).filter(file => isContextVisible(file.context));
+    state.files = visible;
+    setText('fileCount', visible.length);
+    const groups = groupByContext(visible);
+    setText('sharedFileCount', groups.shared.length);
+    setText('sellerFileCount', groups.seller_only.length);
+    setText('buyerFileCount', groups.buyer_only.length);
+    renderList('sharedFileList', groups.shared, renderFileRow, 'No shared documents.');
+    renderList('sellerFileList', groups.seller_only, renderFileRow, 'No seller documents.');
+    renderList('buyerFileList', groups.buyer_only, renderFileRow, 'No buyer documents.');
+    document.querySelectorAll('[data-file-id]').forEach(button => {
+      button.addEventListener('click', () => loadFileDetails(button.getAttribute('data-file-id')));
     });
   } catch (err) {
     setText('fileFeedback', err.message);
@@ -828,11 +1021,18 @@ async function loadFileDetails(fileId) {
   try {
     state.selectedFileId = fileId;
     const res = await fetchJson(`/api/rooms/${state.roomId}/files/${fileId}`);
+    if (!isContextVisible(res.file?.context)) {
+      state.selectedFileId = null;
+      setText('fileFeedback', 'This file is restricted to another persona.');
+      return;
+    }
     const details = document.getElementById('fileDetails');
     if (!details) return;
     details.hidden = false;
     setText('fileDetailTitle', res.file.name);
     setText('fileDetailMeta', `${res.file.mimeType || 'file'} • ${(res.file.currentVersion?.sizeBytes || 0) / 1000} KB`);
+    const feedback = document.getElementById('fileFeedback');
+    if (feedback) feedback.textContent = '';
     const download = document.getElementById('fileDownload');
     if (download) download.href = `/api/rooms/${state.roomId}/files/${fileId}/download`;
     const versions = document.getElementById('fileVersions');
@@ -1091,4 +1291,20 @@ function fileToBase64(file) {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+function subscribeToRoomEvents(roomId) {
+  if (state.eventsInterval) {
+    clearInterval(state.eventsInterval);
+    state.eventsInterval = null;
+  }
+  if (!roomId) return;
+  const poll = async () => {
+    try {
+      await Promise.all([loadMessages(), loadIssues(), loadDeliverables(), loadFiles()]);
+    } catch (err) {
+      console.warn('Room event poll failed', err.message);
+    }
+  };
+  state.eventsInterval = setInterval(poll, 8000);
 }
