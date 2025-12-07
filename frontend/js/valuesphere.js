@@ -1,1243 +1,501 @@
 (function () {
-  const urgencyOptions = ['Immediate', 'In the next 6 months', 'In the next 12 months', 'Roadmap'];
-  const maturityOptions = ['Not in place', 'Partially in place', 'Mostly in place', 'Fully in place', 'Out of scope'];
-
-  const vsState = {
-    user: null,
-    effectiveLicense: null,
-    organizationContext: null,
-    isBusinessBuyerWithProcurePath: false,
-    vendors: [],
-    vendorsLoaded: false,
-    selectedVendor: null,
-    currentAssessment: null
-  };
-
-  const initialTemplate = {
-    id: crypto.randomUUID(),
-    name: 'Datadog GTM Value Path',
-    description: 'Sample BVC assessment for a GTM team covering Inframon, APM, and RUM motions.',
-    stages: 5,
-    createdAt: new Date().toISOString(),
-    areas: [
-      {
-        id: crypto.randomUUID(),
-        name: 'Inframon',
-        description: 'Infrastructure monitoring adoption and operational guardrails.',
-        questions: [
-          { id: crypto.randomUUID(), text: 'How consistently are critical services instrumented with monitors and runbooks?', targetStage: 4 },
-          { id: crypto.randomUUID(), text: 'Do SRE and GTM teams share unified health views for incident comms?', targetStage: 3 }
-        ]
-      },
-      {
-        id: crypto.randomUUID(),
-        name: 'APM',
-        description: 'Application performance, distributed tracing, and SLAs.',
-        questions: [
-          { id: crypto.randomUUID(), text: 'What percentage of tier-1 services are traced end-to-end?', targetStage: 4 },
-          { id: crypto.randomUUID(), text: 'How are APM insights tied to business narratives for execs?', targetStage: 3 }
-        ]
-      },
-      {
-        id: crypto.randomUUID(),
-        name: 'RUM',
-        description: 'Digital experience monitoring for customer journeys.',
-        questions: [
-          { id: crypto.randomUUID(), text: 'Which funnels are tracked with RUM and who owns remediation?', targetStage: 3 },
-          { id: crypto.randomUUID(), text: 'Is UX data linked to revenue guardrails and playbooks?', targetStage: 4 }
-        ]
-      }
-    ]
-  };
-
-  const defaultState = {
-    maturityStages: 5,
-    templates: [initialTemplate],
-    accounts: [
-      {
-        id: crypto.randomUUID(),
-        name: 'Trailhead Systems',
-        tcv: 450000,
-        team: 'GTM: Maya & Omar; Consulting: Priya',
-        createdAt: new Date().toISOString()
-      }
-    ],
+  const state = {
+    context: null,
+    templates: [],
     assessments: [],
-    objectives: [
-      { id: crypto.randomUUID(), text: 'Co-create FY25 value map with executive sponsor', status: 'in-progress' },
-      { id: crypto.randomUUID(), text: 'Baseline RUM across three revenue-critical journeys', status: 'not-started' }
-    ],
-    aiSummary: ''
+    selectedAssessment: null
   };
 
-  function loadState() {
-    try {
-      const stored = localStorage.getItem('valuesphereState');
-      if (stored) return JSON.parse(stored);
-    } catch (err) {
-      console.warn('Falling back to default ValueSphere state', err);
-    }
-    return { ...defaultState, maturityStages: defaultState.maturityStages };
-  }
-
-  function saveState() {
-    localStorage.setItem('valuesphereState', JSON.stringify(state));
-    render();
-  }
-
-  const state = loadState();
-  const accountContext = {
-    user: null,
-    usageLimits: {},
-    effectiveLicense: null,
-    organizationContext: null,
-    suiteEntitlements: null
+  const els = {
+    status: document.getElementById('valuesphereStatus'),
+    personaLabel: document.getElementById('personaLabel'),
+    templateLibrary: document.getElementById('templateLibraryList'),
+    templateLibraryEmpty: document.getElementById('templateLibraryEmpty'),
+    templateLibraryError: document.getElementById('templateLibraryError'),
+    templateForm: document.getElementById('templateForm'),
+    templateSections: document.getElementById('templateSections'),
+    addSectionBtn: document.getElementById('addTemplateSection'),
+    templateCount: document.getElementById('templateCount'),
+    assessmentCount: document.getElementById('assessmentCount'),
+    completedCount: document.getElementById('completedCount'),
+    recentAssessments: document.getElementById('recentAssessments'),
+    assessmentList: document.getElementById('assessmentList'),
+    assessmentEmpty: document.getElementById('assessmentEmpty'),
+    assessmentDetail: document.getElementById('assessmentDetail'),
+    assessmentTitle: document.getElementById('assessmentTitle'),
+    assessmentVendor: document.getElementById('assessmentVendor'),
+    assessmentState: document.getElementById('assessmentState'),
+    assessmentSummary: document.getElementById('assessmentSummary'),
+    assessmentCriteria: document.getElementById('assessmentCriteria'),
+    assessmentScoring: document.getElementById('assessmentScoring'),
+    assessmentStakeholders: document.getElementById('assessmentStakeholders'),
+    assessmentTags: document.getElementById('assessmentTags'),
+    assessmentMeta: document.getElementById('assessmentMeta'),
+    transitionShared: document.getElementById('transitionShared'),
+    transitionAgreed: document.getElementById('transitionAgreed'),
+    transitionLocked: document.getElementById('transitionLocked'),
+    assessmentCreateForm: document.getElementById('assessmentCreateForm'),
+    assessmentTemplateSelect: document.getElementById('assessmentTemplateSelect'),
+    completedAssessments: document.getElementById('completedAssessments')
   };
 
-  const areaList = document.getElementById('areaList');
-  const templateForm = document.getElementById('templateForm');
-  const templateName = document.getElementById('templateName');
-  const templateDescription = document.getElementById('templateDescription');
-  const templateStages = document.getElementById('templateStages');
-  const templateLibraryList = document.getElementById('templateLibraryList');
-  const globalStages = document.getElementById('globalStages');
-  const assessmentAccount = document.getElementById('assessmentAccount');
-  const assessmentTemplate = document.getElementById('assessmentTemplate');
-  const assessmentForm = document.getElementById('assessmentForm');
-  const assessmentDetail = document.getElementById('assessmentDetail');
-  const assessmentMeta = document.getElementById('assessmentMeta');
-  const analyticsPanel = document.getElementById('analyticsPanel');
-  const analyticsTotal = document.getElementById('analyticsTotal');
-  const completedAssessmentsList = document.getElementById('completedAssessmentsList');
-  const completedAssessmentsCount = document.getElementById('completedAssessmentsCount');
-  const accountForm = document.getElementById('accountForm');
-  const accountList = document.getElementById('accountList');
-  const objectivesList = document.getElementById('objectives');
-  const addObjectiveBtn = document.getElementById('addObjective');
-  const generateAiSummaryBtn = document.getElementById('generateAiSummary');
-  const dashboardTemplateCount = document.getElementById('dashboardTemplateCount');
-  const dashboardAccountCount = document.getElementById('dashboardAccountCount');
-  const dashboardAssessmentCount = document.getElementById('dashboardAssessmentCount');
-  const vsVendorMode = document.getElementById('vsVendorMode');
-  const vsBuyerMode = document.getElementById('vsBuyerMode');
-  const vsModeVendorBtn = document.getElementById('vsModeVendorBtn');
-  const vsModeBuyerBtn = document.getElementById('vsModeBuyerBtn');
-  const vsBuyerVendorHelper = document.getElementById('vsBuyerVendorHelper');
-  const vsBuyerVendorList = document.getElementById('vsBuyerVendorList');
-  const vsBuyerAssessmentEmpty = document.getElementById('vsBuyerAssessmentEmpty');
-  const vsBuyerAssessmentDetail = document.getElementById('vsBuyerAssessmentDetail');
-  const vsBuyerAssessmentVendorName = document.getElementById('vsBuyerAssessmentVendorName');
-  const vsBuyerAssessmentTitle = document.getElementById('vsBuyerAssessmentTitle');
-  const vsBuyerAssessmentSummary = document.getElementById('vsBuyerAssessmentSummary');
-  const vsBuyerAssessmentTags = document.getElementById('vsBuyerAssessmentTags');
-  const vsBuyerAssessmentMeta = document.getElementById('vsBuyerAssessmentMeta');
-  const vsBuyerSaveAssessmentBtn = document.getElementById('vsBuyerSaveAssessmentBtn');
-  const vsBuyerOpenProcurePath = document.getElementById('vsBuyerOpenProcurePath');
-  const vsBuyerOpenRooms = document.getElementById('vsBuyerOpenRooms');
-  let activeAssessment = null;
-
-  function computeLocalAssessmentLimit(user) {
-    if (!user) return null;
-    return user.licenseTier === 'personal' ? user.valueAssessmentLimit || 3 : null;
+  function showStatus(message, tone = 'info') {
+    if (!els.status) return;
+    els.status.textContent = message || '';
+    els.status.className = 'alert mb-3';
+    els.status.classList.add(tone === 'error' ? 'alert-danger' : tone === 'success' ? 'alert-success' : 'alert-info');
+    els.status.classList.toggle('d-none', !message);
   }
 
-  async function ensureAuthenticated() {
-    try {
-      const res = await fetch('/api/auth/me', { credentials: 'include' });
-      if (res.status === 401) {
-        window.location.href = '/api/auth/workos/login';
-        return false;
-      }
-      const json = await res.json();
-      if (json.user?.onboardingStatus !== 'completed') {
-        window.location.href = '/onboarding.html';
-        return false;
-      }
-      accountContext.user = json.user;
-      accountContext.usageLimits = json.usageLimits || { valueAssessments: computeLocalAssessmentLimit(json.user) };
-      accountContext.effectiveLicense = json.effectiveLicense || null;
-      accountContext.organizationContext = json.organizationContext || null;
-      accountContext.suiteEntitlements = json.suiteEntitlements || null;
-      return true;
-    } catch (err) {
-      console.error('Unable to load account context', err);
-      return false;
+  async function fetchJson(url, options = {}) {
+    const response = await fetch(url, {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+      ...options
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const errorMessage = data.error || data.message || 'Unexpected error';
+      throw new Error(errorMessage);
+    }
+    return data;
+  }
+
+  function applyTheme(context) {
+    const persona = context?.activePersona || context?.themeHints?.persona || 'seller';
+    const theme = persona === 'buyer' ? 'buyer' : persona === 'shared' ? 'shared' : 'vendor';
+    document.body.dataset.theme = theme;
+    if (els.personaLabel) {
+      const label = theme === 'buyer' ? 'Buyer mode' : theme === 'shared' ? 'Shared mode' : 'Seller mode';
+      els.personaLabel.textContent = label;
     }
   }
 
-  function getSuiteCapabilities() {
-    const suites = accountContext.suiteEntitlements || {};
-    const effective = suites.effective || {};
-    return {
-      canUseSellerSuite: Boolean(effective.sellerSuite),
-      canUseBuyerSuite: Boolean(effective.buyerSuite),
-      canUseRooms: Boolean(effective.engagementRooms)
-    };
-  }
-
-  function computeInitialMode() {
-    const { canUseSellerSuite, canUseBuyerSuite } = getSuiteCapabilities();
-    const userMode = accountContext.user?.valuesphereMode;
-
-    // If both suites are available, honour stored mode if valid.
-    if (canUseSellerSuite && canUseBuyerSuite) {
-      if (userMode === 'vendor' || userMode === 'buyer') return userMode;
-      return 'vendor';
-    }
-
-    // If only one side is available, force that mode.
-    if (canUseSellerSuite) return 'vendor';
-    if (canUseBuyerSuite) return 'buyer';
-
-    // No suites available: default to vendor but we will show an error/empty state.
-    return 'vendor';
-  }
-
-  async function persistValuesphereMode(mode) {
-    try {
-      const res = await fetch('/api/auth/valuesphere-mode', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ mode })
-      });
-      const json = await res.json();
-      if (res.ok && json.ok && json.user) {
-        accountContext.user = json.user;
-      }
-    } catch (err) {
-      console.error('Unable to persist ValueSphere mode', err);
-    }
-  }
-
-  function setMode(mode, { persist = true } = {}) {
-    if (mode !== 'vendor' && mode !== 'buyer') return;
-    if (vsVendorMode) vsVendorMode.classList.toggle('d-none', mode !== 'vendor');
-    if (vsBuyerMode) vsBuyerMode.classList.toggle('d-none', mode !== 'buyer');
-
-    if (vsModeVendorBtn) {
-      vsModeVendorBtn.classList.toggle('btn-primary', mode === 'vendor');
-      vsModeVendorBtn.classList.toggle('btn-outline-light', mode !== 'vendor');
-      vsModeVendorBtn.classList.toggle('active', mode === 'vendor');
-    }
-    if (vsModeBuyerBtn) {
-      vsModeBuyerBtn.classList.toggle('btn-primary', mode === 'buyer');
-      vsModeBuyerBtn.classList.toggle('btn-outline-light', mode !== 'buyer');
-      vsModeBuyerBtn.classList.toggle('active', mode === 'buyer');
-    }
-
-    if (accountContext.user) {
-      accountContext.user.valuesphereMode = mode;
-    }
-
-    if (persist) {
-      persistValuesphereMode(mode);
-    }
-  }
-
-  function hydrateBuyerStateFromContext() {
-    vsState.user = accountContext.user;
-    vsState.effectiveLicense = accountContext.effectiveLicense;
-    vsState.organizationContext = accountContext.organizationContext;
-
-    const tier = vsState.effectiveLicense?.tier || vsState.user?.licenseTier || null;
-    const orgType = (vsState.organizationContext?.orgType || vsState.effectiveLicense?.homeOrg?.orgType || '').toLowerCase();
-    const productAccess = Array.isArray(vsState.organizationContext?.productAccess)
-      ? vsState.organizationContext.productAccess
-      : Array.isArray(vsState.organizationContext?.platformAccess)
-        ? vsState.organizationContext.platformAccess
-        : [];
-
-    vsState.isBusinessBuyerWithProcurePath = tier === 'business'
-      && (orgType === 'buyer' || orgType === 'both')
-      && productAccess.includes('procurepath');
-  }
-
-  function renderBuyerVendorHelper() {
-    if (!vsBuyerVendorHelper) return;
-    if (vsState.isBusinessBuyerWithProcurePath) {
-      vsBuyerVendorHelper.textContent = 'Vendors from ProcurePath will appear here when you’re in a buyer organisation.';
-      return;
-    }
-
-    vsBuyerVendorHelper.textContent = 'Add vendors manually in this mode (future improvement). For now, treat Buyer mode as a sandbox for vendor evaluation.';
-  }
-
-  function renderBuyerAssessmentMeta(assessment, { loading = false, error = null } = {}) {
-    if (!vsBuyerAssessmentMeta) return;
-    if (loading) {
-      vsBuyerAssessmentMeta.textContent = 'Loading assessment...';
-      return;
-    }
-    if (error) {
-      vsBuyerAssessmentMeta.textContent = error;
-      return;
-    }
-    if (assessment?.updatedAt) {
-      const updated = new Date(assessment.updatedAt);
-      vsBuyerAssessmentMeta.textContent = `Last saved ${updated.toLocaleString()}`;
-      return;
-    }
-    vsBuyerAssessmentMeta.textContent = '';
-  }
-
-  function renderBuyerAssessmentForm(vendor, assessment) {
-    if (!vsBuyerAssessmentDetail || !vsBuyerAssessmentEmpty) return;
-    if (!vendor) {
-      vsBuyerAssessmentDetail.classList.add('d-none');
-      vsBuyerAssessmentEmpty.classList.remove('d-none');
-      return;
-    }
-
-    vsBuyerAssessmentEmpty.classList.add('d-none');
-    vsBuyerAssessmentDetail.classList.remove('d-none');
-
-    if (vsBuyerAssessmentVendorName) {
-      vsBuyerAssessmentVendorName.textContent = vendor.name || 'Vendor';
-    }
-
-    if (vsBuyerAssessmentTitle) vsBuyerAssessmentTitle.value = assessment?.title || '';
-    if (vsBuyerAssessmentSummary) vsBuyerAssessmentSummary.value = assessment?.summary || '';
-    if (vsBuyerAssessmentTags) vsBuyerAssessmentTags.value = Array.isArray(assessment?.tags)
-      ? assessment.tags.join(', ')
-      : '';
-
-    renderBuyerAssessmentMeta(assessment);
-
-    if (vsBuyerOpenProcurePath) {
-      vsBuyerOpenProcurePath.href = vendor.id
-        ? `/procurepath-tool.html?vendorId=${encodeURIComponent(vendor.id)}`
-        : '/procurepath-tool.html';
-    }
-
-    if (vsBuyerOpenRooms) {
-      vsBuyerOpenRooms.href = '/rooms.html';
-    }
-  }
-
-  function createVendorListItem(vendor) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'list-group-item list-group-item-action';
-    btn.dataset.vendorId = vendor.id || '';
-
-    const details = [];
-    if (vendor.category) details.push(vendor.category);
-    if (vendor.renewalDate) {
-      details.push(`Renews ${new Date(vendor.renewalDate).toLocaleDateString()}`);
-    }
-
-    btn.innerHTML = `
-      <div class="d-flex justify-content-between align-items-start gap-2">
+  function createSectionCard() {
+    const section = document.createElement('div');
+    section.className = 'card glass p-3 mb-3';
+    section.innerHTML = `
+      <div class="d-flex justify-content-between align-items-center mb-2">
         <div>
-          <strong class="d-block">${vendor.name}</strong>
-          <span class="text-fg-3">${details.join(' • ') || 'Vendor portfolio'}</span>
+          <label class="form-label mb-1">Section title</label>
+          <input class="form-control form-control-sm section-title" placeholder="Technical fit" required />
         </div>
-        <i class="bi bi-chevron-right small"></i>
+        <div class="ms-3" style="width: 160px;">
+          <label class="form-label mb-1">Weight</label>
+          <input class="form-control form-control-sm section-weight" type="number" step="0.1" min="0" max="1" value="1" />
+        </div>
       </div>
+      <div class="mb-2">
+        <label class="form-label mb-1">Description</label>
+        <input class="form-control form-control-sm section-description" placeholder="What we are measuring" />
+      </div>
+      <div class="mb-2">
+        <div class="d-flex justify-content-between align-items-center">
+          <span class="small text-fg-3">Questions</span>
+          <button type="button" class="btn btn-outline-light btn-sm add-question">Add question</button>
+        </div>
+        <div class="question-list d-flex flex-column gap-2 mt-2"></div>
+      </div>
+      <button type="button" class="btn btn-outline-light btn-sm remove-section">Remove section</button>
     `;
 
-    btn.addEventListener('click', () => selectBuyerVendor(vendor));
-    if (vsState.selectedVendor) {
-      const sameVendor = vsState.selectedVendor.id
-        ? vsState.selectedVendor.id === vendor.id
-        : vsState.selectedVendor.name === vendor.name;
-      btn.classList.toggle('active', sameVendor);
-    }
-    return btn;
-  }
-
-  function handleManualVendorAdd() {
-    const name = (prompt('Enter a vendor to assess') || '').trim();
-    if (!name) return;
-    const vendor = { id: null, name, category: 'Manual', renewalDate: null };
-    vsState.vendors = [vendor, ...vsState.vendors.filter(existing => existing.name !== vendor.name || existing.id)];
-    renderBuyerVendorList();
-    selectBuyerVendor(vendor);
-  }
-
-  function renderBuyerVendorList() {
-    if (!vsBuyerVendorList) return;
-    vsBuyerVendorList.innerHTML = '';
-
-    if (!vsState.isBusinessBuyerWithProcurePath) {
-      const manualBtn = document.createElement('button');
-      manualBtn.type = 'button';
-      manualBtn.className = 'list-group-item list-group-item-action';
-      manualBtn.textContent = 'Add vendor manually';
-      manualBtn.addEventListener('click', handleManualVendorAdd);
-      vsBuyerVendorList.appendChild(manualBtn);
-    }
-
-    if (vsState.vendors.length === 0) return;
-    vsState.vendors.forEach(vendor => {
-      vsBuyerVendorList.appendChild(createVendorListItem(vendor));
-    });
-  }
-
-  async function loadBuyerVendors() {
-    try {
-      const res = await fetch('/api/valuesphere/buyer/vendors', { credentials: 'include' });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Unable to load vendors');
-      vsState.vendors = Array.isArray(json.vendors) ? json.vendors : [];
-      vsState.vendorsLoaded = true;
-      renderBuyerVendorList();
-    } catch (err) {
-      console.error('Unable to load buyer vendors', err);
-    }
-  }
-
-  async function loadBuyerAssessmentsForVendor() {
-    if (!vsState.selectedVendor) return;
-    renderBuyerAssessmentMeta(null, { loading: true });
-    try {
-      let url = '/api/valuesphere/buyer/assessments';
-      if (vsState.isBusinessBuyerWithProcurePath && vsState.selectedVendor.id) {
-        url += `?vendorId=${encodeURIComponent(vsState.selectedVendor.id)}`;
-      }
-      const res = await fetch(url, { credentials: 'include' });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Unable to load assessments');
-
-      let assessment = null;
-      if (Array.isArray(json.assessments)) {
-        if (vsState.isBusinessBuyerWithProcurePath && vsState.selectedVendor.id) {
-          assessment = json.assessments[0] || null;
-        } else {
-          const selectedName = (vsState.selectedVendor.name || '').toLowerCase();
-          assessment = json.assessments.find(item => (item.vendorName || '').toLowerCase() === selectedName) || null;
-        }
-      }
-
-      vsState.currentAssessment = assessment || null;
-      renderBuyerAssessmentForm(vsState.selectedVendor, vsState.currentAssessment);
-    } catch (err) {
-      console.error('Unable to load buyer assessments', err);
-      renderBuyerAssessmentMeta(null, { error: 'Unable to load assessment' });
-    }
-  }
-
-  function selectBuyerVendor(vendor) {
-    vsState.selectedVendor = vendor;
-    vsState.currentAssessment = null;
-    renderBuyerVendorList();
-    renderBuyerAssessmentForm(vendor, null);
-    loadBuyerAssessmentsForVendor();
-  }
-
-  async function handleBuyerAssessmentSave() {
-    if (!vsState.selectedVendor) {
-      renderBuyerAssessmentMeta(null, { error: 'Select or add a vendor first' });
-      return;
-    }
-
-    const vendorName = (vsState.selectedVendor.name || '').trim();
-    if (!vendorName) {
-      renderBuyerAssessmentMeta(null, { error: 'Vendor name is required' });
-      return;
-    }
-
-    const title = (vsBuyerAssessmentTitle?.value || '').trim();
-    const summary = vsBuyerAssessmentSummary?.value || '';
-    const tags = (vsBuyerAssessmentTags?.value || '').split(',').map(tag => tag.trim()).filter(Boolean);
-
-    try {
-      renderBuyerAssessmentMeta(null, { loading: true });
-      let res;
-      let json;
-      if (vsState.currentAssessment?.id) {
-        res = await fetch(`/api/valuesphere/buyer/assessments/${vsState.currentAssessment.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ title, summary, tags })
-        });
-        json = await res.json();
-      } else {
-        res = await fetch('/api/valuesphere/buyer/assessments', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            vendorId: vsState.selectedVendor.id || null,
-            vendorName,
-            title,
-            summary,
-            tags
-          })
-        });
-        json = await res.json();
-      }
-
-      if (!res.ok || !json.assessment) {
-        throw new Error(json.error || 'Unable to save assessment');
-      }
-
-      vsState.currentAssessment = json.assessment;
-      renderBuyerAssessmentForm(vsState.selectedVendor, vsState.currentAssessment);
-    } catch (err) {
-      console.error('Unable to save buyer assessment', err);
-      renderBuyerAssessmentMeta(null, { error: 'Unable to save assessment' });
-    }
-  }
-
-  async function prepareBuyerMode() {
-    if (!vsBuyerMode) return;
-    renderBuyerVendorHelper();
-    if (vsState.isBusinessBuyerWithProcurePath && !vsState.vendorsLoaded) {
-      await loadBuyerVendors();
-    } else {
-      renderBuyerVendorList();
-    }
-    renderBuyerAssessmentForm(vsState.selectedVendor, vsState.currentAssessment);
-  }
-
-  function isAssessmentLimitReached() {
-    const limit = accountContext.usageLimits?.valueAssessments;
-    if (!limit) return false;
-    return state.assessments.length >= limit;
-  }
-
-  function renderAssessmentLimitNotice() {
-    const limit = accountContext.usageLimits?.valueAssessments;
-    if (!limit || !assessmentForm) return;
-    if (document.getElementById('assessmentLimitNotice')) return;
-    const notice = document.createElement('div');
-    notice.id = 'assessmentLimitNotice';
-    notice.className = 'alert alert-warning bg-transparent border border-warning text-warning small';
-    notice.innerHTML = `Free personal licenses include ${limit} assessments. Upgrade to Consulting Enterprise for unlimited Navigator assessments.`;
-    assessmentForm.parentNode.insertBefore(notice, assessmentForm);
-  }
-
-  function renderArea(area, index) {
-    const areaCard = document.createElement('div');
-    areaCard.className = 'glass p-3';
-    areaCard.dataset.areaId = area.id;
-    areaCard.innerHTML = `
-      <div class="d-flex justify-content-between align-items-start gap-2">
-        <div class="flex-grow-1">
-          <label class="form-label" for="area-${area.id}">Area ${index + 1} name</label>
-          <input class="form-control mb-2" id="area-${area.id}" value="${area.name}" placeholder="e.g., Inframon" required>
-          <textarea class="form-control" placeholder="Scope and intent" rows="2">${area.description || ''}</textarea>
-        </div>
-        <button class="btn btn-outline-light btn-sm" type="button" data-remove-area="${area.id}"><i class="bi bi-x"></i></button>
-      </div>
-      <div class="mt-3">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <strong class="small mb-0">Questions</strong>
-          <button class="btn btn-outline-light btn-sm" type="button" data-add-question="${area.id}"><i class="bi bi-plus"></i> Question</button>
-        </div>
-        <div class="d-flex flex-column gap-2" data-question-list="${area.id}"></div>
-      </div>
-    `;
-    areaList.appendChild(areaCard);
-
-    const questionList = areaCard.querySelector(`[data-question-list="${area.id}"]`);
-    area.questions.forEach((question, qIndex) => {
-      questionList.appendChild(renderQuestion(question, qIndex));
-    });
-  }
-
-  function renderQuestion(question, qIndex) {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'glass p-2';
-    wrapper.dataset.questionId = question.id;
-    wrapper.innerHTML = `
-      <label class="form-label small" for="question-${question.id}">Question ${qIndex + 1}</label>
-      <div class="row g-2 align-items-center">
-        <div class="col-md-8">
-          <input class="form-control" id="question-${question.id}" value="${question.text}" placeholder="What are we evaluating?" required>
-        </div>
-        <div class="col-md-3">
-          <label class="form-label small mb-1" for="target-${question.id}">Target maturity</label>
-          <select class="form-select form-select-sm" id="target-${question.id}"></select>
-        </div>
-        <div class="col-md-1 d-flex justify-content-end">
-          <button class="btn btn-outline-light btn-sm" type="button" data-remove-question="${question.id}"><i class="bi bi-trash"></i></button>
-        </div>
-      </div>
-    `;
-    const select = wrapper.querySelector(`#target-${question.id}`);
-    for (let i = 1; i <= Number(templateStages.value || state.maturityStages); i += 1) {
-      const option = document.createElement('option');
-      option.value = i;
-      option.textContent = `Stage ${i}`;
-      if (question.targetStage === i) option.selected = true;
-      select.appendChild(option);
-    }
-    return wrapper;
-  }
-
-  function syncAreaQuestions() {
-    const cards = Array.from(areaList.children);
-    return cards.map(card => {
-      const areaId = card.dataset.areaId;
-      const nameInput = card.querySelector(`#area-${areaId}`);
-      const description = card.querySelector('textarea').value.trim();
-      const questions = Array.from(card.querySelectorAll('[data-question-id]')).map(qEl => {
-        const qId = qEl.dataset.questionId;
-        const text = qEl.querySelector(`#question-${qId}`).value.trim();
-        const targetStage = Number(qEl.querySelector(`#target-${qId}`).value);
-        return { id: qId, text, targetStage };
-      }).filter(q => q.text.length);
-      return { id: areaId, name: nameInput.value.trim() || 'Untitled area', description, questions };
-    });
-  }
-
-  function addArea() {
-    const newArea = { id: crypto.randomUUID(), name: '', description: '', questions: [] };
-    renderArea(newArea, areaList.children.length);
-  }
-
-  function seedBuilderFromTemplate(template) {
-    areaList.innerHTML = '';
-    const sourceAreas = template?.areas?.length ? template.areas : [addBlankArea()];
-    sourceAreas.forEach((area, idx) => {
-      const areaClone = {
-        ...area,
-        id: crypto.randomUUID(),
-        questions: (area.questions || []).map(question => ({ ...question, id: crypto.randomUUID() }))
-      };
-      renderArea(areaClone, idx);
-    });
-    refreshQuestionTargets();
-  }
-
-  function loadTemplateToBuilder(templateId) {
-    const template = state.templates.find(t => t.id === templateId);
-    if (!template) return;
-    templateName.value = template.name || '';
-    templateDescription.value = template.description || '';
-    templateStages.value = template.stages || state.maturityStages;
-    seedBuilderFromTemplate(template);
-  }
-
-  function addBlankArea() {
-    return { id: crypto.randomUUID(), name: '', description: '', questions: [{ id: crypto.randomUUID(), text: '', targetStage: 1 }] };
-  }
-
-  function handleTemplateSubmit(event) {
-    event.preventDefault();
-    const areas = syncAreaQuestions();
-    if (!areas.length) {
-      alert('Please add at least one assessment area.');
-      return;
-    }
-    const hasEmptyArea = areas.some(area => !area.questions.length);
-    if (hasEmptyArea) {
-      alert('Each area needs at least one question.');
-      return;
-    }
-    const template = {
-      id: crypto.randomUUID(),
-      name: templateName.value.trim(),
-      description: templateDescription.value.trim(),
-      stages: Number(templateStages.value) || state.maturityStages,
-      areas,
-      createdAt: new Date().toISOString()
-    };
-    state.templates.unshift(template);
-    saveState();
-    templateForm.reset();
-    areaList.innerHTML = '';
-    templateStages.value = state.maturityStages;
-    templateDescription.value = '';
-    alert('Template saved. It is now available for assessments.');
-  }
-
-  function populateTemplateFormDefaults() {
-    if (templateStages) templateStages.value = state.maturityStages;
-  }
-
-  function renderTemplateOptions() {
-    if (!assessmentTemplate) return;
-    assessmentTemplate.innerHTML = '';
-    state.templates.forEach(template => {
-      const option = document.createElement('option');
-      option.value = template.id;
-      option.textContent = `${template.name} (${template.areas.length} areas)`;
-      assessmentTemplate.appendChild(option);
-    });
-  }
-
-  function renderTemplateLibrary() {
-    if (!templateLibraryList) return;
-    templateLibraryList.innerHTML = '';
-    if (!state.templates.length) {
-      templateLibraryList.innerHTML = '<p class="text-fg-3 small mb-0">No templates yet. Create one to seed your library.</p>';
-      return;
-    }
-
-    state.templates.forEach(template => {
-      const card = document.createElement('div');
-      card.className = 'glass p-3';
-      const createdLabel = template.createdAt ? new Date(template.createdAt).toLocaleDateString() : 'Recently added';
-      card.innerHTML = `
-        <div class="d-flex justify-content-between align-items-start gap-3">
-          <div>
-            <strong>${template.name}</strong>
-            <p class="mb-1 small text-fg-3">${template.description || 'Template ready to reuse.'}</p>
-            <p class="mb-0 small text-fg-3">${template.areas.length} areas · ${template.stages || state.maturityStages} stages</p>
-          </div>
-          <div class="text-end">
-            <span class="badge-soft">${createdLabel}</span>
-          </div>
-        </div>
-        <div class="d-flex justify-content-between align-items-center gap-2 mt-2 flex-wrap">
-          <div class="small text-fg-3">Ready for Navigator &amp; assessments</div>
-          <button class="btn btn-outline-light btn-sm" type="button" data-load-template="${template.id}">Load in builder</button>
-        </div>
-      `;
-      templateLibraryList.appendChild(card);
-    });
-  }
-
-  function renderAccountOptions() {
-    if (!assessmentAccount) return;
-    assessmentAccount.innerHTML = '';
-    state.accounts.forEach(account => {
-      const option = document.createElement('option');
-      option.value = account.id;
-      option.textContent = account.name;
-      assessmentAccount.appendChild(option);
-    });
-  }
-
-  function renderAccounts() {
-    if (!accountList) return;
-    accountList.innerHTML = '';
-    if (!state.accounts.length) {
-      accountList.innerHTML = '<p class="text-fg-3 small mb-0">No accounts yet. Create one to begin.</p>';
-      return;
-    }
-    state.accounts.forEach(account => {
-      const card = document.createElement('div');
-      card.className = 'glass p-3';
-      card.innerHTML = `
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <strong>${account.name}</strong>
-            <p class="mb-1 small text-fg-3">TCV: ${account.tcv ? `$${Number(account.tcv).toLocaleString()}` : 'Not set'}</p>
-            <p class="mb-0 small text-fg-3">Team: ${account.team || 'Not set'}</p>
-          </div>
-          <span class="badge-soft">${new Date(account.createdAt).toLocaleDateString()}</span>
-        </div>
-      `;
-      accountList.appendChild(card);
-    });
-  }
-
-  function renderCompletedAssessments() {
-    if (!completedAssessmentsList || !completedAssessmentsCount) return;
-    completedAssessmentsList.innerHTML = '';
-    completedAssessmentsCount.textContent = `${state.assessments.length} recorded`;
-    if (!state.assessments.length) {
-      completedAssessmentsList.innerHTML = '<p class="text-fg-3 small mb-0">Complete an assessment to see it appear here.</p>';
-      return;
-    }
-
-    state.assessments.slice(0, 6).forEach(assessment => {
-      const account = state.accounts.find(acc => acc.id === assessment.accountId);
-      const template = state.templates.find(t => t.id === assessment.templateId);
-      const card = document.createElement('div');
-      card.className = 'glass p-3';
-      card.innerHTML = `
-        <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
-          <div>
-            <strong>${assessment.name || 'Assessment'}</strong>
-            <p class="mb-1 small text-fg-3">${assessment.date || 'Not dated'} · ${template?.name || 'Template removed'}</p>
-            <p class="mb-0 small text-fg-3">Account: ${account?.name || 'Unknown'} · Owner: ${assessment.takenBy || assessment.owner || 'Not recorded'}</p>
-            <p class="mb-0 small text-fg-3">Customer team: ${assessment.customerContributors || 'Not captured'}</p>
-          </div>
-          <div class="text-end">
-            <span class="badge-soft">${new Date(assessment.date || new Date()).toLocaleDateString()}</span>
-            <button class="btn btn-outline-light btn-sm mt-2" type="button" data-open-assessment="${assessment.id}">Open</button>
-          </div>
-        </div>
-      `;
-      completedAssessmentsList.appendChild(card);
-    });
-  }
-
-  function handleAccountSubmit(event) {
-    if (!accountForm) return;
-    event.preventDefault();
-    const name = document.getElementById('accountName').value.trim();
-    const tcv = Number(document.getElementById('accountTcv').value) || 0;
-    const team = document.getElementById('accountTeam').value.trim();
-    state.accounts.unshift({ id: crypto.randomUUID(), name, tcv, team, createdAt: new Date().toISOString() });
-    saveState();
-    accountForm.reset();
-    renderAccountOptions();
-  }
-
-  function buildAssessmentPayload(templateId) {
-    const template = state.templates.find(t => t.id === templateId);
-    if (!template) return null;
-    return {
-      ...template,
-      areas: template.areas.map(area => ({
-        ...area,
-        questions: area.questions.map(question => ({ ...question, response: '', notes: '', urgency: urgencyOptions[3], maturity: maturityOptions[4] }))
-      }))
-    };
-  }
-
-  function renderAssessmentDetail(assessment) {
-    if (!assessmentDetail) return;
-    assessmentDetail.innerHTML = '';
-    assessment.areas.forEach((area, idx) => {
-      const item = document.createElement('div');
-      item.className = 'accordion-item bg-transparent border-soft';
-      item.innerHTML = `
-        <h2 class="accordion-header" id="area-heading-${area.id}">
-          <button class="accordion-button ${idx === 0 ? '' : 'collapsed'}" type="button" data-bs-toggle="collapse" data-bs-target="#area-${area.id}" aria-expanded="${idx === 0}" aria-controls="area-${area.id}">
-            <div class="d-flex flex-column">
-              <span class="fw-semibold">${area.name}</span>
-              <span class="text-fg-3 small">${area.description || 'Assessment area'}</span>
-            </div>
-          </button>
-        </h2>
-        <div id="area-${area.id}" class="accordion-collapse collapse ${idx === 0 ? 'show' : ''}" aria-labelledby="area-heading-${area.id}" data-bs-parent="#assessmentDetail">
-          <div class="accordion-body bg-transparent">
-            <div class="d-flex flex-column gap-3">
-              ${area.questions.map(question => renderAssessmentQuestion(question, assessment.id)).join('')}
-            </div>
-          </div>
-        </div>
-      `;
-      assessmentDetail.appendChild(item);
-    });
-  }
-
-  function renderAssessmentMeta(assessment) {
-    if (!assessmentMeta) return;
-    if (!assessment) {
-      assessmentMeta.classList.add('d-none');
-      assessmentMeta.innerHTML = '';
-      return;
-    }
-    const account = state.accounts.find(acc => acc.id === assessment.accountId);
-    const template = state.templates.find(t => t.id === assessment.templateId);
-    const customerTeam = assessment.customerContributors || 'Not captured yet';
-    const owner = assessment.takenBy || assessment.owner || 'Not recorded';
-    assessmentMeta.innerHTML = `
-      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
-        <div>
-          <strong>${assessment.name || 'Assessment'}</strong>
-          <p class="mb-1 small text-fg-3">${template?.name || 'Template removed'} · ${account?.name || 'No account selected'}</p>
-          <p class="mb-0 small text-fg-3">Taken by ${owner} · Customer contributors: ${customerTeam}</p>
-        </div>
-        <div class="text-end small text-fg-3">
-          <div>${assessment.date || 'Not dated'}</div>
-          ${assessment.owner ? `<div>Account team: ${assessment.owner}</div>` : ''}
-        </div>
-      </div>
-    `;
-    assessmentMeta.classList.remove('d-none');
-  }
-
-  function renderAssessmentQuestion(question, assessmentId) {
-    const urgencySelect = urgencyOptions
-      .map(option => `<option value="${option}" ${question.urgency === option ? 'selected' : ''}>${option}</option>`)
-      .join('');
-    const maturitySelect = maturityOptions
-      .map(option => `<option value="${option}" ${question.maturity === option ? 'selected' : ''}>${option}</option>`)
-      .join('');
-    return `
-      <div class="glass p-3" data-question="${question.id}" data-assessment="${assessmentId}">
-        <div class="d-flex justify-content-between flex-wrap align-items-start gap-2 mb-2">
-          <div>
-            <strong>${question.text}</strong>
-            <p class="small text-fg-3 mb-0">Target stage: ${question.targetStage}</p>
-          </div>
-          <div class="d-flex gap-2 flex-wrap">
-            <select class="form-select form-select-sm" data-urgency>
-              ${urgencySelect}
-            </select>
-            <select class="form-select form-select-sm" data-maturity>
-              ${maturitySelect}
-            </select>
-          </div>
-        </div>
-        <div class="row g-2">
-          <div class="col-md-6">
-            <label class="form-label small">Answer</label>
-            <textarea class="form-control" rows="2" data-response placeholder="Document the customer response"></textarea>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label small">Notes</label>
-            <textarea class="form-control" rows="2" data-notes placeholder="Context, owners, blockers"></textarea>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  function attachAssessmentListeners(currentAssessment) {
-    activeAssessment = currentAssessment;
-  }
-
-  function setActiveAssessment(assessment) {
-    attachAssessmentListeners(assessment);
-    if (!assessment) {
-      renderAssessmentMeta();
-      if (assessmentDetail) assessmentDetail.innerHTML = '';
-      return;
-    }
-    renderAssessmentMeta(assessment);
-    renderAssessmentDetail(assessment);
-  }
-
-  function persistAssessment(assessment) {
-    const index = state.assessments.findIndex(a => a.id === assessment.id);
-    if (index > -1) {
-      state.assessments[index] = assessment;
-      saveState();
-    }
-  }
-
-  function handleAssessmentSubmit(event) {
-    event.preventDefault();
-    if (isAssessmentLimitReached()) {
-      alert('Free personal licenses include up to 3 assessments. Select Consulting Enterprise during onboarding to keep creating more.');
-      return;
-    }
-    const accountId = assessmentAccount.value;
-    const templateId = assessmentTemplate.value;
-    const templatePayload = buildAssessmentPayload(templateId);
-    if (!templatePayload) {
-      alert('Select a template to continue.');
-      return;
-    }
-    const takenBy = document.getElementById('assessmentTakenBy').value.trim();
-    const customerContributors = document.getElementById('customerContributors').value.trim();
-    const assessment = {
-      id: crypto.randomUUID(),
-      name: document.getElementById('assessmentName').value.trim(),
-      owner: document.getElementById('assessmentOwner').value.trim(),
-      date: document.getElementById('assessmentDate').value || new Date().toISOString().split('T')[0],
-      accountId,
-      templateId,
-      takenBy,
-      customerContributors,
-      createdAt: new Date().toISOString(),
-      areas: templatePayload.areas
-    };
-    state.assessments.unshift(assessment);
-    saveState();
-    setActiveAssessment(assessment);
-    renderAnalytics();
-    alert('Assessment created. Sections are ready for input.');
-  }
-
-  function renderAnalytics() {
-    if (!analyticsPanel || !analyticsTotal) return;
-    analyticsPanel.innerHTML = '';
-    analyticsTotal.textContent = `${state.assessments.length} assessments captured`;
-    if (!state.assessments.length) {
-      analyticsPanel.innerHTML = '<p class="text-fg-3 small mb-0">Complete an assessment to see urgency and maturity trends.</p>';
-      return;
-    }
-
-    const urgencyCount = {};
-    const maturityCount = {};
-    state.assessments.forEach(assessment => {
-      assessment.areas.forEach(area => {
-        area.questions.forEach(question => {
-          urgencyCount[question.urgency] = (urgencyCount[question.urgency] || 0) + 1;
-          maturityCount[question.maturity] = (maturityCount[question.maturity] || 0) + 1;
-        });
-      });
-    });
-
-    const urgencyCard = document.createElement('div');
-    urgencyCard.className = 'glass p-3';
-    urgencyCard.innerHTML = `<strong class="small d-block mb-2">Urgency mix</strong>${renderDistribution(urgencyCount)}`;
-
-    const maturityCard = document.createElement('div');
-    maturityCard.className = 'glass p-3';
-    maturityCard.innerHTML = `<strong class="small d-block mb-2">Maturity distribution</strong>${renderDistribution(maturityCount)}`;
-
-    analyticsPanel.appendChild(urgencyCard);
-    analyticsPanel.appendChild(maturityCard);
-  }
-
-  function renderDistribution(map) {
-    const entries = Object.entries(map);
-    if (!entries.length) return '<p class="text-fg-3 small mb-0">No data yet.</p>';
-    const total = entries.reduce((sum, [, value]) => sum + value, 0);
-    return entries
-      .map(([label, value]) => {
-        const pct = Math.round((value / total) * 100);
-        return `
-          <div class="mb-1">
-            <div class="d-flex justify-content-between small"><span>${label}</span><span>${pct}%</span></div>
-            <div class="progress" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" style="height:6px;">
-              <div class="progress-bar bg-info" style="width:${pct}%"></div>
-            </div>
-          </div>
-        `;
-      })
-      .join('');
-  }
-
-  function renderObjectives() {
-    if (!objectivesList) return;
-    objectivesList.innerHTML = '';
-    if (!state.objectives.length) {
-      objectivesList.innerHTML = '<p class="text-fg-3 small mb-0">No objectives yet.</p>';
-      return;
-    }
-    state.objectives.forEach(objective => {
+    section.querySelector('.add-question').addEventListener('click', () => {
+      const list = section.querySelector('.question-list');
       const row = document.createElement('div');
-      row.className = 'glass p-2 d-flex align-items-center gap-2';
+      row.className = 'glass p-2 rounded d-flex flex-wrap gap-2 align-items-center';
       row.innerHTML = `
-        <input class="form-check-input" type="checkbox" ${objective.status === 'done' ? 'checked' : ''} data-objective="${objective.id}">
-        <span class="flex-grow-1 small">${objective.text}</span>
-        <button class="btn btn-outline-light btn-sm" type="button" data-remove-objective="${objective.id}"><i class="bi bi-x"></i></button>
+        <input class="form-control form-control-sm flex-grow-1 question-label" placeholder="API fit" required />
+        <select class="form-select form-select-sm question-type" style="max-width: 140px;">
+          <option value="text">Text</option>
+          <option value="numeric">Numeric</option>
+        </select>
+        <input class="form-control form-control-sm question-weight" type="number" step="0.1" min="0" max="1" value="1" style="max-width: 120px;" />
+        <button type="button" class="btn btn-outline-light btn-sm remove-question"><i class="bi bi-x"></i></button>
       `;
-      objectivesList.appendChild(row);
+      row.querySelector('.remove-question').addEventListener('click', () => row.remove());
+      list.appendChild(row);
     });
+
+    section.querySelector('.remove-section').addEventListener('click', () => section.remove());
+    return section;
   }
 
-  function handleObjectiveToggle(event) {
-    const checkbox = event.target.closest('[data-objective]');
-    if (!checkbox) return;
-    const id = checkbox.dataset.objective;
-    const objective = state.objectives.find(obj => obj.id === id);
-    if (!objective) return;
-    objective.status = checkbox.checked ? 'done' : 'in-progress';
-    saveState();
-  }
-
-  function handleObjectiveRemove(event) {
-    const btn = event.target.closest('[data-remove-objective]');
-    if (!btn) return;
-    const id = btn.dataset.removeObjective;
-    state.objectives = state.objectives.filter(obj => obj.id !== id);
-    saveState();
-  }
-
-  function addObjective() {
-    const text = prompt('Objective description');
-    if (!text) return;
-    state.objectives.unshift({ id: crypto.randomUUID(), text, status: 'not-started' });
-    saveState();
-  }
-
-  function bindAreaEvents() {
-    if (!areaList) return;
-    areaList.addEventListener('click', event => {
-      if (event.target.closest('[data-add-question]')) {
-        const areaId = event.target.closest('[data-add-question]').dataset.addQuestion;
-        const card = areaList.querySelector(`[data-area-id="${areaId}"]`);
-        const questionList = card.querySelector(`[data-question-list="${areaId}"]`);
-        const newQuestion = { id: crypto.randomUUID(), text: '', targetStage: 1 };
-        questionList.appendChild(renderQuestion(newQuestion, questionList.children.length));
-      }
-      if (event.target.closest('[data-remove-area]')) {
-        const id = event.target.closest('[data-remove-area]').dataset.removeArea;
-        const target = areaList.querySelector(`[data-area-id="${id}"]`);
-        if (target) target.remove();
-      }
-      if (event.target.closest('[data-remove-question]')) {
-        const id = event.target.closest('[data-remove-question]').dataset.removeQuestion;
-        const question = areaList.querySelector(`[data-question-id="${id}"]`);
-        if (question) question.remove();
-      }
+  function serialiseTemplateSections() {
+    if (!els.templateSections) return [];
+    const sections = [];
+    const sectionCards = els.templateSections.querySelectorAll('.card');
+    sectionCards.forEach(card => {
+      const title = card.querySelector('.section-title')?.value?.trim();
+      if (!title) return;
+      const weightRaw = card.querySelector('.section-weight')?.value;
+      const description = card.querySelector('.section-description')?.value?.trim();
+      const questions = [];
+      card.querySelectorAll('.question-list .glass').forEach(q => {
+        const label = q.querySelector('.question-label')?.value?.trim();
+        if (!label) return;
+        const type = q.querySelector('.question-type')?.value || 'text';
+        const weight = parseFloat(q.querySelector('.question-weight')?.value || '0');
+        questions.push({ questionId: crypto.randomUUID(), label, type, weight });
+      });
+      sections.push({ sectionId: crypto.randomUUID(), title, weight: parseFloat(weightRaw || '0'), description, questions });
     });
+    return sections;
   }
 
-  function handleGlobalStagesChange() {
-    state.maturityStages = Number(globalStages.value) || defaultState.maturityStages;
-    templateStages.value = state.maturityStages;
-    refreshQuestionTargets();
-    saveState();
-  }
+  function renderTemplates() {
+    if (!els.templateLibrary) return;
+    els.templateLibrary.innerHTML = '';
 
-  function handleResetTemplate() {
-    populateTemplateFormDefaults();
-    seedBuilderFromTemplate();
-  }
-
-  function handleGenerateAiSummary(event) {
-    event.preventDefault();
-    const latestAssessment = state.assessments[0];
-    if (!latestAssessment) {
-      alert('Create an assessment first.');
+    if (state.templates.length === 0) {
+      if (els.templateLibraryEmpty) els.templateLibraryEmpty.classList.remove('d-none');
       return;
     }
-    const account = state.accounts.find(acc => acc.id === latestAssessment.accountId);
-    const urgencyHighlights = collectTopValues(latestAssessment, 'urgency', 2);
-    const maturityHighlights = collectTopValues(latestAssessment, 'maturity', 2);
-    state.aiSummary = `For ${account?.name || 'the account'}, ValueSphere synthesized ${latestAssessment.areas.length} areas. Urgency is led by ${urgencyHighlights.join(' & ')}, while maturity signals concentrate around ${maturityHighlights.join(' & ')}. Recommended path: focus on the top urgency items, align on target stage ${state.maturityStages}, and capture progression in the next assessment.`;
-    saveState();
-    alert('AI summary drafted and stored with the account.');
-  }
 
-  function collectTopValues(assessment, field, limit) {
-    const count = {};
-    assessment.areas.forEach(area => {
-      area.questions.forEach(q => {
-        const key = q[field];
-        count[key] = (count[key] || 0) + 1;
-      });
+    if (els.templateLibraryEmpty) els.templateLibraryEmpty.classList.add('d-none');
+
+    state.templates.forEach(template => {
+      const card = document.createElement('div');
+      card.className = 'card glass p-3 h-100';
+      card.innerHTML = `
+        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+          <div>
+            <strong class="d-block">${template.name}</strong>
+            <span class="text-fg-3 small">Version ${template.versionNumber || 1}${template.isDeprecated ? ' · Deprecated' : ''}</span>
+          </div>
+          <span class="badge-soft">${template.mode === 'seller' ? 'Seller' : template.mode === 'shared' ? 'Shared' : 'Buyer'}</span>
+        </div>
+        <p class="text-fg-3 small mb-2">${template.description || 'No description provided.'}</p>
+        <div class="small text-fg-3">${(template.sections || []).length} sections · Updated ${new Date(template.updatedAt || template.createdAt || Date.now()).toLocaleDateString()}</div>
+      `;
+      els.templateLibrary.appendChild(card);
     });
-    return Object.entries(count)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, limit)
-      .map(([label]) => label || 'n/a');
   }
 
-  function handleAssessmentChange(event) {
-    if (!activeAssessment) return;
-    const container = event.target.closest('[data-question]');
+  function renderOverview() {
+    if (els.templateCount) els.templateCount.textContent = state.templates.length;
+    if (els.assessmentCount) els.assessmentCount.textContent = state.assessments.length;
+    const completed = state.assessments.filter(a => a.state === 'locked');
+    if (els.completedCount) els.completedCount.textContent = completed.length;
+
+    if (els.recentAssessments) {
+      els.recentAssessments.innerHTML = '';
+      const recent = state.assessments.slice(0, 4);
+      if (recent.length === 0) {
+        els.recentAssessments.innerHTML = '<p class="text-fg-3 small mb-0">No assessments yet.</p>';
+      } else {
+        recent.forEach(a => {
+          const item = document.createElement('div');
+          item.className = 'glass p-2 rounded mb-2';
+          item.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <div class="fw-semibold">${a.title || a.vendorName}</div>
+                <div class="text-fg-3 small">${a.vendorName} • ${a.state || 'draft'}</div>
+              </div>
+              <span class="badge-soft">${a.templateVersion ? `v${a.templateVersion}` : 'Assessment'}</span>
+            </div>`;
+          item.addEventListener('click', () => selectAssessment(a));
+          els.recentAssessments.appendChild(item);
+        });
+      }
+    }
+  }
+
+  function renderAssessmentList(container, assessments) {
     if (!container) return;
-    const questionId = container.dataset.question;
-    const area = activeAssessment.areas.find(a => a.questions.some(q => q.id === questionId));
-    const question = area?.questions.find(q => q.id === questionId);
-    if (!question) return;
-    if (event.target.dataset.response !== undefined) question.response = event.target.value;
-    if (event.target.dataset.notes !== undefined) question.notes = event.target.value;
-    if (event.target.dataset.urgency !== undefined) question.urgency = event.target.value;
-    if (event.target.dataset.maturity !== undefined) question.maturity = event.target.value;
-    persistAssessment(activeAssessment);
-  }
-
-  function handleTemplateLibraryClick(event) {
-    const loadBtn = event.target.closest('[data-load-template]');
-    if (!loadBtn) return;
-    localStorage.setItem('valuesphereBuilderTemplateId', loadBtn.dataset.loadTemplate);
-    window.location.href = '/valuesphere-template-new.html';
-  }
-
-  function handleCompletedAssessmentOpen(event) {
-    const btn = event.target.closest('[data-open-assessment]');
-    if (!btn) return;
-    const assessment = state.assessments.find(a => a.id === btn.dataset.openAssessment);
-    if (assessment) setActiveAssessment(assessment);
-  }
-
-  function render() {
-    if (globalStages) globalStages.value = state.maturityStages;
-    renderTemplateOptions();
-    renderTemplateLibrary();
-    renderAccountOptions();
-    renderAccounts();
-    renderObjectives();
-    renderAnalytics();
-    renderCompletedAssessments();
-    renderAssessmentMeta(activeAssessment);
-    updateDashboard();
-  }
-
-  function initDefaults() {
-    populateTemplateFormDefaults();
-    const builderSeedId = localStorage.getItem('valuesphereBuilderTemplateId');
-    if (builderSeedId && state.templates.some(t => t.id === builderSeedId)) {
-      loadTemplateToBuilder(builderSeedId);
-      localStorage.removeItem('valuesphereBuilderTemplateId');
-    } else {
-      seedBuilderFromTemplate(state.templates[0]);
+    container.innerHTML = '';
+    if (!assessments || assessments.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'text-fg-3 small';
+      empty.textContent = 'No assessments yet.';
+      container.appendChild(empty);
+      return;
     }
-    if (state.assessments[0]) {
-      setActiveAssessment(state.assessments[0]);
-    }
-  }
 
-  function refreshQuestionTargets() {
-    if (!areaList || !templateStages) return;
-    const maxStage = Number(templateStages.value || state.maturityStages);
-    areaList.querySelectorAll('[data-question-id]').forEach(questionEl => {
-      const select = questionEl.querySelector('select');
-      const currentValue = Number(select.value) || 1;
-      select.innerHTML = '';
-      for (let i = 1; i <= maxStage; i += 1) {
-        const option = document.createElement('option');
-        option.value = i;
-        option.textContent = `Stage ${i}`;
-        if (i === currentValue) option.selected = true;
-        select.appendChild(option);
-      }
+    assessments.forEach(a => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-start gap-2';
+      btn.innerHTML = `
+        <div>
+          <div class="fw-semibold">${a.title || a.vendorName}</div>
+          <div class="text-fg-3 small">${a.vendorName} • ${a.state || 'draft'}</div>
+        </div>
+        <div class="text-end text-fg-3 small">
+          <div>${new Date(a.updatedAt || a.createdAt || Date.now()).toLocaleDateString()}</div>
+          <span class="badge-soft">${(a.tags || []).slice(0, 2).join(', ') || 'ValueSphere'}</span>
+        </div>`;
+      btn.addEventListener('click', () => selectAssessment(a));
+      container.appendChild(btn);
     });
   }
 
-  function updateDashboard() {
-    if (!dashboardTemplateCount || !dashboardAccountCount || !dashboardAssessmentCount) return;
-    dashboardTemplateCount.textContent = state.templates.length;
-    dashboardAccountCount.textContent = state.accounts.length;
-    dashboardAssessmentCount.textContent = state.assessments.length;
-  }
-
-  async function boot() {
-    const authed = await ensureAuthenticated();
-    if (!authed) return;
-    hydrateBuyerStateFromContext();
-    const { canUseSellerSuite, canUseBuyerSuite } = getSuiteCapabilities();
-
-    // Control visibility of mode toggle buttons based on provisioning
-    if (vsModeVendorBtn) {
-      vsModeVendorBtn.classList.toggle('d-none', !canUseSellerSuite);
-    }
-    if (vsModeBuyerBtn) {
-      vsModeBuyerBtn.classList.toggle('d-none', !canUseBuyerSuite);
+  function renderAssessmentDetail() {
+    if (!els.assessmentDetail) return;
+    const a = state.selectedAssessment;
+    if (!a) {
+      els.assessmentDetail.classList.add('d-none');
+      if (els.assessmentEmpty) els.assessmentEmpty.classList.remove('d-none');
+      return;
     }
 
-    const initialMode = computeInitialMode();
-    setMode(initialMode, { persist: true });
+    els.assessmentDetail.classList.remove('d-none');
+    if (els.assessmentEmpty) els.assessmentEmpty.classList.add('d-none');
 
-    if (!canUseSellerSuite && !canUseBuyerSuite) {
-      // Optionally, show some helper text indicating no access.
-      if (vsBuyerVendorHelper) {
-        vsBuyerVendorHelper.textContent =
-          'Your organisation has not provisioned you for the Seller or Buyer suites yet. Ask your admin to grant access.';
+    if (els.assessmentTitle) els.assessmentTitle.textContent = a.title || 'Assessment';
+    if (els.assessmentVendor) els.assessmentVendor.textContent = a.vendorName || 'Vendor';
+    if (els.assessmentState) els.assessmentState.textContent = (a.state || 'draft').toUpperCase();
+    if (els.assessmentSummary) els.assessmentSummary.textContent = a.summary || 'No summary provided.';
+    if (els.assessmentTags) els.assessmentTags.textContent = (a.tags || []).join(', ') || 'No tags';
+    if (els.assessmentMeta) {
+      const updated = new Date(a.updatedAt || a.createdAt || Date.now()).toLocaleString();
+      els.assessmentMeta.textContent = `Last updated ${updated}`;
+    }
+
+    if (els.assessmentCriteria) {
+      els.assessmentCriteria.innerHTML = '';
+      const criteria = Array.isArray(a.criteria) ? a.criteria : [];
+      if (criteria.length === 0) {
+        els.assessmentCriteria.innerHTML = '<p class="text-fg-3 small mb-0">No criteria captured.</p>';
+      } else {
+        criteria.forEach(c => {
+          const row = document.createElement('div');
+          row.className = 'glass p-2 rounded mb-2';
+          row.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <div class="fw-semibold">${c.questionId || 'Criteria'}</div>
+                <div class="text-fg-3 small">Section: ${c.sectionId || 'N/A'}</div>
+              </div>
+              <div class="text-end">
+                <div class="text-fg-2 small">Score: ${c.score ?? '-'}</div>
+                <div class="text-fg-3 small">Weight: ${c.weight ?? '-'}</div>
+              </div>
+            </div>`;
+          els.assessmentCriteria.appendChild(row);
+        });
       }
     }
-    bindAreaEvents();
-    render();
-    if (templateForm || areaList) {
-      initDefaults();
-    } else if (state.assessments[0]) {
-      setActiveAssessment(state.assessments[0]);
-    }
-    renderAssessmentLimitNotice();
-    if (initialMode === 'buyer') {
-      await prepareBuyerMode();
-    } else {
-      renderBuyerVendorHelper();
+
+    if (els.assessmentScoring) {
+      els.assessmentScoring.innerHTML = '';
+      const scoring = a.scoring || {};
+      const summary = document.createElement('div');
+      summary.className = 'glass p-2 rounded';
+      summary.innerHTML = `
+        <div class="d-flex justify-content-between">
+          <span>Total score</span>
+          <strong>${scoring.totalScore ?? '—'}</strong>
+        </div>
+        <div class="text-fg-3 small">Model: ${scoring.model || 'Weighted criteria'}</div>`;
+      els.assessmentScoring.appendChild(summary);
     }
 
-    const addAreaBtn = document.getElementById('addArea');
-    if (addAreaBtn) addAreaBtn.addEventListener('click', addArea);
-    if (templateForm) {
-      templateForm.addEventListener('submit', handleTemplateSubmit);
-      templateForm.addEventListener('reset', handleResetTemplate);
+    if (els.assessmentStakeholders) {
+      els.assessmentStakeholders.innerHTML = '';
+      const stakeholders = Array.isArray(a.stakeholders) ? a.stakeholders : [];
+      if (stakeholders.length === 0) {
+        els.assessmentStakeholders.innerHTML = '<p class="text-fg-3 small mb-0">No stakeholders recorded.</p>';
+      } else {
+        stakeholders.forEach(s => {
+          const item = document.createElement('div');
+          item.className = 'glass p-2 rounded mb-2';
+          item.innerHTML = `
+            <div class="fw-semibold">${s.name || 'Stakeholder'}</div>
+            <div class="text-fg-3 small">${s.role || 'Role'} • Influence: ${s.influence || 'n/a'}</div>`;
+          els.assessmentStakeholders.appendChild(item);
+        });
+      }
     }
-    if (templateStages) templateStages.addEventListener('change', refreshQuestionTargets);
-    if (accountForm) accountForm.addEventListener('submit', handleAccountSubmit);
-    if (assessmentForm) assessmentForm.addEventListener('submit', handleAssessmentSubmit);
-    if (globalStages) globalStages.addEventListener('change', handleGlobalStagesChange);
-    if (addObjectiveBtn) addObjectiveBtn.addEventListener('click', addObjective);
-    if (objectivesList) {
-      objectivesList.addEventListener('change', handleObjectiveToggle);
-      objectivesList.addEventListener('click', handleObjectiveRemove);
-    }
-    if (generateAiSummaryBtn) generateAiSummaryBtn.addEventListener('click', handleGenerateAiSummary);
-    if (assessmentDetail) {
-      assessmentDetail.addEventListener('input', handleAssessmentChange);
-      assessmentDetail.addEventListener('change', handleAssessmentChange);
-    }
-    if (templateLibraryList) templateLibraryList.addEventListener('click', handleTemplateLibraryClick);
-    if (completedAssessmentsList) completedAssessmentsList.addEventListener('click', handleCompletedAssessmentOpen);
-    if (vsModeVendorBtn) vsModeVendorBtn.addEventListener('click', () => setMode('vendor'));
-    if (vsModeBuyerBtn) vsModeBuyerBtn.addEventListener('click', async () => {
-      setMode('buyer');
-      await prepareBuyerMode();
-    });
-    if (vsBuyerSaveAssessmentBtn) vsBuyerSaveAssessmentBtn.addEventListener('click', handleBuyerAssessmentSave);
   }
 
-  document.addEventListener('DOMContentLoaded', boot);
+  function selectAssessment(assessment) {
+    state.selectedAssessment = assessment;
+    renderAssessmentDetail();
+  }
+
+  async function loadTemplates() {
+    try {
+      const mode = state.context?.activePersona === 'buyer' ? 'buyer' : 'seller';
+      const data = await fetchJson(`/api/valuesphere/templates?mode=${encodeURIComponent(mode)}`);
+      state.templates = Array.isArray(data.templates) ? data.templates : [];
+      renderTemplates();
+      renderOverview();
+      populateTemplateSelect();
+    } catch (err) {
+      if (els.templateLibraryError) {
+        els.templateLibraryError.textContent = err.message;
+        els.templateLibraryError.classList.remove('d-none');
+      }
+    }
+  }
+
+  async function loadAssessments() {
+    try {
+      const data = await fetchJson('/api/valuesphere/buyer/assessments');
+      state.assessments = Array.isArray(data.assessments) ? data.assessments : [];
+      renderOverview();
+      renderAssessmentList(els.assessmentList, state.assessments.filter(a => a.state !== 'locked'));
+      if (els.completedAssessments) {
+        const completed = state.assessments.filter(a => a.state === 'locked');
+        renderAssessmentList(els.completedAssessments, completed);
+      }
+      if (!state.selectedAssessment && state.assessments.length > 0) {
+        selectAssessment(state.assessments[0]);
+      }
+    } catch (err) {
+      showStatus(err.message, 'error');
+    }
+  }
+
+  function populateTemplateSelect() {
+    if (!els.assessmentTemplateSelect) return;
+    els.assessmentTemplateSelect.innerHTML = '<option value="">Select template (optional)</option>';
+    state.templates.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = `${t.name} (v${t.versionNumber || 1})`;
+      els.assessmentTemplateSelect.appendChild(opt);
+    });
+  }
+
+  async function handleTemplateSubmit(event) {
+    event.preventDefault();
+    if (!els.templateForm) return;
+    const formData = new FormData(els.templateForm);
+    const name = formData.get('templateName')?.toString().trim();
+    const description = formData.get('templateDescription')?.toString().trim();
+    const changeSummary = formData.get('templateChangeSummary')?.toString().trim();
+    const mode = state.context?.activePersona === 'buyer' ? 'buyer' : 'seller';
+    const sections = serialiseTemplateSections();
+
+    if (!name) {
+      showStatus('Template name is required.', 'error');
+      return;
+    }
+
+    try {
+      showStatus('Saving template...');
+      const payload = { name, description, changeSummary, sections, mode };
+      const data = await fetchJson('/api/valuesphere/templates', { method: 'POST', body: JSON.stringify(payload) });
+      showStatus('Template created.', 'success');
+      state.templates.unshift(data.template);
+      renderTemplates();
+      renderOverview();
+      populateTemplateSelect();
+      els.templateForm.reset();
+      if (els.templateSections) els.templateSections.innerHTML = '';
+      addInitialSections();
+    } catch (err) {
+      showStatus(err.message, 'error');
+    }
+  }
+
+  async function handleAssessmentSubmit(event) {
+    event.preventDefault();
+    if (!els.assessmentCreateForm) return;
+    const formData = new FormData(els.assessmentCreateForm);
+    const vendorName = formData.get('vendorName')?.toString().trim();
+    const title = formData.get('assessmentTitleInput')?.toString().trim();
+    const summary = formData.get('assessmentSummaryInput')?.toString().trim();
+    const tags = formData.get('assessmentTags')?.toString().split(',').map(t => t.trim()).filter(Boolean) || [];
+    const templateId = formData.get('templateId')?.toString().trim();
+
+    if (!vendorName) {
+      showStatus('Vendor name is required.', 'error');
+      return;
+    }
+
+    try {
+      showStatus('Creating assessment...');
+      const payload = { vendorName, title, summary, tags, templateId: templateId || undefined };
+      const data = await fetchJson('/api/valuesphere/buyer/assessments', { method: 'POST', body: JSON.stringify(payload) });
+      showStatus('Assessment created.', 'success');
+      state.assessments.unshift(data.assessment);
+      renderOverview();
+      renderAssessmentList(els.assessmentList, state.assessments.filter(a => a.state !== 'locked'));
+      if (!state.selectedAssessment) selectAssessment(data.assessment);
+      els.assessmentCreateForm.reset();
+    } catch (err) {
+      showStatus(err.message, 'error');
+    }
+  }
+
+  async function transitionAssessment(stateTarget) {
+    if (!state.selectedAssessment) return;
+    try {
+      showStatus(`Updating assessment to ${stateTarget}...`);
+      const data = await fetchJson(`/api/valuesphere/buyer/assessments/${state.selectedAssessment.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ state: stateTarget })
+      });
+      const updated = data.assessment;
+      state.assessments = state.assessments.map(a => (a.id === updated.id ? updated : a));
+      state.selectedAssessment = updated;
+      renderOverview();
+      renderAssessmentList(els.assessmentList, state.assessments.filter(a => a.state !== 'locked'));
+      if (els.completedAssessments) {
+        const completed = state.assessments.filter(a => a.state === 'locked');
+        renderAssessmentList(els.completedAssessments, completed);
+      }
+      renderAssessmentDetail();
+      showStatus('Assessment updated.', 'success');
+    } catch (err) {
+      showStatus(err.message, 'error');
+    }
+  }
+
+  function addInitialSections() {
+    if (!els.templateSections) return;
+    if (els.templateSections.childElementCount === 0) {
+      els.templateSections.appendChild(createSectionCard());
+    }
+  }
+
+  async function loadContext() {
+    try {
+      const ctx = await fetchJson('/api/me/context');
+      state.context = ctx;
+      applyTheme(ctx);
+    } catch (err) {
+      showStatus(err.message, 'error');
+    }
+  }
+
+  function bindEvents() {
+    if (els.addSectionBtn && els.templateSections) {
+      els.addSectionBtn.addEventListener('click', () => {
+        els.templateSections.appendChild(createSectionCard());
+      });
+    }
+
+    if (els.templateForm) {
+      els.templateForm.addEventListener('submit', handleTemplateSubmit);
+    }
+
+    if (els.assessmentCreateForm) {
+      els.assessmentCreateForm.addEventListener('submit', handleAssessmentSubmit);
+    }
+
+    if (els.transitionShared) {
+      els.transitionShared.addEventListener('click', () => transitionAssessment('shared'));
+    }
+    if (els.transitionAgreed) {
+      els.transitionAgreed.addEventListener('click', () => transitionAssessment('agreed'));
+    }
+    if (els.transitionLocked) {
+      els.transitionLocked.addEventListener('click', () => transitionAssessment('locked'));
+    }
+  }
+
+  async function init() {
+    bindEvents();
+    addInitialSections();
+    await loadContext();
+    await loadTemplates();
+    await loadAssessments();
+    renderAssessmentDetail();
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
 })();

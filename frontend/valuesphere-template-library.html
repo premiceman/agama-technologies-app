@@ -33,46 +33,13 @@
         </a>
         <div class="sidebar-section-label">Applications</div>
         <div class="sidebar-section">
-          <a class="sidebar-link" href="/revenueforge-tool.html">
-            <i class="bi bi-lightning-charge"></i>
-            <span class="sidebar-label">RevenueForge</span>
-          </a>
-          <a class="sidebar-link active" href="/valuesphere-tool.html">
+          <a class="sidebar-link" href="/valuesphere-tool.html">
             <i class="bi bi-kanban"></i>
             <span class="sidebar-label">ValueSphere</span>
           </a>
-          <a class="sidebar-link" href="/procurepath-tool.html">
-            <i class="bi bi-diagram-3"></i>
-            <span class="sidebar-label">ProcurePath</span>
-          </a>
-        </div>
-        <div class="sidebar-section-label" id="orgAdminLabel" style="display:none;">Organisation</div>
-        <div class="sidebar-section" id="orgAdminSection" style="display:none;">
-          <a class="sidebar-link" href="/admin-org.html" id="orgAdminLink">
-            <i class="bi bi-building-gear"></i>
-            <span class="sidebar-label">Org &amp; Members</span>
-          </a>
-        </div>
-        <div class="sidebar-section-label" id="agamaAdminLabel" style="display:none;">Agama</div>
-        <div class="sidebar-section" id="agamaAdminSection" style="display:none;">
-          <a class="sidebar-link" href="/agama-admin.html" id="agamaAdminLink">
-            <i class="bi bi-shield-lock"></i>
-            <span class="sidebar-label">Agama Admin Console</span>
-          </a>
-        </div>
-        <div class="sidebar-section-label">Account &amp; Settings</div>
-        <div class="sidebar-section">
-          <a class="sidebar-link" href="/profile.html">
-            <i class="bi bi-person"></i>
-            <span class="sidebar-label">Profile</span>
-          </a>
-          <a class="sidebar-link" href="/settings.html">
-            <i class="bi bi-gear"></i>
-            <span class="sidebar-label">Settings</span>
-          </a>
-          <a class="sidebar-link" href="/billing.html">
-            <i class="bi bi-credit-card"></i>
-            <span class="sidebar-label">Billing</span>
+          <a class="sidebar-link" href="/valuesphere-accounts.html">
+            <i class="bi bi-building"></i>
+            <span class="sidebar-label">Assessments</span>
           </a>
         </div>
       </nav>
@@ -81,28 +48,20 @@
     <aside class="app-subnav glass" aria-label="ValueSphere navigation">
       <div class="subnav-header">
         <span class="eyebrow d-block mb-1">ValueSphere</span>
-        <strong>Navigator</strong>
+        <strong>Templates</strong>
       </div>
       <nav class="subnav-nav">
         <a class="subnav-link" href="/valuesphere-tool.html">
           <i class="bi bi-compass"></i>
           <span>Dashboard</span>
         </a>
-        <button class="subnav-link subnav-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#templateSubnav" aria-expanded="true" aria-controls="templateSubnav">
-          <span class="d-flex align-items-center gap-2"><i class="bi bi-kanban"></i> Templates</span>
-          <i class="bi bi-chevron-down small"></i>
-        </button>
-        <div class="collapse show" id="templateSubnav">
-          <a class="subnav-sublink" href="/valuesphere-template-new.html">New Template</a>
-          <a class="subnav-sublink active" href="/valuesphere-template-library.html">Template Library</a>
-        </div>
-        <a class="subnav-link" href="/valuesphere-accounts.html">
-          <i class="bi bi-building"></i>
-          <span>Accounts</span>
+        <a class="subnav-link active" href="/valuesphere-template-library.html">
+          <i class="bi bi-collection"></i>
+          <span>Template library</span>
         </a>
-        <a class="subnav-link" href="/valuesphere-completed.html">
-          <i class="bi bi-clipboard-check"></i>
-          <span>Completed assessments</span>
+        <a class="subnav-link" href="/valuesphere-template-new.html">
+          <i class="bi bi-kanban"></i>
+          <span>Create template</span>
         </a>
       </nav>
     </aside>
@@ -116,33 +75,32 @@
           </a>
           <div class="d-flex align-items-center gap-2">
             <a class="btn btn-outline-light btn-sm" href="/workspace.html">Back to workspace</a>
-            <button class="btn btn-primary btn-sm" id="logout">Logout</button>
+            <a class="btn btn-primary btn-sm" href="/api/auth/logout">Logout</a>
           </div>
         </div>
       </nav>
 
-      <main class="container py-4" style="max-width: 1240px;">
+      <main class="container py-4" style="max-width: 1200px;">
+        <div id="valuesphereStatus" class="alert alert-info d-none" role="status"></div>
+
         <header class="card glass p-4 mb-4">
           <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
             <div>
               <span class="eyebrow d-block">Template library</span>
-              <h1 class="h4 mb-1">Reuse and share assessments</h1>
-              <p class="text-fg-3 mb-0">Pull templates from previous engagements or company-wide playbooks.</p>
+              <h1 class="h5 mb-1">Reusable blueprints for buyer and seller modes</h1>
+              <p class="text-fg-3 mb-0">View the latest versions with change summaries and section breakdowns.</p>
             </div>
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-              <a class="btn btn-outline-light btn-sm" href="/valuesphere-template-new.html"><i class="bi bi-plus"></i> New template</a>
+            <div class="text-end">
+              <div class="badge-soft" id="personaLabel">Loading context...</div>
+              <a class="btn btn-primary btn-sm" href="/valuesphere-template-new.html">Create template</a>
             </div>
           </div>
         </header>
 
-        <section class="card glass p-4" id="templateLibrary">
-          <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
-            <div>
-              <h2 class="h5 mb-1">Template Library</h2>
-              <p class="text-fg-3 small mb-0">Load templates back into the studio to adjust areas and maturity targets.</p>
-            </div>
-          </div>
-          <div id="templateLibraryList" class="d-flex flex-column gap-3"></div>
+        <section class="card glass p-3">
+          <div class="row g-3" id="templateLibraryList"></div>
+          <div id="templateLibraryEmpty" class="text-fg-3 small">No templates yet.</div>
+          <div id="templateLibraryError" class="alert alert-danger d-none mt-3" role="alert"></div>
         </section>
       </main>
     </div>
