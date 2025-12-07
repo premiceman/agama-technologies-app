@@ -104,6 +104,49 @@
           </div>
         </div>
 
+        <div class="card glass p-3 mb-4">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <h2 class="h6 mb-1">Filter rooms</h2>
+              <p class="text-fg-3 small mb-0">Search by title, org, status, or participation.</p>
+            </div>
+            <span class="badge-soft" id="roomsFilterSummary">All rooms</span>
+          </div>
+          <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+              <label class="form-label" for="roomSearch">Search</label>
+              <input type="search" class="form-control" id="roomSearch" placeholder="Title or organization">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label" for="roomStatusFilter">Status</label>
+              <select class="form-select" id="roomStatusFilter">
+                <option value="all">All</option>
+                <option value="draft">Draft</option>
+                <option value="active">Active</option>
+                <option value="closed">Closed</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label" for="roomParticipationFilter">Participation</label>
+              <select class="form-select" id="roomParticipationFilter">
+                <option value="all">All rooms</option>
+                <option value="hosted">Hosted by my org</option>
+                <option value="guest">Guest rooms</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label" for="roomPersonaFilter">Persona</label>
+              <select class="form-select" id="roomPersonaFilter">
+                <option value="all">Any</option>
+                <option value="seller">Seller</option>
+                <option value="buyer">Buyer</option>
+                <option value="shared">Shared only</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
         <div class="card glass p-4 mb-4">
           <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
             <div>
