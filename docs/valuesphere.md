@@ -378,7 +378,7 @@ Locked scenarios may only be duplicated, not edited.
 ValueSphere is:
 
 - The structured language of value for the entire Agama platform  
-- A dual-mode system supporting both sellers and buyers  
+- A system supporting both seller and buyer modes
 - A structured collaboration engine inside Rooms  
 - A multi-vendor comparison engine for ProcurePath  
 - A deal justification engine for executive decisions  

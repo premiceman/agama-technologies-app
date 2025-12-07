@@ -72,8 +72,6 @@ describe('ValueSphere buyer flows', () => {
       name: 'Buyer',
       email: 'buyer@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
     });
     expect(signupRes.status).toBe(200);
 
@@ -133,8 +131,6 @@ describe('ValueSphere buyer flows', () => {
       name: 'Buyer',
       email: 'buyer2@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
     });
     expect(signupRes.status).toBe(200);
     const orgRes = await createOrg(agent, 'Buyer Org', 'buyer-org2');
@@ -209,8 +205,6 @@ describe('ValueSphere buyer flows', () => {
       name: 'Seller',
       email: 'seller@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
     });
     const orgRes = await createOrg(agent, 'Vendor Org', 'vendor-suite');
     const orgId = orgRes.body.organization.id;

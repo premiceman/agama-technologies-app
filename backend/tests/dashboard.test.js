@@ -58,13 +58,11 @@ async function seedSharedOrg() {
     name: 'Shared Org',
     slug: `shared-${Date.now()}`,
     seatLimit: 10,
-    seatLimits: { vendorSuite: 10, buyerSuite: 10, sharedSuite: 10 },
+    seatLimits: { vendorSuite: 10, buyerSuite: 10, },
     tier: 'business',
-    platformAccess: ['valuesphere'],
     productAccess: ['valuesphere'],
     vendorSuiteEnabled: true,
     buyerSuiteEnabled: true,
-    sharedSuiteEnabled: true
   });
 }
 
@@ -92,8 +90,6 @@ describe('Dashboard overview aggregation', () => {
       name: 'Vendor User',
       email: 'vendor@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
     });
 
     const { organization, membership, user } = await createOrgForUser(agent, {
@@ -105,7 +101,6 @@ describe('Dashboard overview aggregation', () => {
     await membership.save();
     organization.buyerSuiteEnabled = false;
     organization.vendorSuiteEnabled = true;
-    organization.sharedSuiteEnabled = true;
     await organization.save();
 
     const partnerOrg = await seedSharedOrg();
@@ -145,8 +140,6 @@ describe('Dashboard overview aggregation', () => {
       name: 'Buyer User',
       email: 'buyer@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
     });
 
     const { organization, membership, user } = await createOrgForUser(agent, {
@@ -156,11 +149,9 @@ describe('Dashboard overview aggregation', () => {
 
     membership.vendorSuiteEnabled = false;
     membership.buyerSuiteEnabled = true;
-    membership.sharedSuiteEnabled = true;
     await membership.save();
     organization.vendorSuiteEnabled = false;
     organization.buyerSuiteEnabled = true;
-    organization.sharedSuiteEnabled = true;
     await organization.save();
 
     const partnerOrg = await seedSharedOrg();
@@ -197,8 +188,6 @@ describe('Dashboard overview aggregation', () => {
       name: 'Both User',
       email: 'both@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
     });
 
     const { organization, user } = await createOrgForUser(agent, {

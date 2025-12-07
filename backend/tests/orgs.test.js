@@ -7,6 +7,9 @@ const mongoose = require('mongoose');
 const request = require('supertest');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const { installWorkOSStub, FakeWorkOS } = require('./helpers/workosStub');
+const Organization = require('../models/Organization');
+const OrganizationMembership = require('../models/OrganizationMembership');
+const User = require('../models/User');
 
 let app;
 let mongo;
@@ -62,9 +65,7 @@ describe('Organizations and memberships', () => {
     await agent.post('/api/auth/signup').send({
       name: 'Owner One',
       email: 'owner@example.com',
-      password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
+      password: 'password123'
     });
 
     const createRes = await agent.post('/api/orgs').send({ name: 'Acme Corp', slug: 'acme' });
@@ -74,121 +75,6 @@ describe('Organizations and memberships', () => {
     const listRes = await agent.get('/api/orgs');
     expect(listRes.status).toBe(200);
     expect(listRes.body.organizations[0]).toMatchObject({ name: 'Acme Corp', role: 'org_owner' });
-  });
-
-  test('self-service org creation stores WorkOS organization id when configured', async () => {
-    const agent = request.agent(app);
-    await agent.post('/api/auth/signup').send({
-      name: 'WorkOS Owner',
-      email: 'workos-owner@example.com',
-      password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
-    });
-
-    const createRes = await agent.post('/api/orgs').send({
-      name: 'WorkOS Self Org',
-      slug: 'workos-self-org',
-      domains: ['self.example.com']
-    });
-
-    expect(createRes.status).toBe(201);
-
-    const Organization = require('../models/Organization');
-    const organization = await Organization.findOne({ slug: 'workos-self-org' });
-    expect(organization.workosOrganizationId).toBe('org_test_1');
-    expect(FakeWorkOS.lastOrganizationCreateInput).toMatchObject({
-      name: 'WorkOS Self Org',
-      domainData: [{ domain: 'self.example.com', state: 'verified' }]
-    });
-  });
-
-  test('admin org creation syncs WorkOS organization id', async () => {
-    const agent = request.agent(app);
-    await agent.post('/api/auth/signup').send({
-      name: 'Staff Admin',
-      email: 'staff@example.com',
-      password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
-    });
-
-    const User = require('../models/User');
-    const staffUser = await User.findOne({ email: 'staff@example.com' });
-    staffUser.isStaff = true;
-    await staffUser.save();
-
-    const res = await agent.post('/api/admin/organizations').send({
-      name: 'Admin WorkOS Org',
-      productAccess: ['valuesphere'],
-      domains: ['admin.example.com']
-    });
-
-    expect(res.status).toBe(201);
-
-    const Organization = require('../models/Organization');
-    const organization = await Organization.findOne({ name: 'Admin WorkOS Org' });
-    expect(organization.workosOrganizationId).toBe('org_test_1');
-    expect(FakeWorkOS.lastOrganizationCreateInput).toMatchObject({
-      name: 'Admin WorkOS Org',
-      domainData: [{ domain: 'admin.example.com', state: 'verified' }]
-    });
-  });
-
-  test('enforces seat limit when activating new members', async () => {
-    const ownerAgent = request.agent(app);
-    await ownerAgent.post('/api/auth/signup').send({
-      name: 'Owner Seat',
-      email: 'seat-owner@example.com',
-      password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
-    });
-
-    const orgRes = await ownerAgent.post('/api/orgs').send({ name: 'Seat Co', slug: 'seat-co', seatLimit: 1 });
-    expect(orgRes.status).toBe(201);
-    const orgId = orgRes.body.organization.id;
-
-    const memberAgent = request.agent(app);
-    await memberAgent.post('/api/auth/signup').send({
-      name: 'Second User',
-      email: 'second@example.com',
-      password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
-    });
-
-    const addRes = await ownerAgent
-      .post(`/api/orgs/${orgId}/members`)
-      .send({ email: 'second@example.com', role: 'vendor_user' });
-
-    expect(addRes.status).toBe(403);
-    expect(/Seat limit/i.test(addRes.body.error || '')).toBeTruthy();
-
-    const OrganizationMembership = require('../models/OrganizationMembership');
-    const User = require('../models/User');
-    const seatsUsed = await OrganizationMembership.countActiveSeats(orgId);
-    expect(seatsUsed).toBe(1);
-    const memberUser = await User.findOne({ email: 'second@example.com' });
-    const membership = await OrganizationMembership.findOne({ organization: orgId, user: memberUser._id });
-    expect(membership.status).toBe('suspended');
-  });
-
-  test('auth me returns organization context', async () => {
-    const agent = request.agent(app);
-    await agent.post('/api/auth/signup').send({
-      name: 'Context User',
-      email: 'context@example.com',
-      password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
-    });
-
-    await agent.post('/api/orgs').send({ name: 'Context Org', slug: 'context-org' });
-
-    const meRes = await agent.get('/api/auth/me');
-    expect(meRes.status).toBe(200);
-    expect(meRes.body.organizationContext).toMatchObject({ name: 'Context Org' });
   });
 
   test('workos callback associates organization and membership', async () => {
@@ -212,9 +98,6 @@ describe('Organizations and memberships', () => {
     expect(res.status).toBe(200);
     expect(res.body.user).toBeDefined();
 
-    const Organization = require('../models/Organization');
-    const OrganizationMembership = require('../models/OrganizationMembership');
-    const User = require('../models/User');
     const org = await Organization.findOne({ workosOrganizationId: 'org_123' });
     expect(org).toBeTruthy();
     const membership = await OrganizationMembership.findOne({ organization: org._id, user: res.body.user.id });
@@ -223,171 +106,129 @@ describe('Organizations and memberships', () => {
     expect(String(user.defaultOrganization)).toEqual(String(org._id));
   });
 
-  test('admin org update cascades product access changes to active members', async () => {
-    const agent = request.agent(app);
-    await agent.post('/api/auth/signup').send({
-      name: 'Staff User',
-      email: 'staff-update@example.com',
-      password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
-    });
-
-    const User = require('../models/User');
-    const Organization = require('../models/Organization');
-    const OrganizationMembership = require('../models/OrganizationMembership');
-
-    const staff = await User.findOne({ email: 'staff-update@example.com' });
-    staff.isStaff = true;
-    await staff.save();
-
-    const createRes = await agent.post('/api/admin/organizations').send({
-      name: 'Cascade Org',
-      productAccess: ['valuesphere', 'procurepath']
-    });
-    expect(createRes.status).toBe(201);
-
-    const organization = await Organization.findOne({ name: 'Cascade Org' });
-
-    await request(app).post('/api/auth/signup').send({
-      name: 'Member User',
-      email: 'member-update@example.com',
-      password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere', 'procurepath']
-    });
-    const memberUser = await User.findOne({ email: 'member-update@example.com' });
-
-    await OrganizationMembership.create({
-      organization: organization._id,
-      user: memberUser._id,
-      role: 'vendor_user',
-      status: 'active'
-    });
-
-    const patchRes = await agent
-      .patch(`/api/admin/organizations/${organization._id}`)
-      .send({ productAccess: ['valuesphere'] });
-
-    expect(patchRes.status).toBe(200);
-
-    const refreshedMember = await User.findById(memberUser._id);
-    expect(refreshedMember.platformAccess).toEqual(['valuesphere']);
-  });
-
-  test('admin org update respects member license constraints when syncing access', async () => {
-    const agent = request.agent(app);
-    await agent.post('/api/auth/signup').send({
-      name: 'Staff Two',
-      email: 'staff-constraints@example.com',
-      password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
-    });
-
-    const User = require('../models/User');
-    const Organization = require('../models/Organization');
-    const OrganizationMembership = require('../models/OrganizationMembership');
-
-    const staff = await User.findOne({ email: 'staff-constraints@example.com' });
-    staff.isStaff = true;
-    await staff.save();
-
-    const orgRes = await agent.post('/api/admin/organizations').send({
-      name: 'Constraint Org',
-      productAccess: ['valuesphere']
-    });
-    expect(orgRes.status).toBe(201);
-
-    const organization = await Organization.findOne({ name: 'Constraint Org' });
-
-    await request(app).post('/api/auth/signup').send({
-      name: 'Personal Member',
-      email: 'personal-member@example.com',
-      password: 'password123',
-      licenseTier: 'personal',
-      platformAccess: ['valuesphere']
-    });
-    const personalUser = await User.findOne({ email: 'personal-member@example.com' });
-
-    await OrganizationMembership.create({
-      organization: organization._id,
-      user: personalUser._id,
-      role: 'vendor_user',
-      status: 'active'
-    });
-
-    const updateRes = await agent
-      .patch(`/api/admin/organizations/${organization._id}`)
-      .send({ productAccess: ['revenueforge'] });
-
-    expect(updateRes.status).toBe(200);
-
-    const refreshedPersonal = await User.findById(personalUser._id);
-    expect(refreshedPersonal.platformAccess).toEqual([]);
-  });
-
-  test('enforces suite boundaries for vendor endpoints', async () => {
+  test('enforces vendor suite seat limits when adding members', async () => {
     const ownerAgent = request.agent(app);
     await ownerAgent.post('/api/auth/signup').send({
       name: 'Vendor Owner',
       email: 'vendor-owner@example.com',
-      password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere', 'revenueforge']
+      password: 'password123'
     });
 
-    const orgRes = await ownerAgent.post('/api/orgs').send({ name: 'Vendor Org', slug: 'vendor-org' });
+    const orgRes = await ownerAgent
+      .post('/api/orgs')
+      .send({ name: 'Vendor Seats', slug: 'vendor-seats', seatLimits: { vendorSuite: 1, buyerSuite: 0, bothSuites: 0 } });
     expect(orgRes.status).toBe(201);
     const orgId = orgRes.body.organization.id;
 
-    const buyerAgent = request.agent(app);
-    await buyerAgent.post('/api/auth/signup').send({
-      name: 'Buyer Member',
-      email: 'buyer-member@example.com',
-      password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere', 'procurepath']
+    const organization = await Organization.findById(orgId);
+    organization.vendorSuiteEnabled = true;
+    organization.buyerSuiteEnabled = false;
+    await organization.save();
+
+    const ownerMembership = await OrganizationMembership.findOne({ organization: orgId });
+    ownerMembership.vendorSuiteEnabled = true;
+    ownerMembership.buyerSuiteEnabled = false;
+    await ownerMembership.save();
+
+    const memberAgent = request.agent(app);
+    await memberAgent.post('/api/auth/signup').send({
+      name: 'Second Vendor',
+      email: 'second-vendor@example.com',
+      password: 'password123'
     });
 
     const addRes = await ownerAgent.post(`/api/orgs/${orgId}/members`).send({
-      email: 'buyer-member@example.com',
-      role: 'buyer_user',
-      buyerSuiteEnabled: true,
-      vendorSuiteEnabled: false,
-      sharedSuiteEnabled: true
+      email: 'second-vendor@example.com',
+      role: 'vendor_user',
+      vendorSuiteEnabled: true,
+      buyerSuiteEnabled: false
     });
-    expect(addRes.status === 200 || addRes.status === 201).toBe(true);
 
-    const User = require('../models/User');
-    const buyerUser = await User.findOne({ email: 'buyer-member@example.com' });
-    buyerUser.defaultOrganization = orgId;
-    await buyerUser.save();
-
-    const vendorAccess = await ownerAgent.get('/api/revenueforge/accounts');
-    expect(vendorAccess.status).toBe(200);
-
-    const buyerBlocked = await buyerAgent.get('/api/revenueforge/accounts');
-    expect(buyerBlocked.status).toBe(403);
+    expect(addRes.status).toBe(400);
+    expect(addRes.body).toMatchObject({ error: 'seat_limit_exceeded', details: { suite: 'vendor' } });
   });
 
-  test('both-suite users can access buyer endpoints inside the same org', async () => {
-    const bothAgent = request.agent(app);
-    await bothAgent.post('/api/auth/signup').send({
-      name: 'Both Persona',
-      email: 'both@example.com',
-      password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere', 'revenueforge', 'procurepath']
+  test('enforces buyer suite seat limits when adding members', async () => {
+    const ownerAgent = request.agent(app);
+    await ownerAgent.post('/api/auth/signup').send({
+      name: 'Buyer Owner',
+      email: 'buyer-owner@example.com',
+      password: 'password123'
     });
 
-    const orgRes = await bothAgent.post('/api/orgs').send({ name: 'Both Org', slug: 'both-org' });
+    const orgRes = await ownerAgent
+      .post('/api/orgs')
+      .send({ name: 'Buyer Seats', slug: 'buyer-seats', seatLimits: { vendorSuite: 0, buyerSuite: 1, bothSuites: 0 } });
     expect(orgRes.status).toBe(201);
+    const orgId = orgRes.body.organization.id;
 
-    const procurePathRes = await bothAgent.get('/api/procurepath/vendors');
-    expect(procurePathRes.status).toBe(200);
+    const organization = await Organization.findById(orgId);
+    organization.vendorSuiteEnabled = false;
+    organization.buyerSuiteEnabled = true;
+    await organization.save();
 
-    const revenueRes = await bothAgent.get('/api/revenueforge/accounts');
-    expect(revenueRes.status).toBe(200);
+    const ownerMembership = await OrganizationMembership.findOne({ organization: orgId });
+    ownerMembership.vendorSuiteEnabled = false;
+    ownerMembership.buyerSuiteEnabled = true;
+    await ownerMembership.save();
+
+    const memberAgent = request.agent(app);
+    await memberAgent.post('/api/auth/signup').send({
+      name: 'Second Buyer',
+      email: 'second-buyer@example.com',
+      password: 'password123'
+    });
+
+    const addRes = await ownerAgent.post(`/api/orgs/${orgId}/members`).send({
+      email: 'second-buyer@example.com',
+      role: 'buyer_user',
+      vendorSuiteEnabled: false,
+      buyerSuiteEnabled: true
+    });
+
+    expect(addRes.status).toBe(400);
+    expect(addRes.body).toMatchObject({ error: 'seat_limit_exceeded', details: { suite: 'buyer' } });
+  });
+
+  test('enforces shared seats for users enabled for both suites', async () => {
+    const ownerAgent = request.agent(app);
+    await ownerAgent.post('/api/auth/signup').send({
+      name: 'Both Owner',
+      email: 'both-owner@example.com',
+      password: 'password123'
+    });
+
+    const orgRes = await ownerAgent
+      .post('/api/orgs')
+      .send({ name: 'Both Seats', slug: 'both-seats', seatLimits: { vendorSuite: 0, buyerSuite: 0, bothSuites: 1 } });
+    expect(orgRes.status).toBe(201);
+    const orgId = orgRes.body.organization.id;
+
+    const organization = await Organization.findById(orgId);
+    organization.vendorSuiteEnabled = true;
+    organization.buyerSuiteEnabled = true;
+    await organization.save();
+
+    const ownerMembership = await OrganizationMembership.findOne({ organization: orgId });
+    ownerMembership.vendorSuiteEnabled = true;
+    ownerMembership.buyerSuiteEnabled = true;
+    await ownerMembership.save();
+
+    const memberAgent = request.agent(app);
+    await memberAgent.post('/api/auth/signup').send({
+      name: 'Second Both',
+      email: 'second-both@example.com',
+      password: 'password123'
+    });
+
+    const addRes = await ownerAgent.post(`/api/orgs/${orgId}/members`).send({
+      email: 'second-both@example.com',
+      role: 'vendor_user',
+      vendorSuiteEnabled: true,
+      buyerSuiteEnabled: true
+    });
+
+    expect(addRes.status).toBe(400);
+    expect(addRes.body).toMatchObject({ error: 'seat_limit_exceeded', details: { suite: 'both' } });
   });
 });

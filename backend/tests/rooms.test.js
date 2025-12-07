@@ -76,8 +76,6 @@ describe('Engagement rooms', () => {
       name: 'Owner',
       email: 'owner@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
     });
     const vendor = await createOrg(ownerAgent, 'Vendor Org', 'vendor-org');
     const buyer = await createOrg(ownerAgent, 'Buyer Org', 'buyer-org');
@@ -98,8 +96,6 @@ describe('Engagement rooms', () => {
       name: 'Other User',
       email: 'other@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
     });
     const outsiderList = await outsider.get('/api/rooms');
     expect(outsiderList.status).toBe(200);
@@ -112,8 +108,6 @@ describe('Engagement rooms', () => {
       name: 'Admin',
       email: 'admin@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
     });
     const orgA = await createOrg(adminAgent, 'Org A', 'orga');
     const orgB = await createOrg(adminAgent, 'Org B', 'orgb');
@@ -129,8 +123,6 @@ describe('Engagement rooms', () => {
       name: 'Guest',
       email: 'guest@example.com',
       password: 'password123',
-      licenseTier: 'guest',
-      platformAccess: ['valuesphere']
     });
     const searchRes = await guestAgent.get('/api/org/users/search?q=any');
     expect(searchRes.status).toBe(403);
@@ -151,8 +143,6 @@ describe('Engagement rooms', () => {
       name: 'Admin User',
       email: 'admin2@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
     });
     const orgA = await createOrg(adminAgent, 'Org C', 'orgc');
     const orgB = await createOrg(adminAgent, 'Org D', 'orgd');
@@ -168,8 +158,6 @@ describe('Engagement rooms', () => {
       name: 'Viewer User',
       email: 'viewer@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
     });
 
     const addViewer = await adminAgent
@@ -202,8 +190,6 @@ describe('Engagement rooms', () => {
       name: 'Event Admin',
       email: 'eventadmin@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
     });
     const vendor = await createOrg(adminAgent, 'Vendor Event Org', 'vendor-event');
     const buyer = await createOrg(adminAgent, 'Buyer Event Org', 'buyer-event');
@@ -241,8 +227,6 @@ describe('Engagement rooms', () => {
       name: 'AI Admin',
       email: 'aiadmin@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
     });
     const orgA = await createOrg(adminAgent, 'Org E', 'orge');
     const orgB = await createOrg(adminAgent, 'Org F', 'orgf');

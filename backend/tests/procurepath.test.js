@@ -49,8 +49,6 @@ describe('ProcurePath vendors and RFX', () => {
       name: 'Buyer User',
       email: 'buyer@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['procurepath']
     });
 
     expect(signupRes.status).toBe(200);
@@ -132,8 +130,6 @@ describe('ProcurePath vendors and RFX', () => {
       name: 'Seller Only',
       email: 'seller@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['revenueforge']
     });
 
     await agent.post('/api/orgs').send({ name: 'Seller Org', slug: 'seller-org' });

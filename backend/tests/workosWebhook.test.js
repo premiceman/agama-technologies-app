@@ -123,7 +123,6 @@ describe('WorkOS webhook endpoint', () => {
     expect(org.name).toBe('Example Org');
     expect(org.domains).toEqual(['example.com']);
     expect(org.tier).toBe('business');
-    expect(org.platformAccess).toEqual(['valuesphere']);
   });
 
   test('syncs WorkOS memberships into Mongo', async () => {

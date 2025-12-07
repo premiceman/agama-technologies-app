@@ -67,8 +67,6 @@ describe('Search indexing', () => {
       name: 'Owner',
       email: 'owner@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['procurepath']
     });
     await createOrg(owner, 'Buyer Org', 'buyer-org');
 
@@ -94,8 +92,6 @@ describe('Search indexing', () => {
       name: 'Other',
       email: 'other@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['procurepath']
     });
     await createOrg(outsider, 'Another Org', 'another-org');
 
@@ -110,8 +106,6 @@ describe('Search indexing', () => {
       name: 'Indexer',
       email: 'indexer@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['procurepath']
     });
     await createOrg(agent, 'Reindex Org', 'reindex-org');
 

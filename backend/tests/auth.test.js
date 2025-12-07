@@ -44,75 +44,63 @@ describe('Authentication & licensing', () => {
     }
   });
 
-  test('rejects personal licenses selecting business-only platforms', async () => {
-    const res = await request(app)
-      .post('/api/auth/signup')
-      .send({
-        name: 'Alex Personal',
-        email: 'alex@example.com',
-        password: 'password123',
-        licenseTier: 'personal',
-        platformAccess: ['valuesphere', 'procurepath']
-      });
-
-    expect(res.status).toBe(400);
-    expect(Boolean(res.body.error && /personal licenses/i.test(res.body.error))).toBeTruthy();
-  });
-
-  test('creates a personal ValueSphere license', async () => {
-    const res = await request(app)
-      .post('/api/auth/signup')
-      .send({
-        name: 'Jamie Navigator',
-        email: 'jamie@example.com',
-        password: 'password123',
-        licenseTier: 'personal',
-        platformAccess: ['valuesphere']
-      });
-
-    expect(res.status).toBe(200);
-    expect(res.body.user).toMatchObject({
-      licenseTier: 'personal',
-      platformAccess: ['valuesphere']
-    });
-  });
-
-  test('creates a business license with multiple platforms', async () => {
-    const res = await request(app)
-      .post('/api/auth/signup')
-      .send({
-        name: 'Taylor Operations',
-        email: 'taylor@example.com',
-        password: 'password123',
-        licenseTier: 'business',
-        platformAccess: ['valuesphere', 'procurepath', 'revenueforge']
-      });
-
-    expect(res.status).toBe(200);
-    expect(res.body.user).toMatchObject({
-      licenseTier: 'business',
-      platformAccess: ['valuesphere', 'procurepath', 'revenueforge']
-    });
-  });
-
-  test('prevents clearing business platform access', async () => {
+  test('computeAccessState returns active for staff users', async () => {
     const agent = request.agent(app);
-
-    const signupRes = await agent.post('/api/auth/signup').send({
-      name: 'Morgan Org',
-      email: 'morgan@example.com',
-      password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere', 'procurepath']
-    });
-    expect(signupRes.status).toBe(200);
-
-    const updateRes = await agent.put('/api/auth/me').send({
-      platformAccess: []
+    await agent.post('/api/auth/signup').send({
+      name: 'Staffer',
+      email: 'staffer@example.com',
+      password: 'password123'
     });
 
-    expect(updateRes.status).toBe(400);
-    expect(Boolean(updateRes.body.error && /select at least one platform/i.test(updateRes.body.error))).toBeTruthy();
+    const User = require('../models/User');
+    const staff = await User.findOne({ email: 'staffer@example.com' });
+    staff.isStaff = true;
+    await staff.save();
+
+    const contextRes = await agent.get('/api/me/context');
+    expect(contextRes.status).toBe(200);
+    expect(contextRes.body.accessState).toBe('active');
+  });
+
+  test('computeAccessState requires onboarding when no seats exist', async () => {
+    const agent = request.agent(app);
+    await agent.post('/api/auth/signup').send({
+      name: 'No Seats',
+      email: 'noseats@example.com',
+      password: 'password123'
+    });
+
+    const orgRes = await agent
+      .post('/api/orgs')
+      .send({ name: 'Seatless Org', slug: 'seatless-org', seatLimits: { vendorSuite: 0, buyerSuite: 0 } });
+    expect(orgRes.status).toBe(201);
+
+    const contextRes = await agent.get(`/api/me/context?orgId=${orgRes.body.organization.id}`);
+    expect(contextRes.status).toBe(200);
+    expect(contextRes.body.accessState).toBe('needs_onboarding');
+  });
+
+  test('computeAccessState is active after onboarding with seats', async () => {
+    const agent = request.agent(app);
+    await agent.post('/api/auth/signup').send({
+      name: 'Onboarded',
+      email: 'onboarded@example.com',
+      password: 'password123'
+    });
+
+    const orgRes = await agent
+      .post('/api/orgs')
+      .send({
+        name: 'Onboard Org',
+        slug: 'onboard-org',
+        seatLimits: { vendorSuite: 2 },
+        onboardingStatus: 'completed'
+      });
+    expect(orgRes.status).toBe(201);
+
+    const contextRes = await agent.get(`/api/me/context?orgId=${orgRes.body.organization.id}`);
+    expect(contextRes.status).toBe(200);
+    expect(contextRes.body.accessState).toBe('active');
   });
 
   test('returns context for user with multiple organizations', async () => {
@@ -120,9 +108,7 @@ describe('Authentication & licensing', () => {
     await agent.post('/api/auth/signup').send({
       name: 'Context Multi',
       email: 'multiorg@example.com',
-      password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere', 'procurepath']
+      password: 'password123'
     });
 
     const orgOne = await agent.post('/api/orgs').send({ name: 'Context One', slug: 'context-one' });
@@ -158,9 +144,7 @@ describe('Authentication & licensing', () => {
     await agent.post('/api/auth/signup').send({
       name: 'Suite Mix',
       email: 'mix@example.com',
-      password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
+      password: 'password123'
     });
 
     const orgRes = await agent.post('/api/orgs').send({ name: 'Mix Org', slug: 'mix-org' });
@@ -193,9 +177,7 @@ describe('Authentication & licensing', () => {
     await agent.post('/api/auth/signup').send({
       name: 'Buyer Persona',
       email: 'buyer@example.com',
-      password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['procurepath']
+      password: 'password123'
     });
 
     await agent.patch('/api/auth/persona').send({ persona: 'buyer' });
