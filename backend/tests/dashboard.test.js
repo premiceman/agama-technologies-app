@@ -191,29 +191,29 @@ describe('Dashboard overview aggregation', () => {
     expect(res.body.overview.shared).toMatchObject({ engagementRooms: { total: 1 } });
   });
 
-  test('dual-suite users see all dashboard widgets', async () => {
+  test('both-suite users see all dashboard widgets', async () => {
     const agent = request.agent(app);
     await agent.post('/api/auth/signup').send({
-      name: 'Dual User',
-      email: 'dual@example.com',
+      name: 'Both User',
+      email: 'both@example.com',
       password: 'password123',
       licenseTier: 'business',
       platformAccess: ['valuesphere']
     });
 
     const { organization, user } = await createOrgForUser(agent, {
-      name: 'Dual Org',
-      slug: 'dual-org'
+      name: 'Both Org',
+      slug: 'both-org'
     });
 
     const partnerOrg = await seedSharedOrg();
 
-    await RevenueAccount.create({ userId: user._id, name: 'Dual Account' });
-    await ProcurementVendor.create({ orgId: organization._id, createdByUserId: user._id, name: 'Dual Vendor' });
+    await RevenueAccount.create({ userId: user._id, name: 'Both Account' });
+    await ProcurementVendor.create({ orgId: organization._id, createdByUserId: user._id, name: 'Both Vendor' });
     await BuyerValueAssessment.create({
       organization: organization._id,
       procurementVendor: null,
-      vendorName: 'Dual Vendor',
+      vendorName: 'Both Vendor',
       title: 'Buyer VS Assessment',
       createdBy: user._id
     });

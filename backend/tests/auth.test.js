@@ -294,13 +294,13 @@ describe('Authentication & licensing', () => {
     expect(memberships[0].organization.toString()).toBe(organization._id.toString());
   });
 
-  test('normalizes legacy dual persona to both on WorkOS login', async () => {
+  test('normalizes legacy persona to both on WorkOS login', async () => {
     const agent = request.agent(app);
     const user = await User.create({
       name: 'Legacy Persona',
       email: 'legacy@example.com',
       passwordHash: null,
-      persona: 'dual',
+      persona: 'both',
       authSource: 'workos'
     });
 
