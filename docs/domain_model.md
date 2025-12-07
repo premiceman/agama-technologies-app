@@ -534,7 +534,7 @@ Engagement Rooms are central to Agama’s collaboration design. Domain-wise, we 
 - `guest`:
   - Shared panels only.
   - Locked/greyed vendor/buyer tabs; upsell surfaces.
-- Assignment must respect the org-level suite flags: vendor-side roles require `vendorSuiteEnabled`, buyer-side roles require `buyerSuiteEnabled`, both flags allow dual participation, and guests should have neither flag.
+- Assignment must respect the org-level suite flags: vendor-side roles require `vendorSuiteEnabled`, buyer-side roles require `buyerSuiteEnabled`, both flags allow combined participation, and guests should have neither flag.
 
 ---
 

@@ -67,8 +67,6 @@ describe('Notifications', () => {
       name: 'Owner',
       email: 'owner@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
     });
     const vendorOrg = await createOrg(ownerAgent, 'Vendor Org', 'vendor-room');
     const buyerOrg = await createOrg(ownerAgent, 'Buyer Org', 'buyer-room');
@@ -78,8 +76,6 @@ describe('Notifications', () => {
       name: 'Member',
       email: 'member@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
     });
     const memberUserId = (await memberAgent.get('/api/auth/me')).body.user.id;
 
@@ -132,8 +128,6 @@ describe('Notifications', () => {
       name: 'Buyer Admin',
       email: 'buyer-admin@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['procurepath', 'valuesphere']
     });
     const orgRes = await createOrg(adminAgent, 'Buyer Org', 'buyer-org');
     const orgId = orgRes.body.organization.id;
@@ -143,8 +137,6 @@ describe('Notifications', () => {
       name: 'Evaluator',
       email: 'evaluator@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['procurepath', 'valuesphere']
     });
 
     const addMember = await adminAgent.post(`/api/orgs/${orgId}/members`).send({
@@ -152,7 +144,6 @@ describe('Notifications', () => {
       role: 'buyer_user',
       buyerSuiteEnabled: true,
       vendorSuiteEnabled: false,
-      sharedSuiteEnabled: true
     });
     expect(addMember.status).toBe(201);
 

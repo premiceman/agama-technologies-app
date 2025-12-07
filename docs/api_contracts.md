@@ -156,13 +156,16 @@ Exact fields must match those defined in `domain_model.md`.
           "buyer": false
         },
         "persona": "vendor",
-        "themeHint": "vendor"
+        "themeHint": "vendor",
+        "accessState": "active"
       },
       "correlationId": "123e4567-e89b-12d3-a456-426614174000"
     }
 
 - Notes:
   - `persona` reflects the user's chosen mode and can be `vendor`, `buyer`, or `both`.
+  - `accessState` is either `active` (staff, or onboarded orgs with seats) or `needs_onboarding` (no seats or onboarding pending).
+  - `suites` exposes the effective vendor/buyer booleans; no legacy licensing fields are returned.
   - Seat limits are per suite and must align with billing configuration; there is no `licenseTier`, `platformAccess`, `valueAssessmentLimit`, or `sharedSuiteEnabled` field.
 
 #### PATCH /api/users/me

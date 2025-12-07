@@ -59,8 +59,6 @@ describe('Integration management', () => {
       name: 'Staff User',
       email: 'staff@agamatechnologies.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
     });
 
     const staffUser = await User.findOne({ email: 'staff@agamatechnologies.com' });
@@ -107,8 +105,6 @@ describe('Integration management', () => {
       name: 'Owner User',
       email: 'owner@example.com',
       password: 'password123',
-      licenseTier: 'business',
-      platformAccess: ['valuesphere']
     });
 
     const orgRes = await agent.post('/api/orgs').send({ name: 'Owner Org', slug: 'owner-org' });

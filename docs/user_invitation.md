@@ -39,7 +39,7 @@ Agama supports two invitation types:
 
 Internal users are org-bound; guests are room-bound.
 
-Org Owners and Org Admins may invite vendor users, buyer users, dual-mode users (`persona = both`), or guests. Vendor/buyer/both invitations must remain within the available seat limits for each suite assignment. Guests never consume seats and remain constrained to guest permissions.
+Org Owners and Org Admins may invite vendor users, buyer users, both-suite users (`persona = both`), or guests. Vendor/buyer/both invitations must remain within the available seat limits for each suite assignment. Guests never consume seats and remain constrained to guest permissions.
 
 Both invitation types use the `Invite` object defined in `domain_model.md`.
 

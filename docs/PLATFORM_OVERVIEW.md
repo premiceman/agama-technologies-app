@@ -76,6 +76,9 @@ Agama uses **org-based, seat-based licensing**. Each organisation configures sea
 
 Guests can be invited into Engagement Rooms without consuming seats.
 
+Supported personas are **vendor**, **buyer**, and **both**. Persona drives UI defaults (theme, landing pages, quick actions) but
+actual permissions depend on the suites enabled on the user’s membership.
+
 See [licensing_and_pricing.md](licensing_and_pricing.md) for detailed pricing and packaging guidance.
 
 ### 3.1 Vendor Persona (Seller)
