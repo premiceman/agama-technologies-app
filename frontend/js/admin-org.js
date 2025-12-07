@@ -7,7 +7,9 @@ const adminState = {
   auditEvents: [],
   showActiveOnly: false,
   auditLoaded: false,
-  integrations: []
+  integrations: [],
+  seatLimits: null,
+  seatUsage: null
 };
 
 function setText(id, text) {
@@ -54,28 +56,36 @@ function formatDate(value) {
 function renderOverview() {
   const org = adminState.organization;
   if (!org) return;
+  const seatLimits = adminState.seatLimits || {};
+  const seatUsage = adminState.seatUsage || {};
+  const vendorLimit = seatLimits.vendorSuite ?? 0;
+  const buyerLimit = seatLimits.buyerSuite ?? 0;
+  const bothLimit = seatLimits.bothSuites ?? 0;
+
   setText('orgName', org.name || 'Untitled org');
   setText('orgTier', org.tier ? `${org.tier} tier` : 'Tier');
   setText('orgType', org.orgType || 'both');
   setText('productAccess', formatList(org.productAccess));
-  setText('seatUsage', `${org.seatsUsed || 0} / ${org.seatLimit || 0}`);
-  const sellerLimit = org.seatLimits?.sellerSuite ?? org.seatLimit ?? 0;
-  const buyerLimit = org.seatLimits?.buyerSuite ?? org.seatLimit ?? 0;
-  const seatMixLabel = sellerLimit || buyerLimit ? `${sellerLimit} seller • ${buyerLimit} buyer` : 'Not configured';
+  setText('seatUsage', `${seatUsage.totalUsed ?? 0}`);
+  const seatMixLabel = vendorLimit || buyerLimit || bothLimit
+    ? `${vendorLimit} vendor • ${buyerLimit} buyer • ${bothLimit} both`
+    : 'Not configured';
   setText('seatMix', seatMixLabel);
-  setText('seatHint', 'Active seats vs. limit');
+  setText('seatHint', 'Active seats used across suites');
   setText('orgCreated', org.createdAt ? new Date(org.createdAt).toLocaleDateString() : 'Unknown');
 }
 
 function renderAnalytics() {
   const org = adminState.organization || {};
+  const seatLimits = adminState.seatLimits || {};
+  const seatUsage = adminState.seatUsage || {};
   const members = Array.isArray(adminState.members) ? adminState.members : [];
   const activeMembers = members.filter(member => member.status !== 'removed');
-  const seatsUsed = org.seatsUsed || 0;
-  const seatLimit = org.seatLimit || 0;
-  const utilisation = seatLimit ? Math.round((seatsUsed / seatLimit) * 100) : 0;
-  setText('statSeats', seatLimit ? `${seatsUsed} / ${seatLimit}` : `${seatsUsed}`);
-  setText('statSeatSub', seatLimit ? `${utilisation}% utilisation` : 'Seat utilisation');
+  const seatsUsed = seatUsage.totalUsed ?? 0;
+  const totalLimit = (seatLimits.vendorSuite ?? 0) + (seatLimits.buyerSuite ?? 0) + (seatLimits.bothSuites ?? 0);
+  const utilisation = totalLimit ? Math.round((seatsUsed / totalLimit) * 100) : 0;
+  setText('statSeats', totalLimit ? `${seatsUsed} / ${totalLimit}` : `${seatsUsed}`);
+  setText('statSeatSub', totalLimit ? `${utilisation}% utilisation` : 'Seat utilisation');
 
   const products = Array.isArray(org.productAccess) ? org.productAccess : [];
   setText('statProducts', products.length ? products.length : '0');
@@ -91,6 +101,19 @@ function renderAnalytics() {
   setText('statBuyers', buyerCount.toString());
   setText('statSellersSub', dualCount ? `${dualCount} with both suites` : 'Seller provisioned');
   setText('statBuyersSub', dualCount ? `${dualCount} with both suites` : 'Buyer provisioned');
+}
+
+function renderSeatBreakdown() {
+  const seatLimits = adminState.seatLimits || {};
+  const seatUsage = adminState.seatUsage || {};
+  const vendorLimit = seatLimits.vendorSuite ?? 0;
+  const buyerLimit = seatLimits.buyerSuite ?? 0;
+  const bothLimit = seatLimits.bothSuites ?? 0;
+
+  setText('seatVendor', `${seatUsage.vendorUsed ?? 0} / ${vendorLimit}`);
+  setText('seatBuyer', `${seatUsage.buyerUsed ?? 0} / ${buyerLimit}`);
+  setText('seatBoth', `${seatUsage.bothUsed ?? 0} / ${bothLimit}`);
+  setText('seatTotal', `${seatUsage.totalUsed ?? 0}`);
 }
 
 function renderIntegrations() {
@@ -412,7 +435,7 @@ async function fetchAuthContext() {
     const json = await res.json();
     adminState.user = json.user;
     adminState.memberships = json.memberships || [];
-    adminState.effectiveLicense = json.effectiveLicense || { tier: json.user?.licenseTier };
+    adminState.effectiveLicense = json.effectiveLicense || {};
     toggleAgamaAdminNav(adminState.user);
     toggleOrgAdminNav({
       effectiveLicense: adminState.effectiveLicense,
@@ -440,11 +463,17 @@ async function fetchOverview() {
     const res = await fetch('/api/org/admin/overview', { credentials: 'include' });
     const json = await res.json();
     if (!res.ok || !json.ok) throw new Error(json.error || 'Unable to load');
-    adminState.organization = json.organization;
+    const orgPayload = json.organization || {};
+    const seatLimits = orgPayload.seatLimits || json.seatLimits || {};
+    const seatUsage = orgPayload.seatUsage || json.seatUsage || {};
+    adminState.organization = orgPayload;
     adminState.members = json.members || [];
+    adminState.seatLimits = seatLimits;
+    adminState.seatUsage = seatUsage;
     renderOverview();
     renderMembers();
     renderAnalytics();
+    renderSeatBreakdown();
     await loadIntegrations();
     fetchAuditLog();
   } catch (err) {
