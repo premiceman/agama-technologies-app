@@ -3,7 +3,7 @@
 Version: 1.0  
 Owner: Agama Technologies  
 Status: Authoritative Specification for User Profiles  
-Last Updated: (update before commit)
+Last Updated: 2024-05-08
 
 The Agama User Profile system provides identity, metadata, preferences, presence, role context, and interaction provenance across RevenueForge, ProcurePath, Engagement Rooms, ValueSphere, and RFX workflows.
 
@@ -66,6 +66,7 @@ Fields:
 - `avatarUrl`
 - `phoneNumber`
 - `timezone`
+- `persona: 'vendor' | 'buyer' | 'both'` (UI and AI preference; does **not** grant access)
 - `notificationPreferences`:
   - `inApp: boolean`
   - `email: boolean`
@@ -73,13 +74,15 @@ Fields:
 ## 2.3 OrganizationMembership (context-dependent)
 Defines:
 - Role (org_owner, org_admin, user)
-- Suite entitlements:
-  - vendorSuite  
-  - buyerSuite  
+- Suite entitlements (per suite seat):
+  - vendorSuite
+  - buyerSuite
 - SuperUser flags:
-  - vendor  
-  - buyer  
+  - vendor
+  - buyer
 - Status (active, pending_invite, suspended)
+
+Entitlements and access derive exclusively from `OrganizationMembership` and its suite flags. Persona and any license descriptors are preferences only and never influence permissions.
 
 Profile rendering MUST reflect current `OrganizationMembership`.
 
