@@ -265,6 +265,44 @@
             <div class="card glass p-4 mt-3">
               <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
                 <div>
+                  <h3 class="h6 mb-1">Integrations</h3>
+                  <p class="text-fg-3 small mb-0">Connect CRM, Gong, Clari, and email with safe metadata only.</p>
+                </div>
+                <span class="badge-soft" id="orgIntegrationCount">0</span>
+              </div>
+              <form id="orgIntegrationForm" class="row g-2 align-items-end mb-3">
+                <div class="col-sm-4">
+                  <label class="form-label small" for="orgIntegrationType">Type</label>
+                  <select class="form-select form-select-sm" id="orgIntegrationType">
+                    <option value="crm">CRM</option>
+                    <option value="gong">Gong</option>
+                    <option value="clari">Clari</option>
+                    <option value="email">Email</option>
+                    <option value="calendar">Calendar</option>
+                    <option value="procurement_erp">Procurement ERP</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div class="col-sm-4">
+                  <label class="form-label small" for="orgIntegrationProvider">Provider</label>
+                  <input class="form-control form-control-sm" id="orgIntegrationProvider" type="text" placeholder="HubSpot" required>
+                </div>
+                <div class="col-sm-4">
+                  <label class="form-label small" for="orgIntegrationNotes">Notes</label>
+                  <input class="form-control form-control-sm" id="orgIntegrationNotes" type="text" placeholder="Sandbox connection">
+                </div>
+                <div class="col-auto">
+                  <button class="btn btn-primary btn-sm" type="submit">Add integration</button>
+                </div>
+              </form>
+              <div class="text-danger small" id="orgIntegrationError"></div>
+              <div id="orgIntegrationList" class="d-flex flex-column gap-2"></div>
+              <div class="text-fg-3 small" id="orgIntegrationEmpty">No integrations configured yet.</div>
+            </div>
+
+            <div class="card glass p-4 mt-3">
+              <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+                <div>
                   <h3 class="h6 mb-1">Activity / Audit log</h3>
                   <p class="text-fg-3 small mb-0">Recent membership and workspace changes in your organisation.</p>
                 </div>

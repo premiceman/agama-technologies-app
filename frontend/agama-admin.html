@@ -384,11 +384,49 @@
                         <input class="form-control form-control-sm" id="agamaOrgWorkosId" type="text" placeholder="org_01H...">
                         <div class="form-text small">Paste the WorkOS Organisation ID from the WorkOS dashboard to link SSO users.</div>
                       </div>
-                      <div class="mt-3 d-flex justify-content-between align-items-center">
-                        <div class="small text-fg-3" id="agamaOrgFormFeedback"></div>
-                        <button class="btn btn-primary btn-sm" type="submit" id="agamaOrgSaveBtn">Save organisation</button>
+                    <div class="mt-3 d-flex justify-content-between align-items-center">
+                      <div class="small text-fg-3" id="agamaOrgFormFeedback"></div>
+                      <button class="btn btn-primary btn-sm" type="submit" id="agamaOrgSaveBtn">Save organisation</button>
+                    </div>
+                  </form>
+                </div>
+
+                  <div class="card glass-subtle p-3 mt-3">
+                    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                      <div>
+                        <h3 class="h6 mb-1">Integrations</h3>
+                        <div class="text-fg-3 small">CRM, Gong, Clari, and email connections.</div>
+                      </div>
+                      <span class="badge-soft" id="agamaIntegrationOrgLabel">Select org</span>
+                    </div>
+                    <form class="row g-2 align-items-end mb-3" id="agamaIntegrationForm">
+                      <div class="col-sm-6">
+                        <label class="form-label small" for="agamaIntegrationType">Type</label>
+                        <select class="form-select form-select-sm" id="agamaIntegrationType" required>
+                          <option value="crm">CRM</option>
+                          <option value="gong">Gong</option>
+                          <option value="clari">Clari</option>
+                          <option value="email">Email</option>
+                          <option value="calendar">Calendar</option>
+                          <option value="procurement_erp">Procurement ERP</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                      <div class="col-sm-6">
+                        <label class="form-label small" for="agamaIntegrationProvider">Provider</label>
+                        <input class="form-control form-control-sm" id="agamaIntegrationProvider" type="text" placeholder="Salesforce" required>
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label small" for="agamaIntegrationNotes">Config notes</label>
+                        <textarea class="form-control form-control-sm" id="agamaIntegrationNotes" rows="2" placeholder="Safe notes only. Do not paste secrets."></textarea>
+                        <div class="form-text text-danger" id="agamaIntegrationError"></div>
+                      </div>
+                      <div class="col-auto">
+                        <button class="btn btn-primary btn-sm" type="submit">Add integration</button>
                       </div>
                     </form>
+                    <div id="agamaIntegrationList" class="d-flex flex-column gap-2"></div>
+                    <div class="text-fg-3 small" id="agamaIntegrationEmpty">Select an organisation to manage integrations.</div>
                   </div>
                 </div>
               </div>
