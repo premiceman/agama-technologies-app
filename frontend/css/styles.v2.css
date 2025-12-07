@@ -1561,3 +1561,62 @@ small.text-fg { color: var(--fg) !important; }
     margin-bottom: var(--space-6);
   }
 }
+
+/* Search surfaces */
+.search-input-wrapper {
+  position: relative;
+}
+
+.search-input-wrapper i {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--fg-3);
+  pointer-events: none;
+}
+
+.search-input-wrapper .form-control {
+  background: var(--bg-elevated);
+  border-color: var(--border);
+  color: var(--fg);
+  padding-left: 2.5rem;
+}
+
+.search-dropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 10;
+}
+
+.search-results {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.search-result {
+  padding: 12px 14px;
+  color: var(--fg);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.search-result:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--fg);
+}
+
+.search-result:last-child {
+  border-bottom: none;
+}
+
+.search-result.muted {
+  color: var(--fg-3);
+}

@@ -105,6 +105,31 @@
         </div>
 
         <div class="card glass p-3 mb-4">
+          <div class="d-flex flex-wrap align-items-start gap-3">
+            <div class="flex-grow-1">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                  <span class="eyebrow d-block">Contextual search</span>
+                  <h2 class="h6 mb-0">Find engagement rooms you participate in</h2>
+                </div>
+                <span class="badge-soft">Respects Room membership</span>
+              </div>
+              <div class="search-input-wrapper">
+                <i class="bi bi-search"></i>
+                <input type="search" class="form-control form-control-lg" id="roomSearchGlobal"
+                  placeholder="Search room titles, hosts, or shared signals" autocomplete="off" />
+                <div class="search-dropdown d-none">
+                  <div id="roomSearchResults" class="search-results"></div>
+                </div>
+              </div>
+            </div>
+            <div class="text-fg-3 small" style="max-width: 260px;">
+              Only rooms where you are a participant are returned. Vendor-only or buyer-only visibility is preserved automatically.
+            </div>
+          </div>
+        </div>
+
+        <div class="card glass p-3 mb-4">
           <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
             <div>
               <h2 class="h6 mb-1">Filter rooms</h2>
@@ -312,6 +337,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/search.js"></script>
   <script src="/js/rooms.js"></script>
 </body>
 </html>

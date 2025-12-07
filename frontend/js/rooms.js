@@ -272,6 +272,7 @@ async function initRoomsPage() {
       state.orgContext ? `${state.orgContext.name} • ${state.orgContext.orgType || 'multi-org'}` : 'No organization selected'
     );
     setupCreateRoomHandlers();
+    bindRoomSearchDropdown();
     bindRoomFilters();
     const roomsResp = await fetchJson('/api/rooms');
     state.rooms = roomsResp.rooms || [];
@@ -299,6 +300,19 @@ function renderRooms(rooms) {
 
   renderRoomSection('home', homeRooms);
   renderRoomSection('guest', guestRooms);
+}
+
+function bindRoomSearchDropdown() {
+  const input = document.getElementById('roomSearchGlobal');
+  const results = document.getElementById('roomSearchResults');
+  if (input && results && window.SearchUI) {
+    window.SearchUI.bindSearchField({
+      input,
+      resultsContainer: results,
+      scope: 'engagement_room',
+      contextLabel: 'Room scope'
+    });
+  }
 }
 
 function bindRoomFilters() {

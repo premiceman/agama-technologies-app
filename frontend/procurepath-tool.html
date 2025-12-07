@@ -90,6 +90,30 @@
       </nav>
 
       <main class="container py-4" style="max-width: 1200px;">
+        <section class="card glass p-3 mb-4">
+          <div class="d-flex flex-wrap align-items-start gap-3">
+            <div class="flex-grow-1">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                  <span class="eyebrow d-block">ProcurePath search</span>
+                  <h1 class="h6 mb-0">Find buyer-only vendors and sourcing records</h1>
+                </div>
+                <span class="badge-soft">Buyer visibility</span>
+              </div>
+              <div class="search-input-wrapper">
+                <i class="bi bi-search"></i>
+                <input type="search" class="form-control form-control-lg" id="procurepathSearchInput"
+                  placeholder="Search vendor records, risks, and sourcing context" autocomplete="off" />
+                <div class="search-dropdown d-none">
+                  <div id="procurepathSearchResults" class="search-results"></div>
+                </div>
+              </div>
+            </div>
+            <div class="text-fg-3 small" style="max-width: 260px;">
+              Results stay buyer-only and never expose vendor-only or shared content. Use this to jump directly to vendor records tied to sourcing events.
+            </div>
+          </div>
+        </section>
         <div class="alert alert-warning d-none" role="alert" id="procurepathDetailAlert"></div>
 
         <header class="card glass p-4 mb-4">
@@ -209,6 +233,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/search.js"></script>
   <script type="module" src="/js/procurepath.js"></script>
 </body>
 </html>
