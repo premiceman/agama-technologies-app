@@ -1101,6 +1101,36 @@ async function buildOrganizationContext(user, orgId, { includeSeatDetails = fals
   return context;
 }
 
+async function computeSeatUsageForOrg(orgId) {
+  const memberships = await OrganizationMembership.find({ organization: orgId, status: 'active' }).populate('user');
+
+  let vendorUsed = 0;
+  let buyerUsed = 0;
+  let bothUsed = 0;
+
+  for (const membership of memberships) {
+    if (membership.role === 'guest') continue;
+    if (!membership.user || membership.user.status !== 'active') continue;
+
+    const vendorEnabled = Boolean(membership.vendorSuiteEnabled);
+    const buyerEnabled = Boolean(membership.buyerSuiteEnabled);
+
+    if (!vendorEnabled && !buyerEnabled) continue;
+
+    if (vendorEnabled && buyerEnabled) {
+      bothUsed += 1;
+    } else if (vendorEnabled) {
+      vendorUsed += 1;
+    } else if (buyerEnabled) {
+      buyerUsed += 1;
+    }
+  }
+
+  const totalUsed = vendorUsed + buyerUsed + bothUsed;
+
+  return { vendorUsed, buyerUsed, bothUsed, totalUsed };
+}
+
 function requirePlatformAccess(platformId) {
   return async function(req, res, next) {
     try {
@@ -7470,3 +7500,4 @@ if (require.main === module) {
 }
 
 module.exports = app;
+module.exports.computeSeatUsageForOrg = computeSeatUsageForOrg;
