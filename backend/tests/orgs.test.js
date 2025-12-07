@@ -371,23 +371,23 @@ describe('Organizations and memberships', () => {
     expect(buyerBlocked.status).toBe(403);
   });
 
-  test('dual-suite users can access buyer endpoints inside the same org', async () => {
-    const dualAgent = request.agent(app);
-    await dualAgent.post('/api/auth/signup').send({
-      name: 'Dual Persona',
-      email: 'dual@example.com',
+  test('both-suite users can access buyer endpoints inside the same org', async () => {
+    const bothAgent = request.agent(app);
+    await bothAgent.post('/api/auth/signup').send({
+      name: 'Both Persona',
+      email: 'both@example.com',
       password: 'password123',
       licenseTier: 'business',
       platformAccess: ['valuesphere', 'revenueforge', 'procurepath']
     });
 
-    const orgRes = await dualAgent.post('/api/orgs').send({ name: 'Dual Org', slug: 'dual-org' });
+    const orgRes = await bothAgent.post('/api/orgs').send({ name: 'Both Org', slug: 'both-org' });
     expect(orgRes.status).toBe(201);
 
-    const procurePathRes = await dualAgent.get('/api/procurepath/vendors');
+    const procurePathRes = await bothAgent.get('/api/procurepath/vendors');
     expect(procurePathRes.status).toBe(200);
 
-    const revenueRes = await dualAgent.get('/api/revenueforge/accounts');
+    const revenueRes = await bothAgent.get('/api/revenueforge/accounts');
     expect(revenueRes.status).toBe(200);
   });
 });

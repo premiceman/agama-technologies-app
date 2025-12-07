@@ -511,7 +511,7 @@ function buildSuiteEntitlements(user, orgContext, membership) {
 }
 
 function deriveActivePersona(user, permissions) {
-  const basePersona = user?.persona || 'dual';
+  const basePersona = user?.persona || 'both';
 
   if (basePersona === 'vendor') return 'seller';
   if (basePersona === 'buyer') return 'buyer';
@@ -531,7 +531,6 @@ function deriveThemeHints(activePersona) {
 
 function normalizePersona(persona) {
   const normalized = typeof persona === 'string' ? persona.trim().toLowerCase() : '';
-  if (normalized === 'dual') return 'both';
   if (['vendor', 'buyer', 'both'].includes(normalized)) return normalized;
   return 'both';
 }
