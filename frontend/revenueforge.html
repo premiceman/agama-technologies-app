@@ -3,14 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>RevenueForge AI Studio — Agama Technologies</title>
+  <title>RevenueForge — Agama Technologies</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css">
   <link rel="stylesheet" href="/css/styles.v2.css">
 </head>
-<body class="bg-body text-fg" data-theme="vendor" data-enable-global-nav="true">
+<body class="bg-body text-fg" data-theme="seller" data-enable-global-nav="true">
   <div class="liquid-bg" aria-hidden="true">
     <div class="blob blob-blue"></div>
     <div class="blob blob-teal"></div>
@@ -19,63 +20,108 @@
 
   <div id="globalNavMount"></div>
 
-  <main class="container py-5" style="max-width: 1080px;">
-    <header class="mb-5 text-center">
-      <span class="eyebrow">RevenueForge AI Studio</span>
-      <h1 class="display-5 fw-bold">AI-guided revenue orchestration for modern commercial teams</h1>
-      <p class="text-fg-2 lead">RevenueForge is a business license experience. Shape the sales lifecycle, generate qualified opportunities, and collaborate on every AI-crafted lead dossier.</p>
+  <main class="container py-5" style="max-width: 1100px;">
+    <header class="mb-5" data-aos="fade-up">
+      <div class="suite-hero">
+        <span class="floating-orb"></span><span class="floating-orb"></span>
+        <span class="hero-badge"><i class="bi bi-lightning-charge"></i> RevenueForge</span>
+        <h1 class="display-6 fw-bold mt-3">AI-guided revenue orchestration for modern commercial teams</h1>
+        <p class="text-fg-3 lead">Lifecycle architect, deal intelligence, and coaching copilots that keep sellers and buyers aligned on a shared plan.</p>
+        <div class="d-flex hero-actions">
+          <a class="btn btn-primary btn-lg" href="#pillars">See the pillars</a>
+          <a class="btn btn-outline-light btn-lg" href="/contact.html#demo">Book a demo</a>
+        </div>
+      </div>
     </header>
 
-    <section class="row g-4 mb-5">
-      <div class="col-md-4">
-        <div class="card glass h-100 p-4">
-          <h2 class="h5 mb-3">Lifecycle Architect</h2>
-          <p class="text-fg-3">Design custom sales stages, exit criteria, and enablement assets that keep revenue teams aligned.</p>
-          <ul class="text-fg-2 small mb-0">
-            <li>Drag-and-drop stage designer with guardrails.</li>
-            <li>Qualification frameworks tuned to your market.</li>
-            <li>Playbooks connected to RevOps and CS workflows.</li>
-          </ul>
+    <section class="mb-5" id="pillars">
+      <div class="row g-4">
+        <div class="col-md-4" data-aos="fade-up" data-aos-delay="50">
+          <div class="product-highlight h-100">
+            <span class="tag">Lifecycle Architect</span>
+            <h3>Stages with governance</h3>
+            <p class="text-fg-3">Drag-and-drop stage designer with guardrails, enablement assets, and exit criteria.</p>
+          </div>
         </div>
-      </div>
-      <div class="col-md-4">
-        <div class="card glass h-100 p-4">
-          <h2 class="h5 mb-3">Deal Intelligence Copilot</h2>
-          <p class="text-fg-3">Give sellers AI-driven prompts for discovery, pricing, and objection handling rooted in your operating model.</p>
-          <ul class="text-fg-2 small mb-0">
-            <li>Dynamic question sets for discovery and qualification.</li>
-            <li>Pricing guardrails with finance-approved tactics.</li>
-            <li>Auto-generated follow-up cadences and collateral.</li>
-          </ul>
+        <div class="col-md-4" data-aos="fade-up" data-aos-delay="120">
+          <div class="product-highlight h-100">
+            <span class="tag">Deal Intelligence</span>
+            <h3>Signals that coach sellers</h3>
+            <p class="text-fg-3">Dynamic discovery prompts, pricing guardrails, and AI recaps rooted in your playbooks.</p>
+          </div>
         </div>
-      </div>
-      <div class="col-md-4">
-        <div class="card glass h-100 p-4">
-          <h2 class="h5 mb-3">Engagement Lounge</h2>
-          <p class="text-fg-3">Every AI-generated lead appears as an interactive dossier your teams can assign, collaborate on, and close.</p>
-          <ul class="text-fg-2 small mb-0">
-            <li>Lead rooms with account team chat and executive notes.</li>
-            <li>Signal tracking across email, meetings, and product usage.</li>
-            <li>Forecast-ready metrics for revenue leadership.</li>
-          </ul>
+        <div class="col-md-4" data-aos="fade-up" data-aos-delay="190">
+          <div class="product-highlight h-100">
+            <span class="tag">Engagement Lounge</span>
+            <h3>Rooms that convert</h3>
+            <p class="text-fg-3">Lead dossiers and mutual plans that bring buyers into the same record.</p>
+          </div>
         </div>
       </div>
     </section>
 
-    <section class="card glass p-4 mb-5">
-      <h2 class="h4 mb-3">RevenueForge roadmap</h2>
-      <ul class="text-fg-2 small mb-0">
-        <li>Sales stage configurator with governance and analytics.</li>
-        <li>AI-generated lead dossiers with qualification summaries and next steps.</li>
-        <li>Executive dashboards covering pipeline health and team collaboration.</li>
-      </ul>
+    <section class="mb-5">
+      <div class="row g-4 align-items-start">
+        <div class="col-lg-5" data-aos="fade-right">
+          <div class="role-selector h-100">
+            <label class="form-label" for="revenueRole">Your role</label>
+            <select id="revenueRole" class="form-select" data-role-target="revenueStories">
+              <option value="rev-leader">Revenue Leader</option>
+              <option value="sales-manager">Sales Manager</option>
+              <option value="rep">Seller</option>
+              <option value="revops">RevOps</option>
+            </select>
+            <p class="text-fg-3 small mt-3 mb-0">RevenueForge adapts insights and automation to your lens.</p>
+          </div>
+        </div>
+        <div class="col-lg-7" data-aos="fade-left">
+          <div id="revenueStories">
+            <div class="role-value-card" data-role="rev-leader">
+              <h4>Revenue Leader</h4>
+              <ul>
+                <li>Pipeline risk radar with executive sponsor engagement.</li>
+                <li>Coverage on mutual plan steps across deals and segments.</li>
+                <li>Board-ready views of forecast confidence.</li>
+              </ul>
+            </div>
+            <div class="role-value-card" data-role="sales-manager">
+              <h4>Sales Manager</h4>
+              <ul>
+                <li>Coaching prompts tied to stage exit criteria and buyer signals.</li>
+                <li>Room health indicators to prioritize inspection.</li>
+                <li>Templates and briefs to replicate top-performer habits.</li>
+              </ul>
+            </div>
+            <div class="role-value-card" data-role="rep">
+              <h4>Seller</h4>
+              <ul>
+                <li>AI discovery, follow-up, and objection handling tailored to the room.</li>
+                <li>Milestones that make next steps crystal clear for buyers.</li>
+                <li>Proof stories embedded from ValueSphere.</li>
+              </ul>
+            </div>
+            <div class="role-value-card" data-role="revops">
+              <h4>RevOps</h4>
+              <ul>
+                <li>Guardrails for pricing, approvals, and compliance baked into stages.</li>
+                <li>Signal ingestion without duplicating tools.</li>
+                <li>Analytics aligned to finance expectations.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
-    <section class="text-center">
-      <p class="text-fg-3 mb-3">Bring RevenueForge to your sales organisation</p>
-      <div class="d-flex gap-3 justify-content-center flex-wrap">
-        <a class="btn btn-primary" href="/api/auth/workos/signup">Create a business license</a>
-        <a class="btn btn-outline-light" href="mailto:hello@agamasuite.com">Request a demo</a>
+    <section class="dual-cta" data-aos="fade-up">
+      <div>
+        <div class="eyebrow">Next step</div>
+        <h3 class="fw-bold mb-1">Bring RevenueForge to your sales organisation</h3>
+        <p class="text-fg-3 mb-0">Design your lifecycle, coach teams with AI prompts, and invite buyers into Engagement Rooms.</p>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-primary btn-lg" href="/signup.html">Get started</a>
+        <a class="btn btn-outline-light btn-lg" href="/contact.html#demo">Book a demo</a>
       </div>
     </section>
   </main>
@@ -83,11 +129,12 @@
   <footer class="border-top border-soft py-4 mt-5">
     <div class="container d-flex flex-wrap justify-content-between gap-3 text-fg-3 small">
       <span>&copy; <span id="year"></span> Agama Technologies.</span>
-      <a href="mailto:hello@agamasuite.com" class="text-fg-3">Contact</a>
+      <a href="/contact.html" class="text-fg-3">Contact</a>
     </div>
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
   <script src="/js/global-nav.js"></script>
   <script src="/js/main.js" type="module"></script>
 </body>

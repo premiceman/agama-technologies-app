@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Contact Sales — Agama Technologies</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css">
+  <link rel="stylesheet" href="/css/styles.v2.css">
+</head>
+<body class="bg-body text-fg" data-theme="vendor" data-enable-global-nav="true">
+  <div class="liquid-bg" aria-hidden="true">
+    <div class="blob blob-blue"></div>
+    <div class="blob blob-teal"></div>
+    <div class="blob blob-magenta"></div>
+  </div>
+
+  <div id="globalNavMount"></div>
+
+  <main class="container py-5" style="max-width: 980px;">
+    <header class="mb-5" data-aos="fade-up" id="demo">
+      <div class="suite-hero">
+        <span class="floating-orb"></span><span class="floating-orb"></span>
+        <span class="hero-badge"><i class="bi bi-envelope-open"></i> Contact sales</span>
+        <h1 class="display-6 fw-bold mt-3">Book a demo or start a conversation</h1>
+        <p class="text-fg-3 lead">Tell us about your role and what you want to achieve. We&apos;ll tailor the experience to your suite and products.</p>
+      </div>
+    </header>
+
+    <section class="card glass panel-elevated p-4" data-aos="fade-up">
+      <form class="row g-3" data-contact-form>
+        <div class="col-md-6">
+          <label class="form-label" for="contactName">Name</label>
+          <input class="form-control" id="contactName" name="name" placeholder="Your name" required />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="contactEmail">Work email</label>
+          <input type="email" class="form-control" id="contactEmail" name="email" placeholder="you@company.com" required />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="contactCompany">Company</label>
+          <input class="form-control" id="contactCompany" name="company" placeholder="Organisation" />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="contactRole">Role</label>
+          <input class="form-control" id="contactRole" name="role" placeholder="Head of Procurement, VP Sales, CISO..." />
+        </div>
+        <div class="col-12">
+          <label class="form-label" for="contactInterest">Suite or product</label>
+          <select id="contactInterest" class="form-select" name="interest">
+            <option>Seller Suite</option>
+            <option>Buyer Suite</option>
+            <option>Collaboration Suite</option>
+            <option>ValueSphere</option>
+            <option>RevenueForge</option>
+            <option>ProcurePath</option>
+            <option>Engagement Room</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label" for="contactMessage">Use case</label>
+          <textarea class="form-control" id="contactMessage" name="message" rows="4" placeholder="What outcomes do you need? Who should we involve?"></textarea>
+        </div>
+        <div class="col-12 d-flex gap-2 flex-wrap">
+          <button class="btn btn-primary btn-lg" type="submit">Send to sales@agamatechnologies.com</button>
+          <a class="btn btn-outline-light btn-lg" href="/signup.html">Get started now</a>
+        </div>
+        <div class="col-12 text-fg-3 small" data-contact-status role="status"></div>
+      </form>
+    </section>
+  </main>
+
+  <footer class="border-top border-soft py-4 mt-5">
+    <div class="container d-flex flex-wrap justify-content-between gap-3 text-fg-3 small">
+      <span>&copy; <span id="year"></span> Agama Technologies.</span>
+      <a href="mailto:sales@agamatechnologies.com" class="text-fg-3">sales@agamatechnologies.com</a>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+  <script src="/js/global-nav.js"></script>
+  <script src="/js/main.js" type="module"></script>
+</body>
+</html>

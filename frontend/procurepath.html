@@ -3,179 +3,133 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ProcurePath — Buyer Control Tower</title>
+  <title>ProcurePath — Agama Technologies</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css">
   <link rel="stylesheet" href="/css/styles.v2.css">
 </head>
-<body class="bg-body text-fg" data-theme="buyer" data-page="procurepath-home">
+<body class="bg-body text-fg" data-theme="buyer" data-enable-global-nav="true">
   <div class="liquid-bg" aria-hidden="true">
     <div class="blob blob-blue"></div>
     <div class="blob blob-teal"></div>
     <div class="blob blob-magenta"></div>
   </div>
 
-  <div class="app-shell">
-    <aside class="app-sidebar glass" aria-label="Primary navigation">
-      <div class="sidebar-brand">
-        <div class="mark">AT</div>
-        <div class="sidebar-label">
-          <span class="eyebrow d-block mb-1">Agama</span>
-          <strong>Workspace</strong>
+  <div id="globalNavMount"></div>
+
+  <main class="container py-5" style="max-width: 1100px;">
+    <header class="mb-5" data-aos="fade-up">
+      <div class="suite-hero">
+        <span class="floating-orb"></span><span class="floating-orb"></span>
+        <span class="hero-badge"><i class="bi bi-diagram-3"></i> ProcurePath</span>
+        <h1 class="display-6 fw-bold mt-3">Green-glass control tower for intake, approvals, and renewals</h1>
+        <p class="text-fg-3 lead">Every stakeholder sees the same request, risks, decisions, and value receipts — without chasing emails.</p>
+        <div class="d-flex hero-actions">
+          <a class="btn btn-primary btn-lg" href="#tracks">See the tracks</a>
+          <a class="btn btn-outline-light btn-lg" href="/contact.html#demo">Book a demo</a>
         </div>
       </div>
-      <nav class="sidebar-nav" aria-label="Workspace">
-        <a class="sidebar-link" href="/workspace.html">
-          <i class="bi bi-grid"></i>
-          <span class="sidebar-label">Dashboard</span>
-        </a>
-        <div class="sidebar-section-label">Applications</div>
-        <div class="sidebar-section">
-          <a class="sidebar-link" href="/rooms.html">
-            <i class="bi bi-people"></i>
-            <span class="sidebar-label">Engagement Rooms</span>
-          </a>
-          <a class="sidebar-link" href="/revenueforge-tool.html">
-            <i class="bi bi-lightning-charge"></i>
-            <span class="sidebar-label">RevenueForge</span>
-          </a>
-          <a class="sidebar-link" href="/valuesphere-tool.html">
-            <i class="bi bi-kanban"></i>
-            <span class="sidebar-label">ValueSphere</span>
-          </a>
-          <a class="sidebar-link active" href="/procurepath.html">
-            <i class="bi bi-diagram-3"></i>
-            <span class="sidebar-label">ProcurePath</span>
-          </a>
-        </div>
-        <div class="sidebar-section-label">Docs</div>
-        <div class="sidebar-section">
-          <a class="sidebar-link" href="/docs.html">
-            <i class="bi bi-journal-text"></i>
-            <span class="sidebar-label">Docs</span>
-          </a>
-        </div>
-        <div class="sidebar-section-label">Account &amp; Settings</div>
-        <div class="sidebar-section">
-          <a class="sidebar-link" href="/profile.html">
-            <i class="bi bi-person"></i>
-            <span class="sidebar-label">Profile</span>
-          </a>
-          <a class="sidebar-link" href="/settings.html">
-            <i class="bi bi-gear"></i>
-            <span class="sidebar-label">Settings</span>
-          </a>
-          <a class="sidebar-link" href="/billing.html">
-            <i class="bi bi-credit-card"></i>
-            <span class="sidebar-label">Billing</span>
-          </a>
-        </div>
-      </nav>
-    </aside>
+    </header>
 
-    <div class="app-content">
-      <nav class="navbar navbar-expand-lg bg-glass border-bottom mb-4">
-        <div class="container-fluid">
-          <a class="navbar-brand d-flex align-items-center gap-2" href="/">
-            <span class="brand-dot"></span>
-            Agama <strong>Technologies</strong>
-          </a>
-          <div class="d-flex align-items-center gap-2">
-            <div class="dropdown agama-notification-trigger">
-              <button class="btn btn-outline-light btn-sm position-relative" id="notificationBell" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Notifications">
-                <i class="bi bi-bell"></i>
-                <span class="badge rounded-pill bg-danger-subtle text-danger-emphasis position-absolute top-0 start-100 translate-middle d-none" id="notificationUnreadBadge">0</span>
-              </button>
-              <div class="dropdown-menu dropdown-menu-end shadow agama-notification-dropdown" id="notificationDropdown">
-                <div class="d-flex align-items-center justify-content-between gap-2 px-3 py-2 border-bottom border-dark-subtle">
-                  <div>
-                    <span class="eyebrow d-block mb-1">Notifications</span>
-                    <div class="small text-fg-3" id="notificationDropdownSummary">Recent updates</div>
-                  </div>
-                  <button class="btn btn-outline-light btn-sm" type="button" id="notificationOpenPanel">Open panel</button>
-                </div>
-                <div class="agama-notification-dropdown-feed" id="notificationDropdownList"></div>
-                <div class="text-center text-fg-3 small py-3 d-none" id="notificationDropdownEmpty">You are all caught up.</div>
-                <div class="border-top border-dark-subtle p-2">
-                  <button class="btn btn-outline-light btn-sm w-100" type="button" id="notificationMarkAll">Mark all as read</button>
-                </div>
-              </div>
-            </div>
-            <a class="btn btn-outline-light btn-sm" href="/workspace.html">Back to workspace</a>
-            <button class="btn btn-primary btn-sm" id="logout">Logout</button>
+    <section class="mb-5" id="tracks">
+      <div class="storyline" data-aos="fade-up">
+        <div class="storyline-card">
+          <div class="step-badge">Intake</div>
+          <h4>Structured requests</h4>
+          <p>Business case, budget source, requirements, and data needs captured up front.</p>
+        </div>
+        <div class="storyline-card">
+          <div class="step-badge">Approvals</div>
+          <h4>Predictable governance</h4>
+          <p>Security, finance, and legal tracks with owners, due dates, and AI summaries.</p>
+        </div>
+        <div class="storyline-card">
+          <div class="step-badge">Renewals</div>
+          <h4>Evidence-first</h4>
+          <p>Value receipts and adoption signals connected back to the original request.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="mb-5">
+      <div class="row g-4 align-items-start">
+        <div class="col-lg-5" data-aos="fade-right">
+          <div class="role-selector h-100">
+            <label class="form-label" for="procureRole">Your role</label>
+            <select id="procureRole" class="form-select" data-role-target="procureStories">
+              <option value="head-procurement">Head of Procurement</option>
+              <option value="finance">Finance</option>
+              <option value="security">Security &amp; Risk</option>
+              <option value="business">Business Owner</option>
+            </select>
+            <p class="text-fg-3 small mt-3 mb-0">ProcurePath respects role-based visibility while keeping everyone aligned.</p>
           </div>
         </div>
-      </nav>
-
-      <main class="container py-4" style="max-width: 1280px;">
-        <div class="alert alert-warning d-none" role="alert" id="procurepathAlert"></div>
-
-        <header class="card glass p-4 mb-4">
-          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
-            <div>
-              <span class="eyebrow">Buyer suite · ProcurePath</span>
-              <h1 class="h4 mb-2">Vendor lifecycle control tower</h1>
-              <p class="text-fg-3 mb-0">Track vendor intake through RFX, evaluation, shortlist, and contracting with risk-aware scores.</p>
+        <div class="col-lg-7" data-aos="fade-left">
+          <div id="procureStories">
+            <div class="role-value-card" data-role="head-procurement">
+              <h4>Head of Procurement</h4>
+              <ul>
+                <li>Standardized workflows and approvals for every category.</li>
+                <li>Live view of vendor engagement rooms to monitor progress.</li>
+                <li>Decision logs ready for audit and leadership.</li>
+              </ul>
             </div>
-            <div class="d-flex gap-2 align-items-center">
-              <a class="btn btn-outline-light btn-sm" href="/procurepath-tool.html">Open vendor detail</a>
-              <button class="btn btn-primary btn-sm" id="refreshBoard">Refresh board</button>
+            <div class="role-value-card" data-role="finance">
+              <h4>Finance</h4>
+              <ul>
+                <li>Budget, payback, and accrual data surfaced at intake.</li>
+                <li>Milestones synced to contracting so finance is never surprised.</li>
+                <li>Renewal receipts tied to the business case.</li>
+              </ul>
             </div>
-          </div>
-        </header>
-
-        <section class="card glass p-3 mb-4">
-          <div class="d-flex flex-wrap align-items-start gap-3">
-            <div class="flex-grow-1">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <div>
-                  <span class="eyebrow d-block">Contextual search</span>
-                  <h2 class="h6 mb-0">Search ProcurePath vendors and sourcing entries</h2>
-                </div>
-                <span class="badge-soft">Buyer-only</span>
-              </div>
-              <div class="search-input-wrapper">
-                <i class="bi bi-search"></i>
-                <input type="search" class="form-control form-control-lg" id="procurepathSearchInput"
-                  placeholder="Search vendor names, risk summaries, and intake status" autocomplete="off" />
-                <div class="search-dropdown d-none">
-                  <div id="procurepathSearchResults" class="search-results"></div>
-                </div>
-              </div>
+            <div class="role-value-card" data-role="security">
+              <h4>Security &amp; Risk</h4>
+              <ul>
+                <li>Issue tracker with owners and remediation evidence.</li>
+                <li>AI summaries against your policies and trust center.</li>
+                <li>Governed document sharing and redlines.</li>
+              </ul>
             </div>
-            <div class="text-fg-3 small" style="max-width: 260px;">
-              Results respect buyer-only governance and your organisation membership. Use this to navigate quickly to vendor cards and sourcing records.
+            <div class="role-value-card" data-role="business">
+              <h4>Business Owner</h4>
+              <ul>
+                <li>Clear path to purchase with accountable owners.</li>
+                <li>Shared milestones that keep vendors and internal teams honest.</li>
+                <li>Value receipts to communicate wins to leadership.</li>
+              </ul>
             </div>
           </div>
-        </section>
+        </div>
+      </div>
+    </section>
 
-        <section class="row g-3 mb-4" id="overviewMetrics" aria-label="ProcurePath overview"></section>
+    <section class="dual-cta" data-aos="fade-up">
+      <div>
+        <div class="eyebrow">Next step</div>
+        <h3 class="fw-bold mb-1">Bring ProcurePath to your organisation</h3>
+        <p class="text-fg-3 mb-0">Create governed intakes, predictable approvals, and renewal-ready evidence.</p>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-primary btn-lg" href="/signup.html">Get started</a>
+        <a class="btn btn-outline-light btn-lg" href="/contact.html#demo">Book a demo</a>
+      </div>
+    </section>
+  </main>
 
-        <section class="card glass p-4" aria-labelledby="pipelineHeading">
-          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
-            <div>
-              <h2 class="h5 mb-1" id="pipelineHeading">Procurement stages</h2>
-              <p class="text-fg-3 small mb-0">Kanban view of every vendor across intake, RFX, evaluation, and decision gates.</p>
-            </div>
-            <div class="d-flex align-items-center gap-2 text-fg-3 small">
-              <span class="badge bg-success-subtle text-success" id="boardBuyerPill">Buyer-only</span>
-              <span class="badge bg-light text-dark">Internal scoring only</span>
-            </div>
-          </div>
-          <div class="agama-board" id="stageBoard" aria-live="polite"></div>
-          <div class="text-center text-fg-3 small mt-3" id="boardEmpty" hidden>
-            No vendors have been added yet. Create vendor records from sourcing events to populate this view.
-          </div>
-        </section>
-      </main>
+  <footer class="border-top border-soft py-4 mt-5">
+    <div class="container d-flex flex-wrap justify-content-between gap-3 text-fg-3 small">
+      <span>&copy; <span id="year"></span> Agama Technologies.</span>
+      <a href="/contact.html" class="text-fg-3">Contact</a>
     </div>
-  </div>
+  </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="/js/notifications.js"></script>
-  <script src="/js/search.js"></script>
-  <script type="module" src="/js/procurepath.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+  <script src="/js/global-nav.js"></script>
+  <script src="/js/main.js" type="module"></script>
 </body>
 </html>
