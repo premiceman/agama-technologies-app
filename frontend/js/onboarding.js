@@ -97,9 +97,10 @@ function updatePriceSummary() {
       : '$0/mo';
   }
   if (helper) {
-    if (totalSeats === 0) {
-      helper.textContent = 'Add at least one seat to continue.';
-    } else if (isContactSalesMode()) {
+    const onFinalStep = onboardingState.currentStep === steps.length - 1;
+    if (onFinalStep && !onboardingState.orgManaged && totalSeats === 0) {
+      helper.textContent = 'Add at least one seat to finish.';
+    } else if (onFinalStep && !onboardingState.orgManaged && isContactSalesMode()) {
       helper.textContent = 'Contact Sales to provision more than 200 seats.';
     } else {
       helper.textContent = 'Monthly billing preview (cards accepted later).';
@@ -107,11 +108,15 @@ function updatePriceSummary() {
   }
 
   const contactBanner = document.getElementById('contactSalesBanner');
-  if (contactBanner) contactBanner.classList.toggle('d-none', !isContactSalesMode());
+  if (contactBanner) {
+    contactBanner.classList.toggle('d-none', !isContactSalesMode());
+  }
 
   const nextBtn = document.getElementById('nextStep');
   if (nextBtn) {
-    const disabled = totalSeats === 0 || isContactSalesMode();
+    const isFinalStep = onboardingState.currentStep === steps.length - 1;
+    const shouldGateBySeats = isFinalStep && !onboardingState.orgManaged;
+    const disabled = shouldGateBySeats && (totalSeats === 0 || isContactSalesMode());
     nextBtn.disabled = disabled;
     nextBtn.setAttribute('aria-disabled', disabled ? 'true' : 'false');
   }
