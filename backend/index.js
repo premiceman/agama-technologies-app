@@ -7709,6 +7709,11 @@ app.post(
 const PUBLIC_DIR = path.join(__dirname, 'public');
 app.use(express.static(PUBLIC_DIR));
 
+app.get(['/consulting', '/consulting/'], (req, res) => {
+  const filePath = path.join(PUBLIC_DIR, 'consulting.html');
+  res.sendFile(filePath);
+});
+
 app.get('*', (req, res) => {
   const filePath = path.join(PUBLIC_DIR, 'index.html');
   res.sendFile(filePath);
