@@ -54,6 +54,7 @@ const {
   syncWorkOSOrganization,
   syncWorkOSOrganizationMembership
 } = require('./services/workosSync');
+const { sendEmail } = require('./services/email');
 const searchIndexer = require('./services/searchIndexer');
 const { simulateIntegrationSync, upsertIntegrationState } = require('./services/integrations');
 
@@ -1404,6 +1405,35 @@ const onboardingSchema = z.object({
     .optional(),
   finalize: z.boolean().optional(),
   status: z.enum(['pending', 'in-progress', 'completed']).optional()
+});
+
+const CONSULTING_FOCUS_AREAS = [
+  'Observability',
+  'Security',
+  'AI/GenAI/AIOps',
+  'Cost optimisation',
+  'Other'
+];
+
+const strategyCallSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required'),
+  company: z.string().trim().min(1, 'Company is required'),
+  role: z.string().trim().min(1, 'Role is required'),
+  email: z.string().trim().email('A valid email is required'),
+  region: z.preprocess(
+    val => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.string().trim().max(120).optional()
+  ),
+  focusAreas: z.array(z.enum(CONSULTING_FOCUS_AREAS)).nonempty('Select at least one focus area'),
+  challengeDescription: z.string().trim().min(1, 'Challenge description is required'),
+  timeline: z.preprocess(
+    val => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.string().trim().max(120).optional()
+  ),
+  budgetBand: z.preprocess(
+    val => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.string().trim().max(120).optional()
+  )
 });
 
 const profileUpdateSchema = z.object({
@@ -7705,6 +7735,62 @@ app.post(
     }
   }
 );
+
+app.post('/api/consulting/strategy-call', async (req, res) => {
+  const parsed = strategyCallSchema.safeParse(req.body || {});
+
+  if (!parsed.success) {
+    const details = {};
+    parsed.error.errors.forEach(issue => {
+      const key = issue.path && issue.path.length ? issue.path[0] : 'unknown';
+      if (!details[key]) {
+        details[key] = issue.message;
+      }
+    });
+    return res.status(400).json({ error: 'VALIDATION_FAILED', details });
+  }
+
+  const payload = parsed.data;
+  const subject = `New Agama Consulting strategy call request – ${payload.company} / ${payload.name}`;
+
+  const lines = [
+    `Name: ${payload.name}`,
+    `Company: ${payload.company}`,
+    `Role: ${payload.role}`,
+    `Email: ${payload.email}`,
+    `Region / Time zone: ${payload.region || 'Not provided'}`,
+    `Focus areas: ${payload.focusAreas.join(', ')}`,
+    `Timeline: ${payload.timeline || 'Not provided'}`,
+    payload.budgetBand ? `Budget band: ${payload.budgetBand}` : null,
+    '',
+    'Challenge description:',
+    payload.challengeDescription
+  ].filter(Boolean);
+
+  const textBody = lines.join('\n');
+  const htmlBody = lines
+    .map(line => {
+      if (line === 'Challenge description:') return '<p><strong>Challenge description:</strong></p>';
+      if (line === '') return '';
+      const [label, ...rest] = line.split(':');
+      if (!rest.length) return `<p>${line}</p>`;
+      return `<p><strong>${label}:</strong> ${rest.join(':').trim()}</p>`;
+    })
+    .join('');
+
+  try {
+    await sendEmail({
+      to: 'sales@agamatechnologies.com',
+      subject,
+      text: textBody,
+      html: htmlBody
+    });
+    return res.status(200).json({ status: 'ok' });
+  } catch (err) {
+    console.error('Consulting strategy call email failed', err);
+    return res.status(500).json({ error: 'Unable to submit request right now' });
+  }
+});
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
 app.use(express.static(PUBLIC_DIR));

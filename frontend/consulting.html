@@ -332,31 +332,31 @@
                   <div class="row g-2">
                     <div class="col-sm-6">
                       <div class="form-check consulting-check">
-                        <input class="form-check-input" type="checkbox" value="Observability" id="improve-observability">
+                        <input class="form-check-input" type="checkbox" value="Observability" id="improve-observability" name="focusAreas">
                         <label class="form-check-label" for="improve-observability">Observability</label>
                       </div>
                     </div>
                     <div class="col-sm-6">
                       <div class="form-check consulting-check">
-                        <input class="form-check-input" type="checkbox" value="Security" id="improve-security">
+                        <input class="form-check-input" type="checkbox" value="Security" id="improve-security" name="focusAreas">
                         <label class="form-check-label" for="improve-security">Security &amp; AISec</label>
                       </div>
                     </div>
                     <div class="col-sm-6">
                       <div class="form-check consulting-check">
-                        <input class="form-check-input" type="checkbox" value="AI" id="improve-ai">
+                        <input class="form-check-input" type="checkbox" value="AI/GenAI/AIOps" id="improve-ai" name="focusAreas">
                         <label class="form-check-label" for="improve-ai">AI / GenAI / AIOps</label>
                       </div>
                     </div>
                     <div class="col-sm-6">
                       <div class="form-check consulting-check">
-                        <input class="form-check-input" type="checkbox" value="Cost optimisation" id="improve-cost">
+                        <input class="form-check-input" type="checkbox" value="Cost optimisation" id="improve-cost" name="focusAreas">
                         <label class="form-check-label" for="improve-cost">Cost optimisation</label>
                       </div>
                     </div>
                     <div class="col-sm-6">
                       <div class="form-check consulting-check">
-                        <input class="form-check-input" type="checkbox" value="Other" id="improve-other">
+                        <input class="form-check-input" type="checkbox" value="Other" id="improve-other" name="focusAreas">
                         <label class="form-check-label" for="improve-other">Other</label>
                       </div>
                     </div>
@@ -366,6 +366,7 @@
                   <label for="stack" class="form-label">Briefly describe your current stack and main challenge</label>
                   <textarea class="form-control" id="stack" name="stack" rows="3" placeholder="Key platforms, tooling, and where friction shows up" required></textarea>
                 </div>
+                <div class="col-12 d-none" id="consulting-form-status" role="status" aria-live="polite"></div>
                 <div class="col-md-6">
                   <label for="budget" class="form-label">Budget band (optional)</label>
                   <input type="text" class="form-control" id="budget" name="budget" placeholder="e.g., &lt;$50k, $50–150k, TBD">
