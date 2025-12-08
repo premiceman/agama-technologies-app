@@ -7,33 +7,17 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <link rel="stylesheet" href="/css/styles.v2.css">
 </head>
-<body class="bg-body text-fg" data-theme="vendor">
+<body class="bg-body text-fg" data-theme="vendor" data-enable-global-nav="true">
   <div class="liquid-bg" aria-hidden="true">
     <div class="blob blob-blue"></div>
     <div class="blob blob-teal"></div>
     <div class="blob blob-magenta"></div>
   </div>
 
-  <nav class="navbar navbar-expand-lg sticky-top bg-glass border-bottom">
-    <div class="container">
-      <a class="navbar-brand d-flex align-items-center gap-2" href="/">
-        <span class="brand-dot"></span>
-        Agama <strong>Technologies</strong>
-      </a>
-      <button class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#nav"><span class="navbar-toggler-icon"></span></button>
-      <div class="collapse navbar-collapse" id="nav">
-        <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-3">
-          <li class="nav-item"><a href="/" class="nav-link">Back to suite</a></li>
-          <li class="nav-item"><a href="/valuesphere.html" class="nav-link">ValueSphere</a></li>
-          <li class="nav-item"><a href="/procurepath.html" class="nav-link">ProcurePath</a></li>
-          <li class="nav-item"><a href="/api/auth/workos/signup" class="btn btn-primary">Create account</a></li>
-          <li class="nav-item"><a href="/api/auth/workos/login" class="btn btn-outline-light">Client login</a></li>
-        </ul>
-      </div>
-    </div>
-  </nav>
+  <div id="globalNavMount"></div>
 
   <main class="container py-5" style="max-width: 1080px;">
     <header class="mb-5 text-center">
@@ -104,6 +88,7 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/global-nav.js"></script>
   <script src="/js/main.js" type="module"></script>
 </body>
 </html>
