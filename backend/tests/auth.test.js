@@ -80,6 +80,28 @@ describe('Authentication & licensing', () => {
     expect(contextRes.body.accessState).toBe('needs_onboarding');
   });
 
+  test('computeAccessState stays active after onboarding even without seats', async () => {
+    const agent = request.agent(app);
+    await agent.post('/api/auth/signup').send({
+      name: 'Seatless Active',
+      email: 'seatless-active@example.com',
+      password: 'password123'
+    });
+
+    const orgRes = await agent
+      .post('/api/orgs')
+      .send({ name: 'Seatless Active Org', slug: 'seatless-active-org', seatLimits: { vendorSuite: 0 } });
+    expect(orgRes.status).toBe(201);
+
+    const user = await User.findOne({ email: 'seatless-active@example.com' });
+    user.onboardingStatus = 'completed';
+    await user.save();
+
+    const contextRes = await agent.get(`/api/me/context?orgId=${orgRes.body.organization.id}`);
+    expect(contextRes.status).toBe(200);
+    expect(contextRes.body.accessState).toBe('active');
+  });
+
   test('computeAccessState is active after onboarding with seats', async () => {
     const agent = request.agent(app);
     await agent.post('/api/auth/signup').send({

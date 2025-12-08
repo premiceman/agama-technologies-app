@@ -480,21 +480,21 @@ function computeEffectiveLicense(user, organizationContext) {
 }
 
 function computeAccessState(user, organizationContext) {
-  if (user && user.isStaff) return 'active';
+  // Staff can always access the app
+  if (user && user.isStaff) {
+    return 'active';
+  }
 
-  if (!organizationContext) return 'needs_onboarding';
+  // Single source of truth for onboarding: user.onboardingStatus (fall back to org if needed)
+  const onboardingStatus =
+    (user && user.onboardingStatus) || (organizationContext && organizationContext.onboardingStatus);
 
-  const seatLimits = organizationContext.seatLimits || {};
-  const totalSeats =
-    (seatLimits.vendorSuite || 0) + (seatLimits.buyerSuite || 0) + (seatLimits.bothSuites || 0);
-
-  if (totalSeats <= 0) return 'needs_onboarding';
-
-  const onboardingStatus = (user && user.onboardingStatus) || organizationContext.onboardingStatus;
-  if (onboardingStatus && onboardingStatus !== 'completed') {
+  if (onboardingStatus !== 'completed') {
     return 'needs_onboarding';
   }
 
+  // Once onboarding is completed, always treat access as active.
+  // Org existence and seat limits are handled elsewhere by feature-level checks.
   return 'active';
 }
 
