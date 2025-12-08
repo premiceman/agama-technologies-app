@@ -1,9 +1,11 @@
 const SECTION_IDS = ['hero', 'platforms', 'vendor', 'buyer', 'rooms', 'ai', 'licenses'];
 const NAV_ACTIVE_CLASS = 'active';
 
+const defaultTheme = document.body?.getAttribute('data-theme') || 'vendor';
+
 document.addEventListener('DOMContentLoaded', () => {
   if (window.AOS) {
-    window.AOS.init({ once: true, duration: 700, easing: 'ease-out-cubic' });
+    window.AOS.init({ once: true, duration: 750, easing: 'ease-out-cubic' });
   }
 
   const yearEl = document.getElementById('year');
@@ -12,6 +14,9 @@ document.addEventListener('DOMContentLoaded', () => {
   initSmoothScroll();
   initScrollSpy();
   initLiquidBackground();
+  initThemeShift();
+  initRoleValueBlocks();
+  initContactForm();
 });
 
 function initSmoothScroll() {
@@ -88,6 +93,101 @@ function initLiquidBackground() {
 
   commitPointer();
   commitScroll();
+}
+
+function initThemeShift() {
+  const body = document.body;
+  if (!body) return;
+
+  const themeSections = Array.from(document.querySelectorAll('[data-theme-target]'));
+  if (!themeSections.length) return;
+
+  body.classList.add('theme-transition');
+  const initialTheme = body.getAttribute('data-theme') || defaultTheme;
+
+  const observer = new IntersectionObserver(
+    entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        const theme = entry.target.getAttribute('data-theme-target');
+        if (theme) {
+          body.setAttribute('data-theme', theme);
+        }
+      });
+    },
+    { threshold: 0.45 }
+  );
+
+  themeSections.forEach(section => observer.observe(section));
+
+  window.addEventListener(
+    'scroll',
+    () => {
+      if (window.scrollY < 120) {
+        body.setAttribute('data-theme', initialTheme);
+      }
+    },
+    { passive: true }
+  );
+}
+
+function initRoleValueBlocks() {
+  const selects = document.querySelectorAll('select[data-role-target]');
+  selects.forEach(select => {
+    const targetId = select.getAttribute('data-role-target');
+    const target = targetId ? document.getElementById(targetId) : null;
+    if (!target) return;
+
+    const cards = Array.from(target.querySelectorAll('[data-role]'));
+    if (!cards.length) return;
+
+    const setRole = role => {
+      cards.forEach(card => {
+        const isActive = card.getAttribute('data-role') === role;
+        card.classList.toggle('active', isActive);
+        card.toggleAttribute('aria-hidden', !isActive);
+      });
+    };
+
+    select.addEventListener('change', () => setRole(select.value));
+
+    const initial = select.value || cards[0].getAttribute('data-role');
+    setRole(initial);
+    select.closest('.role-selector')?.classList.add('ready');
+  });
+}
+
+function initContactForm() {
+  const form = document.querySelector('[data-contact-form]');
+  if (!form) return;
+
+  const status = form.querySelector('[data-contact-status]');
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+
+    const data = new FormData(form);
+    const values = Object.fromEntries(data.entries());
+    const subject = encodeURIComponent(`Agama demo request — ${values.interest || 'Platform'}`);
+
+    const lines = [
+      `Name: ${values.name || 'N/A'}`,
+      `Company: ${values.company || 'N/A'}`,
+      `Email: ${values.email || 'N/A'}`,
+      `Role: ${values.role || 'N/A'}`,
+      `Interest: ${values.interest || 'Platform'}`,
+      `Use case: ${values.message || 'N/A'}`
+    ];
+
+    const mailto = `mailto:sales@agamatechnologies.com?subject=${subject}&body=${encodeURIComponent(lines.join('\n'))}`;
+    window.location.href = mailto;
+
+    if (status) {
+      status.textContent = 'Opening your email client to send the details to sales@agamatechnologies.com...';
+      status.classList.add('show');
+    }
+
+    form.reset();
+  });
 }
 
 function clamp(value, min, max) {

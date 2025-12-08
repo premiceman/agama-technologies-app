@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Engagement Room — Agama Technologies</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css">
+  <link rel="stylesheet" href="/css/styles.v2.css">
+</head>
+<body class="bg-body text-fg" data-theme="collaboration" data-enable-global-nav="true">
+  <div class="liquid-bg" aria-hidden="true">
+    <div class="blob blob-blue"></div>
+    <div class="blob blob-teal"></div>
+    <div class="blob blob-magenta"></div>
+  </div>
+
+  <div id="globalNavMount"></div>
+
+  <main class="container py-5" style="max-width: 1100px;">
+    <header class="mb-5" data-aos="fade-up">
+      <div class="suite-hero">
+        <span class="floating-orb"></span><span class="floating-orb"></span>
+        <span class="hero-badge"><i class="bi bi-people"></i> Engagement Room</span>
+        <h1 class="display-6 fw-bold mt-3">Orange-glass room where buyers and sellers share the same plan</h1>
+        <p class="text-fg-3 lead">Timeline, approvals, documents, and value receipts live together so every decision has context.</p>
+        <div class="d-flex hero-actions">
+          <a class="btn btn-primary btn-lg" href="#flow">See the flow</a>
+          <a class="btn btn-outline-light btn-lg" href="/contact.html#demo">Book a demo</a>
+        </div>
+      </div>
+    </header>
+
+    <section class="mb-5" id="flow">
+      <div class="storyline" data-aos="fade-up">
+        <div class="storyline-card">
+          <div class="step-badge">Before</div>
+          <h4>Mutual discovery</h4>
+          <p>Intake forms, stakeholder maps, and value hypotheses both sides can edit.</p>
+        </div>
+        <div class="storyline-card">
+          <div class="step-badge">During</div>
+          <h4>Execution with clarity</h4>
+          <p>Milestones, approvals, and document versions with guest-ready permissions.</p>
+        </div>
+        <div class="storyline-card">
+          <div class="step-badge">After</div>
+          <h4>Proof of value</h4>
+          <p>Adoption signals and receipts ready for QBRs and renewals.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="mb-5">
+      <div class="row g-4 align-items-start">
+        <div class="col-lg-5" data-aos="fade-right">
+          <div class="role-selector h-100">
+            <label class="form-label" for="roomRole">Your role</label>
+            <select id="roomRole" class="form-select" data-role-target="roomStories">
+              <option value="buyer">Buyer Champion</option>
+              <option value="seller">Account Team</option>
+              <option value="security">Security/Legal</option>
+              <option value="exec">Executive</option>
+            </select>
+            <p class="text-fg-3 small mt-3 mb-0">Room views, summaries, and controls adapt to the person in the room.</p>
+          </div>
+        </div>
+        <div class="col-lg-7" data-aos="fade-left">
+          <div id="roomStories">
+            <div class="role-value-card" data-role="buyer">
+              <h4>Buyer Champion</h4>
+              <ul>
+                <li>Mutual timeline mapped to procurement, finance, and security.</li>
+                <li>Executive-ready briefs for leadership updates.</li>
+                <li>Value receipts and adoption metrics for renewals.</li>
+              </ul>
+            </div>
+            <div class="role-value-card" data-role="seller">
+              <h4>Account Team</h4>
+              <ul>
+                <li>Health signals and AI recaps to focus on the right next step.</li>
+                <li>Document controls and guest-ready redlines.</li>
+                <li>Proof stories embedded from ValueSphere.</li>
+              </ul>
+            </div>
+            <div class="role-value-card" data-role="security">
+              <h4>Security/Legal</h4>
+              <ul>
+                <li>Issue tracker and remediation owners with due dates.</li>
+                <li>Audit-ready history and controlled sharing.</li>
+                <li>AI summaries that map to your policies.</li>
+              </ul>
+            </div>
+            <div class="role-value-card" data-role="exec">
+              <h4>Executive</h4>
+              <ul>
+                <li>Roll-up of risks, approvals, and ROI in one place.</li>
+                <li>Signals that highlight where leadership should engage.</li>
+                <li>Receipts to communicate progress to the board.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="dual-cta" data-aos="fade-up">
+      <div>
+        <div class="eyebrow">Next step</div>
+        <h3 class="fw-bold mb-1">Open your first Engagement Room</h3>
+        <p class="text-fg-3 mb-0">Invite both sides, align on milestones, and keep proof of value close to every decision.</p>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-primary btn-lg" href="/signup.html">Get started</a>
+        <a class="btn btn-outline-light btn-lg" href="/contact.html#demo">Book a demo</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-top border-soft py-4 mt-5">
+    <div class="container d-flex flex-wrap justify-content-between gap-3 text-fg-3 small">
+      <span>&copy; <span id="year"></span> Agama Technologies.</span>
+      <a href="/contact.html" class="text-fg-3">Contact</a>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+  <script src="/js/global-nav.js"></script>
+  <script src="/js/main.js" type="module"></script>
+</body>
+</html>

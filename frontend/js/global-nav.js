@@ -36,15 +36,15 @@
             <div class="nav-dropdown" data-dropdown>
               <button class="nav-link nav-link-inline" type="button" aria-expanded="false" aria-haspopup="true">Suites <i class="bi bi-chevron-down small ms-1"></i></button>
               <div class="dropdown-panel" role="menu">
-                <a class="suite-card suite-seller" href="/#seller-suite" role="menuitem">
+                <a class="suite-card suite-seller" href="/seller-suite.html" role="menuitem">
                   <div class="suite-label">Seller Suite</div>
                   <p class="suite-desc">ValueSphere + RevenueForge for revenue teams.</p>
                 </a>
-                <a class="suite-card suite-buyer" href="/#buyer-suite" role="menuitem">
+                <a class="suite-card suite-buyer" href="/buyer-suite.html" role="menuitem">
                   <div class="suite-label">Buyer Suite</div>
                   <p class="suite-desc">ProcurePath for procurement, finance, and security.</p>
                 </a>
-                <a class="suite-card suite-collaboration" href="/#collaboration-suite" role="menuitem">
+                <a class="suite-card suite-collaboration" href="/collaboration-suite.html" role="menuitem">
                   <div class="suite-label">Collaboration Suite</div>
                   <p class="suite-desc">Engagement Rooms for shared execution and guests.</p>
                 </a>
@@ -55,7 +55,7 @@
           </div>
           <div class="global-nav-actions">
             <a class="btn btn-ghost" href="/api/auth/workos/login">Sign in</a>
-            <a class="btn btn-primary" href="/#demo">Get a demo</a>
+            <a class="btn btn-primary" href="/contact.html#demo">Get a demo</a>
           </div>
         </div>
       </nav>
@@ -72,15 +72,15 @@
           <a class="mobile-nav-link" href="/">Platform</a>
           <div class="mobile-nav-group" data-suite-group>
             <div class="mobile-nav-label">Suites</div>
-            <a class="mobile-nav-link" href="/#seller-suite">Seller Suite <span class="suite-badge suite-seller"></span></a>
-            <a class="mobile-nav-link" href="/#buyer-suite">Buyer Suite <span class="suite-badge suite-buyer"></span></a>
-            <a class="mobile-nav-link" href="/#collaboration-suite">Collaboration Suite <span class="suite-badge suite-collaboration"></span></a>
+            <a class="mobile-nav-link" href="/seller-suite.html">Seller Suite <span class="suite-badge suite-seller"></span></a>
+            <a class="mobile-nav-link" href="/buyer-suite.html">Buyer Suite <span class="suite-badge suite-buyer"></span></a>
+            <a class="mobile-nav-link" href="/collaboration-suite.html">Collaboration Suite <span class="suite-badge suite-collaboration"></span></a>
           </div>
           <a class="mobile-nav-link" href="/consulting">Consulting</a>
           <a class="mobile-nav-link" href="/resources">Resources</a>
           <hr class="mobile-divider" />
           <a class="mobile-nav-link" href="/api/auth/workos/login">Sign in</a>
-          <a class="btn btn-primary w-100" href="/#demo">Get a demo</a>
+          <a class="btn btn-primary w-100" href="/contact.html#demo">Get a demo</a>
         </div>
       </div>
     `;
