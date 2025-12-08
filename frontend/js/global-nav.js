@@ -107,8 +107,10 @@
     if (!dropdown || !toggle || !panel) return;
 
     let open = false;
+    let closeTimer;
 
     const close = () => {
+      clearTimeout(closeTimer);
       open = false;
       dropdown.classList.remove('open');
       toggle.setAttribute('aria-expanded', 'false');
@@ -129,8 +131,22 @@
       toggleMenu();
     });
 
-    dropdown.addEventListener('mouseenter', openMenu);
-    dropdown.addEventListener('mouseleave', close);
+    const scheduleClose = () => {
+      clearTimeout(closeTimer);
+      closeTimer = setTimeout(close, 120);
+    };
+
+    const cancelClose = () => clearTimeout(closeTimer);
+
+    dropdown.addEventListener('mouseenter', () => {
+      cancelClose();
+      openMenu();
+    });
+
+    dropdown.addEventListener('mouseleave', scheduleClose);
+
+    panel.addEventListener('mouseenter', cancelClose);
+    panel.addEventListener('mouseleave', scheduleClose);
 
     toggle.addEventListener('keydown', event => {
       if (event.key === 'Escape') {
