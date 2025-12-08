@@ -20,79 +20,92 @@
 
   <div id="globalNavMount"></div>
 
-  <header class="hero container" id="hero">
-    <div class="row align-items-center g-5 py-5">
-      <div class="col-xl-6" data-aos="fade-right">
-        <div class="eyebrow">Vendor + Buyer + Guests on one platform</div>
-        <h1 class="display-4 fw-bold my-3">
-          Agama unites revenue teams and procurement leaders with AI-powered Engagement Rooms.
-        </h1>
-        <p class="lead text-fg mb-4">
-          Vendor Suite (ValueSphere + RevenueForge) meets Buyer Suite (ProcurePath) on a single, license-aware platform with shared rooms, copilots, and guest collaboration.
-        </p>
-        <div class="d-flex flex-wrap gap-3">
-          <a class="btn btn-primary btn-lg" href="/api/auth/workos/signup">Launch your workspace</a>
-          <a class="btn btn-outline-light btn-lg" href="/valuesphere.html">See Vendor Suite</a>
-          <a class="btn btn-outline-light btn-lg" href="/procurepath.html">See Buyer Suite</a>
-        </div>
-        <div class="d-flex align-items-center gap-2 flex-wrap mt-3">
-          <span class="text-fg-3 small">Explore:</span>
-          <div class="btn-group btn-group-sm" id="landingSuiteToggle" role="group" aria-label="Suite toggle">
-            <button type="button" class="btn btn-outline-light active" data-suite="vendor">Vendor Suite</button>
-            <button type="button" class="btn btn-outline-light" data-suite="buyer">Buyer Suite</button>
-          </div>
-        </div>
-        <div class="d-flex align-items-center gap-3 mt-4 text-fg small flex-wrap">
-          <span><i class="bi bi-stars"></i> Shorter cycles, cleaner deals</span>
-          <span><i class="bi bi-diagram-3"></i> Engagement Rooms with guests</span>
-          <span><i class="bi bi-robot"></i> AI copilots for both sides</span>
+  <div class="platform-subnav-shell">
+    <div class="container">
+      <div class="platform-subnav glass panel-elevated">
+        <div class="subnav-title text-fg-2">Platform</div>
+        <div class="subnav-links" role="tablist">
+          <a class="subnav-link active" href="#overview" data-subnav-target="overview">Overview</a>
+          <a class="subnav-link" href="#collaboration-suite" data-subnav-target="collaboration-suite">Collaboration Suite</a>
+          <a class="subnav-link" href="#seller-suite" data-subnav-target="seller-suite">Seller Suite</a>
+          <a class="subnav-link" href="#buyer-suite" data-subnav-target="buyer-suite">Buyer Suite</a>
+          <a class="subnav-link" href="#intelligence-governance" data-subnav-target="intelligence-governance">Intelligence &amp; Governance</a>
+          <a class="subnav-link" href="#personas" data-subnav-target="personas">Personas</a>
         </div>
       </div>
-      <div class="col-xl-6" data-aos="fade-left">
+    </div>
+  </div>
+
+  <header class="platform-hero container" id="overview">
+    <div class="row align-items-center g-5 py-5">
+      <div class="col-lg-6" data-aos="fade-right">
+        <div class="eyebrow">Vendor + Buyer + Consulting in one shared space</div>
+        <h1 class="display-5 fw-bold my-3">
+          Agama Technologies – Where vendors and buyers run revenue, procurement and value in one shared operating space.
+        </h1>
+        <p class="lead text-fg-3 mb-4">
+          Engagement Rooms, deal &amp; revenue intelligence, procurement control towers, and value consulting live together so every stakeholder sees the same plan and progress.
+        </p>
+        <div class="d-flex flex-wrap gap-2 mb-4">
+          <span class="suite-pill suite-pill-seller">Seller</span>
+          <span class="suite-pill suite-pill-buyer">Buyer</span>
+          <span class="suite-pill suite-pill-collab">Collaboration</span>
+          <span class="suite-pill suite-pill-consulting">Consulting</span>
+        </div>
+        <div class="d-flex flex-wrap gap-3">
+          <a class="btn btn-primary btn-lg" href="#collaboration-suite" data-scroll-target>See how Agama works</a>
+          <a class="btn btn-outline-light btn-lg" href="#demo" data-scroll-target>Get a live demo</a>
+        </div>
+        <div class="d-flex align-items-center gap-3 mt-4 text-fg small flex-wrap">
+          <span><i class="bi bi-diagram-3"></i> Engagement Rooms that feel like home for both sides</span>
+          <span><i class="bi bi-robot"></i> AI copilots tuned for vendor and buyer needs</span>
+        </div>
+      </div>
+      <div class="col-lg-6" data-aos="fade-left">
         <div class="card glass panel-elevated pad-md">
           <div class="panel-content">
-            <div class="badge-pill text-fg-2">Platform snapshot</div>
-            <h3 class="mt-3 panel-title-strong text-contrast-high">Vendor &amp; Buyer tracks, one shared room</h3>
+            <div class="badge-pill text-fg-2">Shared operating space</div>
+            <h3 class="mt-3 panel-title-strong text-contrast-high">Everything in one space, but permissioned</h3>
             <div class="row g-3 mt-3">
               <div class="col-sm-6">
-                <div class="card glass h-100 shadow-sm" data-aos="zoom-in" data-aos-delay="50">
+                <div class="card glass h-100 shadow-sm">
                   <div class="card-body">
-                    <div class="d-flex align-items-center gap-2 mb-2 text-brand"><i class="bi bi-graph-up"></i><span>Vendor Suite</span></div>
-                    <p class="text-fg-3 small mb-2">ValueSphere + RevenueForge to coach discovery, deals, and value proofs.</p>
+                    <div class="d-flex align-items-center gap-2 mb-2 text-brand"><i class="bi bi-graph-up"></i><span>Revenue intelligence</span></div>
+                    <p class="text-fg-3 small mb-2">Live deal signals, milestones, and coaching for sellers.</p>
                     <ul class="text-fg-2 small mb-0">
-                      <li>Navigator diagnostics</li>
-                      <li>Deal intelligence</li>
-                      <li>Value storytelling</li>
+                      <li>Engagement health</li>
+                      <li>Stakeholder mapping</li>
+                      <li>Value proof library</li>
                     </ul>
                   </div>
                 </div>
               </div>
               <div class="col-sm-6">
-                <div class="card glass h-100 shadow-sm" data-aos="zoom-in" data-aos-delay="100">
+                <div class="card glass h-100 shadow-sm">
                   <div class="card-body">
-                    <div class="d-flex align-items-center gap-2 mb-2 text-brand"><i class="bi bi-shield-check"></i><span>Buyer Suite</span></div>
-                    <p class="text-fg-3 small mb-2">ProcurePath keeps procurement, finance, legal, and security aligned.</p>
+                    <div class="d-flex align-items-center gap-2 mb-2 text-brand"><i class="bi bi-shield-check"></i><span>Procurement clarity</span></div>
+                    <p class="text-fg-3 small mb-2">Control tower for sourcing, finance, legal, and security.</p>
                     <ul class="text-fg-2 small mb-0">
-                      <li>Vendor graph &amp; contracts</li>
-                      <li>Risk &amp; renewal command</li>
-                      <li>Negotiation guardrails</li>
+                      <li>Issue &amp; risk tracker</li>
+                      <li>Audit-ready actions</li>
+                      <li>Mutual milestones</li>
                     </ul>
                   </div>
                 </div>
               </div>
               <div class="col-12">
-                <div class="card glass h-100 shadow-sm" data-aos="zoom-in" data-aos-delay="150">
+                <div class="card glass h-100 shadow-sm">
                   <div class="card-body d-flex flex-wrap gap-3 align-items-center">
                     <div class="flex-grow-1">
-                      <div class="d-flex align-items-center gap-2 mb-2 text-brand"><i class="bi bi-people"></i><span>Engagement Rooms</span></div>
-                      <p class="text-fg-3 small mb-2">Shared rooms for vendor, buyer, and guests with AI copilots, boards, documents, and deliverables.</p>
+                      <div class="d-flex align-items-center gap-2 mb-2 text-brand"><i class="bi bi-people"></i><span>Engagement Room</span></div>
+                      <p class="text-fg-3 small mb-2">Shared space with timeline, decisions, documents, and value outcomes.</p>
                       <div class="d-flex gap-3 flex-wrap text-fg-2 small mb-0">
-                        <span><i class="bi bi-kanban"></i> Project board</span>
-                        <span><i class="bi bi-chat-square-dots"></i> Messages &amp; summaries</span>
-                        <span><i class="bi bi-cloud-check"></i> Documents &amp; validation</span>
+                        <span><i class="bi bi-kanban"></i> Shared timeline</span>
+                        <span><i class="bi bi-chat-square-dots"></i> Summaries both sides trust</span>
+                        <span><i class="bi bi-cloud-check"></i> Controls and approvals</span>
                       </div>
                     </div>
-                    <a class="btn btn-outline-light" href="/rooms.html">Open a room</a>
+                    <a class="btn btn-outline-light" href="#collaboration-suite" data-scroll-target>Tour the room</a>
                   </div>
                 </div>
               </div>
@@ -104,209 +117,38 @@
   </header>
 
   <main>
-    <section class="container py-5" id="platforms">
-      <div class="text-center mb-5" data-aos="fade-up">
-        <span class="eyebrow">Platform overview</span>
-        <h2 class="fw-bold">One platform, three pillars, built for both sides</h2>
-        <p class="text-fg-3">ValueSphere and RevenueForge for vendors, ProcurePath for buyers, all connected by Engagement Rooms and AI copilots.</p>
-      </div>
-      <div class="row g-4">
-        <div class="col-md-4" data-aos="zoom-in">
-          <div class="card glass h-100">
-            <div class="card-body">
-              <div class="d-flex align-items-center gap-2 mb-2 text-brand"><i class="bi bi-briefcase"></i><span>Vendor Suite</span></div>
-              <h5 class="mb-3">ValueSphere + RevenueForge</h5>
-              <ul class="text-fg-2 small mb-0">
-                <li>Strategic value consulting and ROI blueprints.</li>
-                <li>Deal rooms with AI intelligence and coaching.</li>
-                <li>Lifecycle design tuned to every commercial motion.</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-4" data-aos="zoom-in" data-aos-delay="50">
-          <div class="card glass h-100">
-            <div class="card-body">
-              <div class="d-flex align-items-center gap-2 mb-2 text-brand"><i class="bi bi-diagram-3"></i><span>Buyer Suite</span></div>
-              <h5 class="mb-3">ProcurePath</h5>
-              <ul class="text-fg-2 small mb-0">
-                <li>Vendor graph with contracts, spend, and risk signals.</li>
-                <li>Negotiation guidance rooted in benchmarks.</li>
-                <li>Renewal and compliance command center.</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-4" data-aos="zoom-in" data-aos-delay="100">
-          <div class="card glass h-100">
-            <div class="card-body">
-              <div class="d-flex align-items-center gap-2 mb-2 text-brand"><i class="bi bi-people"></i><span>Engagement Rooms &amp; AI</span></div>
-              <h5 class="mb-3">Collaboration cockpit</h5>
-              <ul class="text-fg-2 small mb-0">
-                <li>Shared rooms for vendors, buyers, and guests.</li>
-                <li>Project board, documents, deliverables, and messages.</li>
-                <li>AI copilots that brief both sides in their language.</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="landingVendorSection">
-      <div id="seller-suite" class="anchor-target" aria-hidden="true"></div>
-      <section class="bg-surface py-5" id="vendor">
-        <div class="container">
-          <div class="row g-4 align-items-center mb-4">
-            <div class="col-lg-7" data-aos="fade-right">
-              <span class="eyebrow">Vendor Suite</span>
-              <h2 class="fw-bold">ValueSphere + RevenueForge for revenue leaders</h2>
-              <p class="text-fg-3">Guide CROs, value consultants, and account teams with playbooks that standardise discovery, sharpen pricing strategy, and prove value without slowing the deal.</p>
-            </div>
-            <div class="col-lg-5 text-lg-end d-flex gap-3 justify-content-lg-end flex-wrap" data-aos="fade-left">
-              <a class="btn btn-primary" href="/valuesphere.html">Explore ValueSphere</a>
-              <a class="btn btn-outline-light" href="/revenueforge.html">Tour RevenueForge</a>
-            </div>
-          </div>
-          <div class="row g-4">
-            <div class="col-md-6" data-aos="zoom-in">
-              <div class="card glass h-100">
-                <div class="card-body">
-                  <h5 class="mb-3">ValueSphere Navigator</h5>
-                  <p class="text-fg-3">Value consulting workspace for exec-ready ROI narratives and stakeholder alignment.</p>
-                  <ul class="text-fg-2 small mb-0">
-                    <li>Shorten discovery cycles with guided diagnostics.</li>
-                    <li>Standardise value narratives for every persona.</li>
-                    <li>Boards and documents that stay linked to Engagement Rooms.</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-6" data-aos="zoom-in" data-aos-delay="50">
-              <div class="card glass h-100">
-                <div class="card-body">
-                  <h5 class="mb-3">RevenueForge Lifecycle</h5>
-                  <p class="text-fg-3">AI revenue studio to design lifecycle stages, coach deals, and automate follow-up.</p>
-                  <ul class="text-fg-2 small mb-0">
-                    <li>Deal intelligence to unstick pricing and risk conversations.</li>
-                    <li>AI-supported meeting prep and follow-up with next best actions.</li>
-                    <li>Engagement dossiers that sync with project boards and documents.</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-    </section>
-
-    <section id="landingBuyerSection">
-      <div id="buyer-suite" class="anchor-target" aria-hidden="true"></div>
-      <section class="container py-5" id="buyer">
-        <div class="row g-4 align-items-center mb-4">
-          <div class="col-lg-7" data-aos="fade-right">
-            <span class="eyebrow">Buyer Suite</span>
-            <h2 class="fw-bold">ProcurePath for procurement, finance, legal, and security</h2>
-            <p class="text-fg-3">Give sourcing and risk teams a shared inventory of vendors, contracts, benchmarks, and renewal posture, connected directly into Engagement Rooms.</p>
-          </div>
-          <div class="col-lg-5 text-lg-end d-flex gap-3 justify-content-lg-end flex-wrap" data-aos="fade-left">
-            <a class="btn btn-primary" href="/procurepath.html">Discover ProcurePath</a>
-            <a class="btn btn-outline-light" href="/api/auth/workos/signup">Start a buyer workspace</a>
-          </div>
-        </div>
-        <div class="row g-4">
-          <div class="col-md-6" data-aos="zoom-in">
-            <div class="card glass h-100">
-              <div class="card-body">
-                <h5 class="mb-3">Vendor graph &amp; contracts</h5>
-                <p class="text-fg-3">Centralised view of every vendor with contract lifecycle, obligations, and spend.</p>
-                <ul class="text-fg-2 small mb-0">
-                  <li>Single inventory across legal, finance, and security.</li>
-                  <li>Benchmarked negotiation guidance surfaced in context.</li>
-                  <li>Link contracts directly to Engagement Rooms and issues.</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-6" data-aos="zoom-in" data-aos-delay="50">
-            <div class="card glass h-100">
-              <div class="card-body">
-                <h5 class="mb-3">Risk, compliance, renewals</h5>
-                <p class="text-fg-3">Command center for renewals, risk scoring, and stakeholder updates.</p>
-                <ul class="text-fg-2 small mb-0">
-                  <li>Continuous risk monitoring with renewal countdowns.</li>
-                  <li>AI-ready posture that combines issues, files, and milestones.</li>
-                  <li>Renewal command center feeding shared status reports.</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-    </section>
-
-    <div id="collaboration-suite" class="anchor-target" aria-hidden="true"></div>
-    <section class="bg-surface py-5" id="rooms">
+    <section class="platform-section" id="problem">
       <div class="container">
-        <div class="row g-5 align-items-center">
-          <div class="col-lg-6" data-aos="fade-right">
-            <span class="eyebrow">Engagement Rooms</span>
-            <h2 class="fw-bold">Collaboration cockpit for vendors, buyers, and guests</h2>
-            <p class="text-fg-3">Rooms bring messaging, project boards, documents, deliverables, and AI copilots into one glass workspace. Every participant stays aligned without losing governance.</p>
-            <ul class="text-fg-2 small mb-4">
-              <li>Messages with AI summaries for executives and sponsors.</li>
-              <li>Project board with statuses, assignees, and due dates.</li>
-              <li>Documents with AI validation for contracts, SoWs, and designs.</li>
-              <li>Deliverables &amp; milestones tied to renewal and expansion goals.</li>
-              <li>Guest collaboration with scoped permissions and auditability.</li>
-            </ul>
-            <div class="d-flex gap-3 flex-wrap">
-              <a class="btn btn-primary" href="/rooms.html">Open Engagement Rooms</a>
-              <a class="btn btn-outline-light" href="/workspace.html">Go to workspace</a>
+        <div class="row g-4 align-items-center">
+          <div class="col-lg-5" data-aos="fade-right">
+            <div class="glass panel-elevated h-100 p-4">
+              <div class="eyebrow">Before Agama</div>
+              <h3 class="fw-bold mb-3">Fragmented tools, fragmented outcomes</h3>
+              <p class="text-fg-3">Vendors, buyers, and consultants work in different tools. Messages drift, documents fork, and no one sees the same value story.</p>
+              <ul class="text-fg-2 small list-unstyled mb-0">
+                <li class="d-flex align-items-start gap-2"><i class="bi bi-exclamation-triangle text-warning"></i><span>Communication scattered across email, chat, and decks.</span></li>
+                <li class="d-flex align-items-start gap-2"><i class="bi bi-slash-circle text-danger"></i><span>No mutual plan or timeline everyone trusts.</span></li>
+                <li class="d-flex align-items-start gap-2"><i class="bi bi-question-diamond text-primary"></i><span>Value tracking disappears after signature.</span></li>
+              </ul>
             </div>
           </div>
-          <div class="col-lg-6" data-aos="fade-left">
-            <div class="card glass p-4">
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <span class="badge-pill text-fg-2"><i class="bi bi-kanban"></i> Room board</span>
-                <span class="text-fg-2 small">Shared by vendor &amp; buyer</span>
-              </div>
+          <div class="col-lg-7" data-aos="fade-left">
+            <div class="glass panel-elevated h-100 p-4">
+              <div class="eyebrow">With Agama</div>
+              <h3 class="fw-bold mb-3">A single Agama space for vendors, buyers, and guests</h3>
+              <p class="text-fg-3">Everyone works in the same Engagement Room with suites tuned to their role. The value story, decisions, and governance live together.</p>
               <div class="row g-3">
-                <div class="col-sm-6">
-                  <div class="card glass h-100" data-aos="zoom-in" data-aos-delay="50">
-                    <div class="card-body">
-                      <div class="d-flex align-items-center gap-2 text-brand mb-2"><i class="bi bi-chat-dots"></i><span>Messages</span></div>
-                      <p class="text-fg-3 small mb-2">Threaded updates, mentions, and AI summaries for stakeholders.</p>
-                      <span class="badge bg-primary-subtle text-fg-2">Auto briefings</span>
-                    </div>
-                  </div>
+                <div class="col-md-4">
+                  <div class="mini-badge suite-pill-collab">Shared timeline</div>
+                  <p class="small text-fg-2 mb-0">Milestones, owners, and due dates visible to both sides.</p>
                 </div>
-                <div class="col-sm-6">
-                  <div class="card glass h-100" data-aos="zoom-in" data-aos-delay="100">
-                    <div class="card-body">
-                      <div class="d-flex align-items-center gap-2 text-brand mb-2"><i class="bi bi-table"></i><span>Project board</span></div>
-                      <p class="text-fg-3 small mb-2">Issues with statuses, owners, due dates, and links to deliverables.</p>
-                      <span class="badge bg-primary-subtle text-fg-2">Room-aligned</span>
-                    </div>
-                  </div>
+                <div class="col-md-4">
+                  <div class="mini-badge suite-pill-seller">Deal intelligence</div>
+                  <p class="small text-fg-2 mb-0">Signals on momentum, risk, and executive readiness.</p>
                 </div>
-                <div class="col-sm-6">
-                  <div class="card glass h-100" data-aos="zoom-in" data-aos-delay="150">
-                    <div class="card-body">
-                      <div class="d-flex align-items-center gap-2 text-brand mb-2"><i class="bi bi-file-earmark-check"></i><span>Documents</span></div>
-                      <p class="text-fg-3 small mb-2">Versioned files with comments plus AI validation for contracts and SoWs.</p>
-                      <span class="badge bg-primary-subtle text-fg-2">AI validation</span>
-                    </div>
-                  </div>
-                </div>
-                <div class="col-sm-6">
-                  <div class="card glass h-100" data-aos="zoom-in" data-aos-delay="200">
-                    <div class="card-body">
-                      <div class="d-flex align-items-center gap-2 text-brand mb-2"><i class="bi bi-flag"></i><span>Deliverables</span></div>
-                      <p class="text-fg-3 small mb-2">Milestones with owners and status powering renewal readiness.</p>
-                      <span class="badge bg-primary-subtle text-fg-2">Milestone-ready</span>
-                    </div>
-                  </div>
+                <div class="col-md-4">
+                  <div class="mini-badge suite-pill-buyer">Procurement control</div>
+                  <p class="small text-fg-2 mb-0">Issues, reviews, and approvals managed with context.</p>
                 </div>
               </div>
             </div>
@@ -315,87 +157,256 @@
       </div>
     </section>
 
-    <section class="container py-5" id="ai">
-      <div class="text-center mb-5" data-aos="fade-up">
-        <span class="eyebrow">AI &amp; Copilots</span>
-        <h2 class="fw-bold">Copilots that speak vendor and buyer context</h2>
-        <p class="text-fg-3">Room-aware AI that drafts briefs, grooms issues, validates contracts, and delivers status reports for every stakeholder.</p>
-      </div>
-      <div class="row g-4">
-        <div class="col-md-3" data-aos="zoom-in">
-          <div class="card glass h-100">
-            <div class="card-body">
-              <div class="d-flex align-items-center gap-2 text-brand mb-2"><i class="bi bi-journal-text"></i><span>Room summary</span></div>
-              <p class="text-fg-3 small">Executive-ready summaries of messages, files, issues, and milestones.</p>
+    <section class="platform-section bg-surface" id="collaboration-suite">
+      <div class="container">
+        <div class="row g-5 align-items-start">
+          <div class="col-xl-5" data-aos="fade-right">
+            <div class="sticky-card glass panel-elevated h-100 p-4 border-collab">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="suite-pill suite-pill-collab">Collaboration</span>
+                <span class="badge bg-transparent text-fg-2 border border-soft">Sunset orange</span>
+              </div>
+              <h2 class="fw-bold">Collaboration Suite</h2>
+              <p class="text-fg-3">The Engagement Room anchors every commercial moment. Content, milestones, and approvals stay linked and permissioned.</p>
+              <div class="glass p-3 rounded-4 mt-3">
+                <div class="d-flex align-items-center gap-2 text-fg-2 mb-2"><i class="bi bi-kanban"></i><span>Shared timeline</span></div>
+                <div class="d-flex align-items-center gap-2 text-fg-2 mb-2"><i class="bi bi-people"></i><span>Stakeholder mapping</span></div>
+                <div class="d-flex align-items-center gap-2 text-fg-2"><i class="bi bi-graph-up-arrow"></i><span>Value tracker</span></div>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="col-md-3" data-aos="zoom-in" data-aos-delay="50">
-          <div class="card glass h-100">
-            <div class="card-body">
-              <div class="d-flex align-items-center gap-2 text-brand mb-2"><i class="bi bi-clipboard-data"></i><span>Status reports</span></div>
-              <p class="text-fg-3 small">Role-specific status recaps and renewal posture for vendor and buyer sponsors.</p>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-3" data-aos="zoom-in" data-aos-delay="100">
-          <div class="card glass h-100">
-            <div class="card-body">
-              <div class="d-flex align-items-center gap-2 text-brand mb-2"><i class="bi bi-list-check"></i><span>Issue grooming</span></div>
-              <p class="text-fg-3 small">AI triage for project boards: statuses, assignees, risks, and next actions.</p>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-3" data-aos="zoom-in" data-aos-delay="150">
-          <div class="card glass h-100">
-            <div class="card-body">
-              <div class="d-flex align-items-center gap-2 text-brand mb-2"><i class="bi bi-file-earmark-richtext"></i><span>Contract &amp; SOW validation</span></div>
-              <p class="text-fg-3 small">Check clauses, map obligations to issues, and surface negotiation playbooks.</p>
+          <div class="col-xl-7" data-aos="fade-left">
+            <div class="stacked-steps">
+              <div class="step-card glass">
+                <div class="step-badge suite-pill-collab">Before the deal</div>
+                <h4 class="mt-2">Mutual discovery, shared requirements, value hypotheses</h4>
+                <p class="text-fg-3">Map stakeholders, collect needs from both sides, and capture value hypotheses everyone can see. Agama keeps diagnostics, docs, and context aligned.</p>
+                <div class="step-callouts">
+                  <span class="callout">Mutual intake</span>
+                  <span class="callout">Value hypotheses</span>
+                  <span class="callout">Executive-ready briefs</span>
+                </div>
+              </div>
+              <div class="step-card glass">
+                <div class="step-badge suite-pill-collab">During the deal</div>
+                <h4 class="mt-2">Documents, milestones, and both-side stakeholders</h4>
+                <p class="text-fg-3">Engagement Room timelines show deliverables, approvals, and responsibilities. Documents stay versioned, and both sides get AI summaries in their language.</p>
+                <div class="step-callouts">
+                  <span class="callout">Mutual milestones</span>
+                  <span class="callout">Stakeholder mapping</span>
+                  <span class="callout">Document control</span>
+                </div>
+              </div>
+              <div class="step-card glass">
+                <div class="step-badge suite-pill-collab">After the deal</div>
+                <h4 class="mt-2">Renewals, ongoing value, and risk</h4>
+                <p class="text-fg-3">Post-signature rooms keep the value tracker, issues, and expansion plans alive. Renewals use the same room history—no relearning or digging through email.</p>
+                <div class="step-callouts">
+                  <span class="callout">Value tracker</span>
+                  <span class="callout">Renewal readiness</span>
+                  <span class="callout">Risk signals</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="bg-surface py-5" id="licenses">
+    <section class="platform-section" id="seller-suite">
       <div class="container">
-        <div class="row g-4 align-items-center">
-          <div class="col-lg-6" data-aos="fade-right">
-            <span class="eyebrow">Licensing &amp; access</span>
-            <h2 class="fw-bold">Full members and guests on one license-aware platform</h2>
-            <p class="text-fg-3">Start as a vendor or buyer. Invite guests to Engagement Rooms with scoped permissions while full users run RevenueForge, ValueSphere, and ProcurePath.</p>
-            <ul class="text-fg-2 small mb-0">
-              <li>Full access for teams that live in Salesforce, Splunk, Snowflake, and beyond.</li>
-              <li>Guest collaboration without exposing your full directory or billing.</li>
-              <li>Simple entry points for vendors and buyers with the same signup flow.</li>
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4" data-aos="fade-up">
+          <div>
+            <div class="eyebrow">Seller Suite</div>
+            <h2 class="fw-bold mb-2">Magenta energy for revenue teams</h2>
+            <p class="text-fg-3 mb-0">RevenueForge and ValueSphere for sellers, anchored by Engagement Rooms for every key account.</p>
+          </div>
+          <div class="text-end small text-fg-2">
+            <div class="fw-semibold">For Revenue Leaders</div>
+            <ul class="mb-0 ps-3">
+              <li>Forecast accuracy</li>
+              <li>Cycle time discipline</li>
+              <li>Win-rate lift</li>
             </ul>
           </div>
-          <div class="col-lg-6" data-aos="fade-left">
-            <div class="card glass p-4">
-              <h5 class="mb-3">Choose your entry point</h5>
-              <div class="d-flex gap-3 flex-wrap mb-3">
-                <a class="btn btn-primary" href="/api/auth/workos/signup">Start as a vendor</a>
-                <a class="btn btn-outline-light" href="/api/auth/workos/signup">Start as a buyer</a>
-                <a class="btn btn-outline-light" href="/api/auth/workos/login">Sign in</a>
+        </div>
+        <div class="card-carousel" data-aos="fade-up">
+          <div class="glow-card glass border-seller">
+            <div class="suite-pill suite-pill-seller">RevenueForge</div>
+            <h4 class="mt-2">Pipeline execution, instrumented.</h4>
+            <p class="text-fg-3">Design the revenue lifecycle, coach reps with AI signals, and ship follow-ups tied to Engagement Room milestones.</p>
+          </div>
+          <div class="glow-card glass border-seller">
+            <div class="suite-pill suite-pill-seller">ValueSphere – Seller</div>
+            <h4 class="mt-2">Quantified value, not vague ROI slides.</h4>
+            <p class="text-fg-3">Guided discovery produces quantified value blueprints you can defend with finance and procurement.</p>
+          </div>
+          <div class="glow-card glass border-seller">
+            <div class="suite-pill suite-pill-seller">Engagement Rooms</div>
+            <h4 class="mt-2">Every key account gets a home.</h4>
+            <p class="text-fg-3">Rooms connect content, stakeholders, and decisions to the value story the buyer signed up for.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="platform-section bg-surface" id="buyer-suite">
+      <div class="container">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4" data-aos="fade-up">
+          <div>
+            <div class="eyebrow">Buyer Suite</div>
+            <h2 class="fw-bold mb-2">Green clarity for procurement teams</h2>
+            <p class="text-fg-3 mb-0">ProcurePath and ValueSphere for buyers keep sourcing, finance, legal, and security aligned in the same room.</p>
+          </div>
+          <div class="text-end small text-fg-2">
+            <div class="fw-semibold">For Procurement &amp; Finance</div>
+            <ul class="mb-0 ps-3">
+              <li>Vendor comparability</li>
+              <li>Risk visibility</li>
+              <li>Audit-ready decisions</li>
+            </ul>
+          </div>
+        </div>
+        <div class="card-carousel" data-aos="fade-up">
+          <div class="glow-card glass border-buyer">
+            <div class="suite-pill suite-pill-buyer">ProcurePath</div>
+            <h4 class="mt-2">Your procurement control tower.</h4>
+            <p class="text-fg-3">Command center with issues, approvals, spend context, and renewal posture connected to each Engagement Room.</p>
+          </div>
+          <div class="glow-card glass border-buyer">
+            <div class="suite-pill suite-pill-buyer">ValueSphere – Buyer</div>
+            <h4 class="mt-2">Evidence-based vendor selection.</h4>
+            <p class="text-fg-3">Value scoring, risk, and benchmarking sit next to every proposal and deliverable.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="platform-section" id="intelligence-governance">
+      <div class="container">
+        <div class="row g-4 align-items-center">
+          <div class="col-lg-5" data-aos="fade-right">
+            <div class="eyebrow">Intelligence &amp; Governance</div>
+            <h2 class="fw-bold">Deal intelligence, risk signals, and control towers</h2>
+            <p class="text-fg-3">Dashboards show Engagement Health, Procurement Status, and Revenue signals in one glance. Governance is embedded, not bolted on.</p>
+            <ul class="text-fg-2 small list-unstyled">
+              <li class="d-flex align-items-start gap-2"><i class="bi bi-bar-chart-line text-brand"></i><span>Revenue &amp; Deal Intelligence</span></li>
+              <li class="d-flex align-items-start gap-2"><i class="bi bi-diagram-3 text-brand"></i><span>Procurement Control Tower</span></li>
+              <li class="d-flex align-items-start gap-2"><i class="bi bi-shield-lock text-brand"></i><span>Audit &amp; Governance by Design (RBAC, audit trails, AI context boundaries)</span></li>
+            </ul>
+          </div>
+          <div class="col-lg-7" data-aos="fade-left">
+            <div class="dashboard-mock glass panel-elevated p-4">
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <div class="mini-panel">
+                    <div class="mini-badge suite-pill-seller">Deal Intelligence</div>
+                    <p class="small text-fg-2 mb-0">Momentum, risks, and coaching suggestions.</p>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mini-panel">
+                    <div class="mini-badge suite-pill-buyer">Procurement Status</div>
+                    <p class="small text-fg-2 mb-0">Issues, reviews, and approvals with SLA timers.</p>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mini-panel">
+                    <div class="mini-badge suite-pill-collab">Engagement Health</div>
+                    <p class="small text-fg-2 mb-0">Stakeholder coverage and milestone completion.</p>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mini-panel">
+                    <div class="mini-badge suite-pill-consulting">Value Tracker</div>
+                    <p class="small text-fg-2 mb-0">Promised outcomes, realized value, renewal readiness.</p>
+                  </div>
+                </div>
               </div>
-              <p class="text-fg-3 small mb-0">One workspace, license-aware features, and Engagement Rooms ready for vendor, buyer, and guest collaboration.</p>
+              <div class="glass p-3 rounded-4">
+                <div class="d-flex align-items-center gap-2 mb-2 text-fg-2"><i class="bi bi-shield-check"></i><span>Governance</span></div>
+                <p class="small text-fg-3 mb-0">Role-based access, immutable audit logs, and AI context boundaries keep every action compliant and explainable.</p>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="container py-5" id="demo">
-      <div class="card glass p-4 p-md-5">
-        <div class="row g-4 align-items-center">
-          <div class="col-lg-8">
-            <span class="eyebrow">See Agama live</span>
-            <h2 class="fw-bold mb-2">Book a demo that covers vendor, buyer, and collaboration suites</h2>
-            <p class="text-fg-3 mb-0">Tell us your motion and we will tailor a walkthrough across ValueSphere, RevenueForge, ProcurePath, and shared Engagement Rooms.</p>
+    <section class="platform-section bg-surface" id="personas">
+      <div class="container">
+        <div class="d-flex flex-wrap gap-3 align-items-center justify-content-between mb-4" data-aos="fade-up">
+          <div>
+            <div class="eyebrow">Personas</div>
+            <h2 class="fw-bold">Built for leaders on both sides</h2>
           </div>
-          <div class="col-lg-4 text-lg-end d-flex flex-wrap gap-3 justify-content-lg-end">
-            <a class="btn btn-primary" href="mailto:hello@agamasuite.com?subject=Agama%20demo%20request">Email sales</a>
-            <a class="btn btn-outline-light" href="/api/auth/workos/signup">Start a workspace</a>
+          <div class="persona-pills" role="tablist">
+            <button class="persona-pill active" data-persona="cro">CRO / VP Sales</button>
+            <button class="persona-pill" data-persona="procurement">Head of Procurement</button>
+            <button class="persona-pill" data-persona="cfo">CFO</button>
+            <button class="persona-pill" data-persona="revops">RevOps</button>
+          </div>
+        </div>
+        <div class="glass panel-elevated p-4" data-aos="fade-up">
+          <div class="persona-panel active" data-persona-panel="cro">
+            <div class="text-fg-2 small">Before</div>
+            <p class="mb-2">Forecast swings, fragmented deal notes, and value stories trapped in slides.</p>
+            <div class="text-fg-2 small">After</div>
+            <p class="mb-0">Every opportunity runs in an Engagement Room with signals on risk, stakeholder coverage, and value proof—ready for board meetings.</p>
+          </div>
+          <div class="persona-panel" data-persona-panel="procurement">
+            <div class="text-fg-2 small">Before</div>
+            <p class="mb-2">Too many vendor threads, unclear ownership, and slow approvals.</p>
+            <div class="text-fg-2 small">After</div>
+            <p class="mb-0">ProcurePath centralizes issues, documents, and approvals with SLA visibility, so vendors and finance stay aligned.</p>
+          </div>
+          <div class="persona-panel" data-persona-panel="cfo">
+            <div class="text-fg-2 small">Before</div>
+            <p class="mb-2">Opaque spend, vague ROI promises, and risky renewals.</p>
+            <div class="text-fg-2 small">After</div>
+            <p class="mb-0">Value trackers and deal intelligence show realized outcomes, risk posture, and renewal scenarios—without chasing teams.</p>
+          </div>
+          <div class="persona-panel" data-persona-panel="revops">
+            <div class="text-fg-2 small">Before</div>
+            <p class="mb-2">Disconnected tools and manual hygiene across CRM, decks, and chat.</p>
+            <div class="text-fg-2 small">After</div>
+            <p class="mb-0">Engagement Rooms sync milestones, documents, and stakeholders to the GTM workflow—RevOps gets reliable data and governance.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="platform-section" id="trust">
+      <div class="container">
+        <div class="row g-4 align-items-center">
+          <div class="col-lg-5" data-aos="fade-right">
+            <div class="eyebrow">Trust &amp; Architecture</div>
+            <h2 class="fw-bold">Governed by design</h2>
+            <p class="text-fg-3">Security, identity, and audit are built-in so teams can collaborate confidently.</p>
+          </div>
+          <div class="col-lg-7" data-aos="fade-left">
+            <div class="badge-grid">
+              <span class="trust-badge">SSO / SAML</span>
+              <span class="trust-badge">RBAC</span>
+              <span class="trust-badge">Audit trails</span>
+              <span class="trust-badge">Data residency</span>
+              <span class="trust-badge">SOC2-ready</span>
+              <span class="trust-badge">AI context boundaries</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="platform-section bg-surface" id="demo">
+      <div class="container">
+        <div class="glass panel-elevated p-5 text-center" data-aos="zoom-in">
+          <div class="eyebrow">Next step</div>
+          <h2 class="fw-bold mb-3">Ready to run your next strategic cycle in Agama?</h2>
+          <p class="text-fg-3 mb-4">See how Engagement Rooms, RevenueForge, ValueSphere, and ProcurePath work together.</p>
+          <div class="d-flex gap-3 justify-content-center flex-wrap">
+            <a class="btn btn-primary btn-lg" href="/api/auth/workos/signup">Get a demo</a>
+            <a class="btn btn-outline-light btn-lg" href="/consulting">Talk to consulting</a>
           </div>
         </div>
       </div>
@@ -419,85 +430,57 @@
   <script src="/js/global-nav.js"></script>
   <script src="/js/main.js" type="module"></script>
   <script>
-    (function() {
-      const toggle = document.getElementById('landingSuiteToggle');
-      if (!toggle) return;
+    AOS.init({ once: true });
 
-      const body = document.body;
-      const vendorBtn = toggle.querySelector('[data-suite="vendor"]');
-      const buyerBtn = toggle.querySelector('[data-suite="buyer"]');
-      const vendorSection = document.getElementById('vendor');
-      const buyerSection = document.getElementById('buyer');
-      const buyerLinks = document.querySelectorAll('a[href="#buyer"]');
-      const vendorLinks = document.querySelectorAll('a[href="#vendor"]');
-
-      let currentSuite = 'vendor';
-      let themeTimeout;
-
-      function syncButtons(suite) {
-        if (suite === 'buyer') {
-          buyerBtn?.classList.add('active');
-          vendorBtn?.classList.remove('active');
-        } else {
-          vendorBtn?.classList.add('active');
-          buyerBtn?.classList.remove('active');
+    const scrollLinks = document.querySelectorAll('[data-scroll-target]');
+    scrollLinks.forEach((link) => {
+      link.addEventListener('click', (e) => {
+        const href = link.getAttribute('href');
+        if (href && href.startsWith('#')) {
+          e.preventDefault();
+          const target = document.querySelector(href);
+          if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-      }
-
-      function applyTheme(suite, { force = false } = {}) {
-        if (!force && currentSuite === suite) return;
-        currentSuite = suite;
-        body.classList.add('theme-transition');
-        body.setAttribute('data-theme', suite === 'buyer' ? 'buyer' : 'vendor');
-        syncButtons(suite);
-
-        clearTimeout(themeTimeout);
-        themeTimeout = setTimeout(() => body.classList.remove('theme-transition'), 650);
-      }
-
-      function setSuite(suite, { scrollIntoView = false } = {}) {
-        applyTheme(suite);
-        if (!scrollIntoView) return;
-
-        const target = suite === 'buyer' ? buyerSection : vendorSection;
-        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-
-      toggle.addEventListener('click', (e) => {
-        const btn = e.target.closest('[data-suite]');
-        if (!btn) return;
-        const suite = btn.getAttribute('data-suite');
-        setSuite(suite, { scrollIntoView: true });
       });
+    });
 
-      buyerLinks.forEach((link) => {
-        link.addEventListener('click', (e) => {
+    const subnavLinks = document.querySelectorAll('[data-subnav-target]');
+    const observedSections = Array.from(subnavLinks).map((link) => document.getElementById(link.dataset.subnavTarget)).filter(Boolean);
+
+    subnavLinks.forEach((link) => {
+      link.addEventListener('click', (e) => {
+        const targetId = link.dataset.subnavTarget;
+        const section = document.getElementById(targetId);
+        if (section) {
           e.preventDefault();
-          setSuite('buyer', { scrollIntoView: true });
+          section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        const id = entry.target.id;
+        subnavLinks.forEach((link) => {
+          const isActive = link.dataset.subnavTarget === id;
+          link.classList.toggle('active', isActive);
         });
       });
+    }, { threshold: 0.4 });
 
-      vendorLinks.forEach((link) => {
-        link.addEventListener('click', (e) => {
-          e.preventDefault();
-          setSuite('vendor', { scrollIntoView: true });
-        });
+    observedSections.forEach((section) => observer.observe(section));
+
+    const personaPills = document.querySelectorAll('.persona-pill');
+    const personaPanels = document.querySelectorAll('.persona-panel');
+
+    personaPills.forEach((pill) => {
+      pill.addEventListener('click', () => {
+        const target = pill.dataset.persona;
+        personaPills.forEach((p) => p.classList.toggle('active', p === pill));
+        personaPanels.forEach((panel) => panel.classList.toggle('active', panel.dataset.personaPanel === target));
       });
-
-      const observer = new IntersectionObserver((entries) => {
-        const visibleEntry = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-
-        if (!visibleEntry) return;
-        const suite = visibleEntry.target.id === 'buyer' ? 'buyer' : 'vendor';
-        applyTheme(suite);
-      }, { threshold: 0.4 });
-
-      [vendorSection, buyerSection].forEach((section) => section && observer.observe(section));
-
-      applyTheme('vendor', { force: true });
-    })();
+    });
   </script>
 </body>
 </html>
