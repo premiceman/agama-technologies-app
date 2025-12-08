@@ -11,35 +11,14 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css">
   <link rel="stylesheet" href="/css/styles.v2.css">
 </head>
-<body class="bg-body text-fg" data-theme="vendor">
+<body class="bg-body text-fg" data-theme="vendor" data-enable-global-nav="true">
   <div class="liquid-bg" aria-hidden="true">
     <div class="blob blob-blue"></div>
     <div class="blob blob-teal"></div>
     <div class="blob blob-magenta"></div>
   </div>
 
-  <nav class="navbar navbar-expand-lg sticky-top bg-glass border-bottom">
-    <div class="container">
-      <a class="navbar-brand d-flex align-items-center gap-2" href="/">
-        <span class="brand-dot"></span>
-        Agama <strong>Technologies</strong>
-      </a>
-      <button class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#nav"><span class="navbar-toggler-icon"></span></button>
-      <div class="collapse navbar-collapse" id="nav">
-        <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-3" id="navLinks">
-          <li class="nav-item"><a href="#hero" class="nav-link">Overview</a></li>
-          <li class="nav-item"><a href="#platforms" class="nav-link">Suites</a></li>
-          <li class="nav-item"><a href="#vendor" class="nav-link">Vendor Suite</a></li>
-          <li class="nav-item"><a href="#buyer" class="nav-link">Buyer Suite</a></li>
-          <li class="nav-item"><a href="#rooms" class="nav-link">Engagement Rooms</a></li>
-          <li class="nav-item"><a href="#ai" class="nav-link">AI</a></li>
-          <li class="nav-item"><a href="#licenses" class="nav-link">Licensing</a></li>
-          <li class="nav-item"><a href="/api/auth/workos/signup" class="btn btn-primary">Create account</a></li>
-          <li class="nav-item"><a href="/api/auth/workos/login" class="btn btn-outline-light">Client login</a></li>
-        </ul>
-      </div>
-    </div>
-  </nav>
+  <div id="globalNavMount"></div>
 
   <header class="hero container" id="hero">
     <div class="row align-items-center g-5 py-5">
@@ -175,6 +154,7 @@
     </section>
 
     <section id="landingVendorSection">
+      <div id="seller-suite" class="anchor-target" aria-hidden="true"></div>
       <section class="bg-surface py-5" id="vendor">
         <div class="container">
           <div class="row g-4 align-items-center mb-4">
@@ -221,6 +201,7 @@
     </section>
 
     <section id="landingBuyerSection">
+      <div id="buyer-suite" class="anchor-target" aria-hidden="true"></div>
       <section class="container py-5" id="buyer">
         <div class="row g-4 align-items-center mb-4">
           <div class="col-lg-7" data-aos="fade-right">
@@ -264,6 +245,7 @@
       </section>
     </section>
 
+    <div id="collaboration-suite" class="anchor-target" aria-hidden="true"></div>
     <section class="bg-surface py-5" id="rooms">
       <div class="container">
         <div class="row g-5 align-items-center">
@@ -402,6 +384,22 @@
         </div>
       </div>
     </section>
+
+    <section class="container py-5" id="demo">
+      <div class="card glass p-4 p-md-5">
+        <div class="row g-4 align-items-center">
+          <div class="col-lg-8">
+            <span class="eyebrow">See Agama live</span>
+            <h2 class="fw-bold mb-2">Book a demo that covers vendor, buyer, and collaboration suites</h2>
+            <p class="text-fg-3 mb-0">Tell us your motion and we will tailor a walkthrough across ValueSphere, RevenueForge, ProcurePath, and shared Engagement Rooms.</p>
+          </div>
+          <div class="col-lg-4 text-lg-end d-flex flex-wrap gap-3 justify-content-lg-end">
+            <a class="btn btn-primary" href="mailto:hello@agamasuite.com?subject=Agama%20demo%20request">Email sales</a>
+            <a class="btn btn-outline-light" href="/api/auth/workos/signup">Start a workspace</a>
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer class="border-top border-soft py-4">
@@ -418,6 +416,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+  <script src="/js/global-nav.js"></script>
   <script src="/js/main.js" type="module"></script>
   <script>
     (function() {
