@@ -103,6 +103,14 @@
             <span class="badge-soft" id="orgBadge">Org check</span>
           </div>
 
+          <button
+            id="refreshOrgStatus"
+            type="button"
+            class="btn btn-outline-secondary licensing-refresh-btn"
+          >
+            Refresh organisation status
+          </button>
+
           <div class="alert alert-warning d-none" id="orgManagedAlert">
             You’re already part of an organisation with managed licensing. Suite choices are locked by your admin—click Finish to continue.
           </div>
@@ -143,6 +151,47 @@
               </div>
             </div>
 
+            <section id="seatSelectionSection" class="licensing-block">
+              <h3 class="licensing-block-title">Seat allocation</h3>
+              <p class="licensing-block-subtitle">
+                Choose the number of seats for your organisation. Minimum 2 seats.
+              </p>
+
+              <div class="seat-controls">
+                <label for="seatSlider" class="seat-slider-label">
+                  Seats
+                </label>
+                <input
+                  type="range"
+                  id="seatSlider"
+                  min="2"
+                  max="250"
+                  value="2"
+                  class="seat-slider"
+                />
+
+                <div class="seat-input-row">
+                  <label for="seatInput" class="seat-input-label">Seats</label>
+                  <input
+                    id="seatInput"
+                    type="number"
+                    min="2"
+                    max="250"
+                    value="2"
+                    class="seat-input"
+                  />
+                </div>
+
+                <button
+                  id="contactSalesButton"
+                  type="button"
+                  class="btn btn-primary contact-sales-btn d-none"
+                >
+                  Contact Sales
+                </button>
+              </div>
+            </section>
+
             <div class="glass p-3 rounded-3 mb-3">
               <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div class="d-flex align-items-center gap-2">
@@ -161,18 +210,12 @@
                 <div class="card glass p-3 h-100">
                   <h5 class="h6 mb-2">Organisation details</h5>
                   <div class="mb-2">
-                    <label class="form-label" for="orgNameInput">Organisation name</label>
-                    <input class="form-control" id="orgNameInput" placeholder="e.g., Apex Labs" />
+                    <label class="form-label" for="orgName">Organisation name</label>
+                    <input class="form-control" id="orgName" placeholder="e.g., Apex Labs" />
                   </div>
-                  <div class="row g-2">
-                    <div class="col-6">
-                      <label class="form-label" for="orgSeatsInput">Seats needed</label>
-                      <input class="form-control" id="orgSeatsInput" type="number" min="1" value="10" />
-                    </div>
-                    <div class="col-6">
-                      <label class="form-label" for="orgDomainInput">Primary domain</label>
-                      <input class="form-control" id="orgDomainInput" placeholder="example.com" />
-                    </div>
+                  <div class="mb-2">
+                    <label class="form-label" for="orgDomain">Primary domain</label>
+                    <input class="form-control" id="orgDomain" placeholder="example.com" />
                   </div>
                   <div class="mt-2">
                     <small class="text-fg-3">We’ll create the org in WorkOS and MongoDB and make you the admin.</small>
@@ -216,12 +259,41 @@
                 </div>
               </div>
             </div>
+
+            <section id="licensingTotalsSection" class="licensing-block">
+              <h3 class="licensing-block-title">Totals</h3>
+              <div id="licensingTotals" class="licensing-totals-body">
+                <!-- Populated by JS -->
+              </div>
+            </section>
           </div>
 
           <div class="mt-3 d-flex justify-content-between align-items-center">
             <div class="small text-fg-3" id="orgLicenseFeedback">We’ll ask you to confirm org details before billing.</div>
-            <button class="btn btn-outline-light btn-sm" type="button" id="checkOrgLicense">Refresh org status</button>
           </div>
+
+          <section id="licensingConsentSection" class="licensing-block">
+            <div class="licensing-consent-row">
+              <label class="checkbox-row">
+                <input type="checkbox" id="termsAccepted" />
+                <span>
+                  I agree to the
+                  <a href="/legal/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+                  and
+                  <a href="/legal/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
+                </span>
+              </label>
+            </div>
+
+            <div class="licensing-consent-row">
+              <label class="checkbox-row">
+                <input type="checkbox" id="marketingOptIn" />
+                <span>
+                  I agree to receive product updates and marketing communications.
+                </span>
+              </label>
+            </div>
+          </section>
         </section>
       </div>
 
