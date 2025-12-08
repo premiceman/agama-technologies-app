@@ -516,7 +516,7 @@ a:hover{text-decoration:none;color:var(--accent);}
   gap: 1.5rem;
   align-items: stretch;
   min-height: 100vh;
-  padding: 2rem 2rem 2rem calc(var(--sidebar-expanded) + 2.5rem);
+  padding: 2rem 2rem 2rem calc(var(--sidebar-collapsed) + 2rem);
 }
 
 .app-sidebar {
