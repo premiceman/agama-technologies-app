@@ -6,7 +6,11 @@ class FakeWorkOS {
       authenticateWithCode: async () => FakeWorkOS.mockAuthResponse,
       getAuthorizationUrl: () => 'https://example.com/auth',
       getLogoutUrl: ({ sessionId, redirectUri }) =>
-        `https://example.com/logout/${sessionId || 'session'}?redirect=${encodeURIComponent(redirectUri || '')}`
+        `https://example.com/logout/${sessionId || 'session'}?redirect=${encodeURIComponent(redirectUri || '')}`,
+      createOrganizationMembership: async params => {
+        FakeWorkOS.lastOrganizationMembershipCreateInput = params;
+        return { id: `orgmem_${++FakeWorkOS.membershipCounter}` };
+      }
     };
     this.portal = {
       generateLink: async ({ organization }) => ({ link: `https://example.com/portal/${organization || 'org'}` })
@@ -36,8 +40,10 @@ class FakeWorkOS {
 FakeWorkOS.mockAuthResponse = {};
 FakeWorkOS.mockEvent = null;
 FakeWorkOS.lastOrganizationCreateInput = null;
+FakeWorkOS.lastOrganizationMembershipCreateInput = null;
 FakeWorkOS.nextOrganizationId = null;
 FakeWorkOS.organizationCounter = 0;
+FakeWorkOS.membershipCounter = 0;
 
 function installWorkOSStub() {
   require.cache[modulePath] = {

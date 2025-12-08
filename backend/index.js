@@ -651,13 +651,24 @@ async function createOrgForOnboarding({ user, suiteSelection = {}, orgDraft = {}
   const buyerSeatLimit = orgDraft.buyerSeatLimit || orgDraft.buyerSeats || seatLimit;
   const roomsSeatLimit = orgDraft.roomsSeatLimit || sellerSeatLimit;
 
+  const requireWorkOSOrg = Boolean(workosClient);
   let workosOrganizationId = orgDraft.workosOrganizationId || null;
-  if (!workosOrganizationId) {
-    try {
-      workosOrganizationId = await ensureWorkOSOrganization({ name, domains });
-    } catch (err) {
-      console.error('Failed to create WorkOS organization during onboarding', err);
-    }
+  if (!workosOrganizationId || requireWorkOSOrg) {
+    workosOrganizationId = await ensureWorkOSOrganization({
+      name,
+      domains,
+      existingWorkOSId: workosOrganizationId,
+      requireWorkOS: requireWorkOSOrg
+    });
+  }
+
+  if (workosOrganizationId && requireWorkOSOrg) {
+    await ensureWorkOSOrganizationMembership({
+      organizationId: workosOrganizationId,
+      user,
+      roleSlug: 'owner',
+      requireWorkOS: true
+    });
   }
 
   const organizationPayload = {
@@ -1298,8 +1309,16 @@ function normaliseProductAccess(requested) {
   return selections.filter(id => PLATFORM_IDS.has(id));
 }
 
-async function ensureWorkOSOrganization({ name, domains = [], existingWorkOSId = null }) {
-  if (!workosClient) return existingWorkOSId || null;
+async function ensureWorkOSOrganization({
+  name,
+  domains = [],
+  existingWorkOSId = null,
+  requireWorkOS = false
+}) {
+  if (!workosClient) {
+    if (requireWorkOS) throw new Error('WORKOS_NOT_CONFIGURED');
+    return existingWorkOSId || null;
+  }
 
   if (existingWorkOSId) {
     // Optionally we could verify it exists, but for now just trust the ID
@@ -1317,7 +1336,50 @@ async function ensureWorkOSOrganization({ name, domains = [], existingWorkOSId =
     domains: domainObjects.length === 0 ? domains : undefined
   });
 
+  if (!workosOrg?.id) {
+    if (requireWorkOS) throw new Error('WORKOS_ORG_CREATE_FAILED');
+    return null;
+  }
+
   return workosOrg.id;
+}
+
+async function ensureWorkOSOrganizationMembership({
+  organizationId,
+  user,
+  roleSlug = 'owner',
+  requireWorkOS = false
+}) {
+  if (!organizationId) {
+    if (requireWorkOS) throw new Error('WORKOS_ORG_ID_REQUIRED');
+    return null;
+  }
+
+  if (!workosClient) {
+    if (requireWorkOS) throw new Error('WORKOS_NOT_CONFIGURED');
+    return null;
+  }
+
+  const workosUserId = user?.workosUserId;
+  if (!workosUserId) {
+    if (requireWorkOS) throw new Error('WORKOS_USER_ID_REQUIRED');
+    return null;
+  }
+
+  try {
+    await workosClient.userManagement.createOrganizationMembership({
+      organization: organizationId,
+      user: workosUserId,
+      roleSlug
+    });
+  } catch (err) {
+    console.error('Failed to create WorkOS organization membership', {
+      organizationId,
+      workosUserId,
+      error: err?.message || err
+    });
+    if (requireWorkOS) throw err;
+  }
 }
 
 const signupSchema = z.object({
