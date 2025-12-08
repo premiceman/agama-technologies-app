@@ -399,6 +399,30 @@ function setOrgManagedUI(managed, organization) {
   updateSuiteButtons();
 }
 
+function renderOrgStatus(orgWrapper) {
+  // orgWrapper is the full /api/org/current payload or null
+  const statusEl = document.getElementById('orgStatusMessage');
+  if (!statusEl) return;
+
+  const org = orgWrapper && (orgWrapper.organization || orgWrapper.org || orgWrapper);
+
+  if (!org) {
+    statusEl.textContent =
+      "We can't find any associated organisations for your account. You can create a new organisation below.";
+    return;
+  }
+
+  const name = org.name || 'Unnamed organisation';
+  const tier = org.tier || org.licenceTier || org.licenseTier;
+  const managedByAdmin = tier === 'business' || tier === 'enterprise';
+
+  if (managedByAdmin) {
+    statusEl.textContent = `Organisation found: ${name}. Your licence is managed by your organisation admin.`;
+  } else {
+    statusEl.textContent = `Organisation found: ${name}. Licences will be managed from this page.`;
+  }
+}
+
 function hydrateForms() {
   const orgName = document.getElementById('orgName');
   if (orgName && onboardingState.orgDraft.name) orgName.value = onboardingState.orgDraft.name;
@@ -458,20 +482,29 @@ async function loadContext() {
     updateFinishButtonState();
 
     const orgRes = await fetch('/api/org/current', { credentials: 'include' });
-    if (orgRes.ok) {
-      const orgJson = await orgRes.json();
-      onboardingState.organization = orgJson.organization;
-      const managed = orgJson.organization && orgJson.organization.tier === 'business';
-      if (managed) {
-        onboardingState.suiteSelection = {
-          sellerSuite: Boolean(orgJson.organization?.sellerSuiteEnabled),
-          buyerSuite: Boolean(orgJson.organization?.buyerSuiteEnabled)
-        };
-      }
-      setOrgManagedUI(managed, orgJson.organization);
+    let orgJson = null;
+    if (orgRes.status === 304) {
+      orgJson = onboardingState.organization || null;
+    } else if (orgRes.ok) {
+      orgJson = await orgRes.json();
+    }
+
+    onboardingState.organization = orgJson || null;
+    const managed = orgJson?.organization && orgJson.organization.tier === 'business';
+    if (managed) {
+      onboardingState.suiteSelection = {
+        sellerSuite: Boolean(orgJson.organization?.sellerSuiteEnabled),
+        buyerSuite: Boolean(orgJson.organization?.buyerSuiteEnabled)
+      };
+    }
+
+    if (orgJson) {
+      setOrgManagedUI(Boolean(managed), orgJson.organization);
     } else {
       setOrgManagedUI(false, null);
     }
+
+    renderOrgStatus(orgJson || null);
 
     if (onboardingJson.onboarding?.status === 'completed' && !new URLSearchParams(window.location.search).has('force')) {
       window.location.href = '/workspace.html';
@@ -555,9 +588,10 @@ async function handleNextStep() {
       }
     };
   } else if (onboardingState.organization) {
+    const org = onboardingState.organization.organization || onboardingState.organization;
     payload.suiteSelection = {
-      sellerSuite: Boolean(onboardingState.organization.sellerSuiteEnabled),
-      buyerSuite: Boolean(onboardingState.organization.buyerSuiteEnabled)
+      sellerSuite: Boolean(org.sellerSuiteEnabled),
+      buyerSuite: Boolean(org.buyerSuiteEnabled)
     };
   }
 
@@ -641,19 +675,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (refreshOrgStatusBtn) {
     refreshOrgStatusBtn.addEventListener('click', () => {
-      fetch('/api/org/current', { credentials: 'include' })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((org) => {
-          if (org) {
-            onboardingState.organization = org;
-            const managed = org.organization && org.organization.tier === 'business';
-            setOrgManagedUI(managed, org.organization);
+      fetch(`/api/org/current?ts=${Date.now()}`, {
+        credentials: 'include',
+        cache: 'no-store'
+      })
+        .then(async (res) => {
+          // 304 = not modified → reuse whatever we already have
+          if (res.status === 304) {
+            return onboardingState.organization || null;
           }
+          if (res.status === 404) {
+            return null;
+          }
+          if (!res.ok) {
+            return null;
+          }
+          try {
+            return await res.json();
+          } catch (e) {
+            return null;
+          }
+        })
+        .then((orgWrapper) => {
+          // Normalise + store
+          onboardingState.organization = orgWrapper || null;
+
+          // Update any "managed org" UI if you have it
+          if (orgWrapper && orgWrapper.organization && typeof setOrgManagedUI === 'function') {
+            const managed = orgWrapper.organization.tier === 'business';
+            setOrgManagedUI(managed, orgWrapper.organization);
+          } else if (typeof setOrgManagedUI === 'function') {
+            setOrgManagedUI(false, null);
+          }
+
+          // Always update the status message
+          renderOrgStatus(orgWrapper);
+
           updatePriceSummary();
           updateFinishButtonState();
         })
         .catch(() => {
-          // fail silently, UI is still usable
+          // On error, show a clear message instead of failing silently.
+          renderOrgStatus(null);
         });
     });
   }
