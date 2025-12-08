@@ -653,22 +653,33 @@ async function createOrgForOnboarding({ user, suiteSelection = {}, orgDraft = {}
 
   const requireWorkOSOrg = Boolean(workosClient);
   let workosOrganizationId = orgDraft.workosOrganizationId || null;
-  if (!workosOrganizationId || requireWorkOSOrg) {
-    workosOrganizationId = await ensureWorkOSOrganization({
-      name,
-      domains,
-      existingWorkOSId: workosOrganizationId,
-      requireWorkOS: requireWorkOSOrg
-    });
-  }
 
-  if (workosOrganizationId && requireWorkOSOrg) {
-    await ensureWorkOSOrganizationMembership({
-      organizationId: workosOrganizationId,
-      user,
-      roleSlug: 'owner',
-      requireWorkOS: true
-    });
+  if (requireWorkOSOrg) {
+    try {
+      workosOrganizationId = await ensureWorkOSOrganization({
+        name,
+        domains,
+        existingWorkOSId: workosOrganizationId,
+        requireWorkOS: true
+      });
+
+      if (workosOrganizationId) {
+        await ensureWorkOSOrganizationMembership({
+          organizationId: workosOrganizationId,
+          user,
+          roleSlug: 'owner',
+          requireWorkOS: true
+        });
+      }
+    } catch (err) {
+      console.error('Onboarding WorkOS organization provisioning failed', {
+        error: err?.message,
+        name,
+        domains
+      });
+      // When WorkOS is configured, we should not create a local-only org
+      throw err;
+    }
   }
 
   const organizationPayload = {
@@ -706,9 +717,8 @@ async function createOrgForOnboarding({ user, suiteSelection = {}, orgDraft = {}
     buyerSuiteEnabled: Boolean(suiteSelection.buyerSuite)
   });
 
-  if (!user.defaultOrganization) {
-    user.defaultOrganization = organization._id;
-  }
+  // 🔧 Always route the user into the org they just created
+  user.defaultOrganization = organization._id;
 
   return { organization, membership };
 }
@@ -1325,23 +1335,49 @@ async function ensureWorkOSOrganization({
     return existingWorkOSId;
   }
 
-  const domainObjects = (domains || [])
-    .filter(Boolean)
-    .map(domain => ({ domain, state: 'verified' }));
+  const trimmedName = (name || '').trim() || 'Agama Workspace';
+  const domainList = (domains || []).map(d => d.toLowerCase());
 
-  const workosOrg = await workosClient.organizations.createOrganization({
-    name,
-    // Use domainData if available in current SDK; fallback to domains otherwise.
-    domainData: domainObjects.length > 0 ? domainObjects : undefined,
-    domains: domainObjects.length === 0 ? domains : undefined
-  });
-
-  if (!workosOrg?.id) {
-    if (requireWorkOS) throw new Error('WORKOS_ORG_CREATE_FAILED');
-    return null;
+  // Try to find an existing WorkOS org by domain
+  let matchedOrg = null;
+  if (domainList.length > 0) {
+    const list = await workosClient.organizations.listOrganizations({ limit: 100 });
+    for (const org of list.data || []) {
+      const orgDomains = (org.domains || [])
+        .map(d => d.domain?.toLowerCase?.() || d.toLowerCase?.() || '')
+        .filter(Boolean);
+      if (orgDomains.some(d => domainList.includes(d))) {
+        matchedOrg = org;
+        break;
+      }
+    }
   }
 
-  return workosOrg.id;
+  if (matchedOrg) {
+    // Optionally align name with the friendly onboarding name
+    if (trimmedName && matchedOrg.name !== trimmedName) {
+      try {
+        matchedOrg = await workosClient.organizations.updateOrganization({
+          organization: matchedOrg.id,
+          name: trimmedName
+        });
+      } catch (err) {
+        console.warn('Failed to update WorkOS org name', {
+          id: matchedOrg.id,
+          error: err?.message
+        });
+      }
+    }
+    return matchedOrg.id;
+  }
+
+  // Create a new WorkOS organization
+  const newOrg = await workosClient.organizations.createOrganization({
+    name: trimmedName,
+    domains: domainList
+  });
+
+  return newOrg.id;
 }
 
 async function ensureWorkOSOrganizationMembership({
@@ -1448,9 +1484,12 @@ const onboardingSchema = z.object({
     .optional(),
   suiteSelection: z
     .object({
-      vendorSuite: z.boolean().optional(),
-      buyerSuite: z.boolean().optional()
+      // Frontend uses sellerSuite; backend expects vendorSuite
+      sellerSuite: z.boolean().optional(),
+      buyerSuite: z.boolean().optional(),
+      vendorSuite: z.boolean().optional()
     })
+    .partial()
     .optional(),
   organizationDraft: z
     .object({
@@ -3108,6 +3147,16 @@ app.post('/api/onboarding', requireAuth, validateBody(onboardingSchema), async (
 
     const payload = req.validatedBody;
     const nextResponses = { ...(user.onboardingResponses || {}) };
+
+    // 🔧 Normalise suite selection across payload and previous state
+    const rawSuiteSelection = payload.suiteSelection || nextResponses.suiteSelection || {};
+
+    const canonicalSuiteSelection = {
+      vendorSuite: Boolean(rawSuiteSelection.vendorSuite ?? rawSuiteSelection.sellerSuite),
+      buyerSuite: Boolean(rawSuiteSelection.buyerSuite)
+    };
+
+    nextResponses.suiteSelection = canonicalSuiteSelection;
     [
       'persona',
       'usage',
@@ -3118,7 +3167,6 @@ app.post('/api/onboarding', requireAuth, validateBody(onboardingSchema), async (
       'recommendation',
       'licenseSelection',
       'billingDetails',
-      'suiteSelection',
       'organizationDraft'
     ].forEach(
       key => {
@@ -3132,7 +3180,7 @@ app.post('/api/onboarding', requireAuth, validateBody(onboardingSchema), async (
       user.persona = payload.persona;
     }
 
-    const suiteSelection = payload.suiteSelection || nextResponses.suiteSelection || {};
+    const suiteSelection = nextResponses.suiteSelection || {};
     const finalize = payload.finalize === true || payload.status === 'completed';
 
     let isOrgManaged = Boolean(user.defaultOrganization);

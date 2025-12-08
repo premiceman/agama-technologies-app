@@ -14,7 +14,7 @@ const OrganizationMembershipSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ['active', 'invited', 'suspended', 'removed'],
+      enum: ['active', 'invited', 'suspended', 'removed', 'inactive'],
       default: 'active'
     },
     roleOrigin: { type: String, enum: ['app', 'idp'], default: 'app' },

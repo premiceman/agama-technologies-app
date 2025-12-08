@@ -2,6 +2,20 @@ const User = require('../models/User');
 const Organization = require('../models/Organization');
 const OrganizationMembership = require('../models/OrganizationMembership');
 
+const ORG_ROLE_ORDER = ['guest', 'buyer_user', 'vendor_user', 'org_admin', 'org_owner'];
+
+function mapWorkOSRoleSlugToOrgRole(slug) {
+  const normalized = String(slug || '').toLowerCase();
+  if (normalized === 'owner') return 'org_owner';
+  if (normalized === 'admin') return 'org_admin';
+  // Default WorkOS "member" maps to vendor_user here; adjust if needed
+  return 'vendor_user';
+}
+
+function mapMembershipStatus(status) {
+  return status === 'inactive' ? 'inactive' : 'active';
+}
+
 async function generateUniqueOrgSlug(baseValue) {
   const baseSlug = String(baseValue || '')
     .toLowerCase()
@@ -164,25 +178,6 @@ async function syncWorkOSOrganization(workosOrg) {
   }
 }
 
-function mapWorkOSRoleSlugToOrgRole(slug) {
-  if (!slug) return 'vendor_user';
-  const normalised = String(slug).toLowerCase();
-  if (normalised === 'owner') return 'org_owner';
-  if (normalised === 'admin') return 'org_admin';
-  if (normalised === 'viewer') return 'guest';
-  if (normalised === 'buyer') return 'buyer_user';
-  return 'vendor_user';
-}
-
-function mapMembershipStatus(status) {
-  const normalised = String(status || '').toLowerCase();
-  if (normalised === 'inactive') return 'suspended';
-  if (normalised === 'pending') return 'invited';
-  if (normalised === 'active') return 'active';
-  if (normalised === 'removed') return 'removed';
-  return 'active';
-}
-
 async function syncWorkOSOrganizationMembership(workosMembership) {
   if (!workosMembership) return null;
 
@@ -218,16 +213,38 @@ async function syncWorkOSOrganizationMembership(workosMembership) {
     user: user._id
   });
 
+  const mappedRole = mapWorkOSRoleSlugToOrgRole(
+    workosMembership.role?.slug || workosMembership.role
+  );
+
   if (!membership) {
     membership = new OrganizationMembership({
       organization: organization._id,
-      user: user._id
+      user: user._id,
+      role: mappedRole,
+      status: mapMembershipStatus(workosMembership.status),
+      roleOrigin: 'idp'
     });
+  } else {
+    const currentRole = membership.role || 'guest';
+    const currentIndex = ORG_ROLE_ORDER.indexOf(currentRole);
+    const incomingIndex = ORG_ROLE_ORDER.indexOf(mappedRole);
+
+    const isAppOwnerOrAdmin =
+      membership.roleOrigin === 'app' &&
+      (membership.role === 'org_owner' || membership.role === 'org_admin');
+
+    const canOverwriteRole =
+      !isAppOwnerOrAdmin && incomingIndex >= currentIndex;
+
+    if (canOverwriteRole) {
+      membership.role = mappedRole;
+      membership.roleOrigin = 'idp';
+    }
+
+    membership.status = mapMembershipStatus(workosMembership.status);
   }
 
-  membership.role = mapWorkOSRoleSlugToOrgRole(workosMembership.role?.slug || workosMembership.role);
-  membership.status = mapMembershipStatus(workosMembership.status);
-  membership.roleOrigin = 'idp';
   if (membership.vendorSuiteEnabled === undefined) {
     membership.vendorSuiteEnabled = Boolean(organization.vendorSuiteEnabled);
   }
