@@ -1796,3 +1796,87 @@ small.text-fg { color: var(--fg) !important; }
 .search-result.muted {
   color: var(--fg-3);
 }
+
+.licensing-block {
+  margin-top: 1.5rem;
+}
+
+.licensing-block-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.licensing-block-subtitle {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.seat-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.seat-slider {
+  width: 100%;
+}
+
+.seat-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.seat-input {
+  max-width: 96px;
+}
+
+.contact-sales-btn {
+  align-self: flex-start;
+}
+
+.licensing-totals-body {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.licensing-total-line {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+.licensing-total-subline,
+.licensing-total-discount,
+.licensing-unified-hint,
+.licensing-totals-text {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+
+.licensing-total-discount .muted {
+  opacity: 0.7;
+}
+
+.licensing-unified-hint {
+  color: #a0ffcf;
+}
+
+.licensing-consent-row {
+  margin-top: 0.5rem;
+}
+
+.checkbox-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-size: 0.8rem;
+}
+
+.licensing-refresh-btn {
+  margin-bottom: 1rem;
+  align-self: flex-end;
+}
