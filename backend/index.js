@@ -7903,6 +7903,23 @@ app.post('/api/consulting/strategy-call', async (req, res) => {
 });
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
+const FRONTEND_DIR = path.join(__dirname, '..', 'frontend');
+
+// Fallback route: serve onboarding.js directly from the frontend source tree.
+// This ensures /js/onboarding.js works even if the build copy step doesn't.
+app.get('/js/onboarding.js', (req, res, next) => {
+  const filePath = path.join(FRONTEND_DIR, 'js', 'onboarding.js');
+  res.sendFile(filePath, err => {
+    if (err) {
+      console.error('Failed to serve /js/onboarding.js from frontend', {
+        error: err && err.message ? err.message : err
+      });
+      // Fall back to the normal static handler (which may 404 if the file truly doesn't exist)
+      next();
+    }
+  });
+});
+
 app.use(express.static(PUBLIC_DIR));
 
 app.get(['/consulting', '/consulting/'], (req, res) => {
