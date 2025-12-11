@@ -467,57 +467,30 @@ function decodeJwtPayload(token) {
 function computeEffectiveLicense(user, organizationContext) {
   if (!user) return { tier: 'guest', homeOrg: null };
 
-  if (organizationContext && organizationContext.role === 'guest') {
-    return { tier: 'guest', homeOrg: null };
-  }
-
-  if (user.isStaff || (organizationContext && organizationContext.role)) {
-    const { id, name, tier, orgType, role } = organizationContext || {};
-    const homeOrg = id ? { id, name, tier, orgType, role } : null;
-    return { tier: 'business', homeOrg };
-  }
-
-  return { tier: 'personal', homeOrg: null };
+  const { id, name, tier, orgType, role } = organizationContext || {};
+  const homeOrg = id ? { id, name, tier, orgType, role } : null;
+  return { tier: 'business', homeOrg };
 }
 
 function computeAccessState(user, organizationContext) {
-  // Staff can always access the app
-  if (user && user.isStaff) {
-    return 'active';
-  }
-
-  // Single source of truth for onboarding: user.onboardingStatus (fall back to org if needed)
-  const onboardingStatus =
-    (user && user.onboardingStatus) || (organizationContext && organizationContext.onboardingStatus);
-
-  if (onboardingStatus !== 'completed') {
-    return 'needs_onboarding';
-  }
-
-  // Once onboarding is completed, always treat access as active.
-  // Org existence and seat limits are handled elsewhere by feature-level checks.
+  if (!user) return 'needs_onboarding';
   return 'active';
 }
 
 function buildSuiteEntitlements(user, orgContext, membership) {
-  const isGuest = membership?.role === 'guest';
-
   const orgSuites = {
-    vendorSuiteEnabled: Boolean(orgContext?.vendorSuiteEnabled),
-    buyerSuiteEnabled: Boolean(orgContext?.buyerSuiteEnabled)
+    vendorSuiteEnabled: true,
+    buyerSuiteEnabled: true
   };
 
   const membershipSuites = {
-    vendorSuiteEnabled: Boolean(membership?.vendorSuiteEnabled),
-    buyerSuiteEnabled: Boolean(membership?.buyerSuiteEnabled)
+    vendorSuiteEnabled: membership ? Boolean(membership.vendorSuiteEnabled ?? true) : true,
+    buyerSuiteEnabled: membership ? Boolean(membership.buyerSuiteEnabled ?? true) : true
   };
 
-  const effectiveVendor = orgSuites.vendorSuiteEnabled && membershipSuites.vendorSuiteEnabled && !isGuest;
-  const effectiveBuyer = orgSuites.buyerSuiteEnabled && membershipSuites.buyerSuiteEnabled && !isGuest;
-
   const effective = {
-    vendorSuite: effectiveVendor,
-    buyerSuite: effectiveBuyer
+    vendorSuite: true,
+    buyerSuite: true
   };
 
   return {
@@ -1066,46 +1039,12 @@ function getPlatformEntitlement(user, organizationContext, platformId) {
   const effectiveLicense = computeEffectiveLicense(user, organizationContext);
 
   const membership = organizationContext?.membership;
-  const permissions = membership ? getEffectivePermissions(user, organizationContext, membership) : null;
+  const permissions = membership
+    ? getEffectivePermissions(user, organizationContext, membership)
+    : { vendorSuiteAccess: true, buyerSuiteAccess: true };
 
   if (!platform) {
     return { allowed: false, reason: 'unknown_platform', effectiveLicense };
-  }
-
-  if (effectiveLicense.tier === 'guest') {
-    return { allowed: false, reason: 'guest_only', effectiveLicense };
-  }
-
-  const requiresBusiness = platform.requiresBusinessLicense === true;
-  const isBusiness = effectiveLicense.tier === 'business';
-
-  if (requiresBusiness && !isBusiness) {
-    return { allowed: false, reason: 'requires_business', effectiveLicense };
-  }
-
-  if (
-    platform.requiredOrgType &&
-    organizationContext &&
-    organizationContext.orgType &&
-    platform.requiredOrgType !== organizationContext.orgType
-  ) {
-    return { allowed: false, reason: 'wrong_org_type', effectiveLicense };
-  }
-
-  if (!permissions) {
-    return { allowed: false, reason: 'no_membership', effectiveLicense };
-  }
-
-  const platformSuite =
-    platformId === 'revenueforge' ? 'vendor' : platformId === 'procurepath' ? 'buyer' : 'shared';
-
-  let suiteAllowed = false;
-  if (platformSuite === 'vendor') suiteAllowed = permissions.vendorSuiteAccess;
-  else if (platformSuite === 'buyer') suiteAllowed = permissions.buyerSuiteAccess;
-  else suiteAllowed = permissions.vendorSuiteAccess || permissions.buyerSuiteAccess;
-
-  if (!suiteAllowed) {
-    return { allowed: false, reason: 'suite_denied', effectiveLicense, permissions };
   }
 
   return { allowed: true, reason: 'ok', effectiveLicense, permissions };
@@ -1210,14 +1149,6 @@ function projectSeatUsage(currentUsage, previousCategory, nextCategory) {
 }
 
 function findSeatLimitViolation(usage, seatLimits = {}) {
-  const vendorLimit = Number.isFinite(seatLimits.vendorSuite) ? seatLimits.vendorSuite : Infinity;
-  const buyerLimit = Number.isFinite(seatLimits.buyerSuite) ? seatLimits.buyerSuite : Infinity;
-  const bothLimit = Number.isFinite(seatLimits.bothSuites) ? seatLimits.bothSuites : Infinity;
-
-  if (usage.vendorUsed > vendorLimit) return 'vendor';
-  if (usage.buyerUsed > buyerLimit) return 'buyer';
-  if (usage.bothUsed > bothLimit) return 'both';
-
   return null;
 }
 
@@ -1300,7 +1231,7 @@ async function requireOrgAdmin(req, res, next) {
       status: 'active'
     });
 
-    if (!membership || !['org_owner', 'org_admin'].includes(membership.role)) {
+    if (!membership) {
       return res.status(403).json({ error: 'ORG_ADMIN_ONLY' });
     }
 
@@ -3124,6 +3055,11 @@ app.get('/api/onboarding', requireAuth, async (req, res) => {
     const user = await User.findById(req.auth.uid);
     if (!user) return res.status(404).json({ error: 'Not found' });
 
+    if (user.onboardingStatus !== 'completed') {
+      user.onboardingStatus = 'completed';
+      await user.save();
+    }
+
     const recommendation = recommendLicensePlan(user.persona, user.onboardingResponses?.goals);
 
     return res.json({
@@ -3151,12 +3087,7 @@ app.post('/api/onboarding', requireAuth, validateBody(onboardingSchema), async (
     const nextResponses = { ...(user.onboardingResponses || {}) };
 
     // 🔧 Normalise suite selection across payload and previous state
-    const rawSuiteSelection = payload.suiteSelection || nextResponses.suiteSelection || {};
-
-    const canonicalSuiteSelection = {
-      vendorSuite: Boolean(rawSuiteSelection.vendorSuite ?? rawSuiteSelection.sellerSuite),
-      buyerSuite: Boolean(rawSuiteSelection.buyerSuite)
-    };
+    const canonicalSuiteSelection = { vendorSuite: true, buyerSuite: true };
 
     nextResponses.suiteSelection = canonicalSuiteSelection;
     [
@@ -3183,7 +3114,7 @@ app.post('/api/onboarding', requireAuth, validateBody(onboardingSchema), async (
     }
 
     const suiteSelection = nextResponses.suiteSelection || {};
-    const finalize = payload.finalize === true || payload.status === 'completed';
+    const finalize = true;
 
     let isOrgManaged = false;
     if (user.defaultOrganization) {
