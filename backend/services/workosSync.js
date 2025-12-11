@@ -138,8 +138,11 @@ async function syncWorkOSOrganization(workosOrg) {
         slug,
         workosOrganizationId: workosOrgId,
         domains,
-        vendorSuiteEnabled: true,
-        buyerSuiteEnabled: true,
+        // WorkOS-created orgs are treated as personal/workspace by default.
+        // They do NOT implicitly unlock platform suites.
+        tier: 'personal',
+        vendorSuiteEnabled: false,
+        buyerSuiteEnabled: false,
         seatLimits: { vendorSuite: 0, buyerSuite: 0, bothSuites: 0 }
       });
     } else {
