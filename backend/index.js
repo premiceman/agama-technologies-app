@@ -3185,14 +3185,17 @@ app.post('/api/onboarding', requireAuth, validateBody(onboardingSchema), async (
     const suiteSelection = nextResponses.suiteSelection || {};
     const finalize = payload.finalize === true || payload.status === 'completed';
 
-    let isOrgManaged = Boolean(user.defaultOrganization);
+    let isOrgManaged = false;
     if (user.defaultOrganization) {
       const defaultOrg = await Organization.findById(user.defaultOrganization);
-      const membership = defaultOrg
-        ? await OrganizationMembership.findOne({ organization: defaultOrg._id, user: user._id, status: 'active' })
-        : null;
-      if (defaultOrg && membership) {
-        if (defaultOrg.tier === 'business') {
+      if (defaultOrg?.tier === 'business') {
+        const membership = await OrganizationMembership.findOne({
+          organization: defaultOrg._id,
+          user: user._id,
+          status: 'active'
+        });
+
+        if (membership) {
           isOrgManaged = true;
         }
       }
