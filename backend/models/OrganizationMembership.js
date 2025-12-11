@@ -10,7 +10,7 @@ const OrganizationMembershipSchema = new Schema(
     role: {
       type: String,
       enum: ['org_owner', 'org_admin', 'vendor_user', 'buyer_user', 'guest'],
-      default: 'guest'
+      default: 'org_owner'
     },
     status: {
       type: String,
@@ -19,8 +19,8 @@ const OrganizationMembershipSchema = new Schema(
     },
     roleOrigin: { type: String, enum: ['app', 'idp'], default: 'app' },
     invitedEmail: { type: String, trim: true },
-    vendorSuiteEnabled: { type: Boolean, default: false },
-    buyerSuiteEnabled: { type: Boolean, default: false }
+    vendorSuiteEnabled: { type: Boolean, default: true },
+    buyerSuiteEnabled: { type: Boolean, default: true }
   },
   { timestamps: true }
 );
