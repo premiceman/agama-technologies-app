@@ -400,8 +400,31 @@ function setOrgManagedUI(managed, organization) {
 }
 
 function renderOrgStatus(org) {
-  const statusEl = document.getElementById('orgStatusMessage');
-  if (!statusEl) return;
+  console.debug('[onboarding] renderOrgStatus called with org:', org);
+
+  let statusEl = document.getElementById('orgStatusMessage');
+
+  // If the element doesn't exist, create it and append to a sensible container.
+  if (!statusEl) {
+    console.warn('[onboarding] #orgStatusMessage not found, creating it dynamically');
+    statusEl = document.createElement('p');
+    statusEl.id = 'orgStatusMessage';
+    statusEl.className = 'org-status-message';
+
+    // Prefer to attach to a known container if it exists; otherwise fall back to body.
+    const container =
+      document.querySelector('.licensing-card') ||
+      document.querySelector('.onboarding-licensing') ||
+      document.body;
+
+    container.appendChild(statusEl);
+  }
+
+  // Ensure the status element is visible.
+  statusEl.style.display = 'block';
+  statusEl.style.visibility = 'visible';
+  statusEl.removeAttribute('hidden');
+  statusEl.classList.remove('visually-hidden', 'd-none');
 
   if (!org) {
     statusEl.textContent =
@@ -688,6 +711,7 @@ document.addEventListener('DOMContentLoaded', () => {
           return data.organization || null;
         })
         .then((org) => {
+          console.debug('[onboarding] Refresh org status result:', org);
           // org is either the organization object or null
           onboardingState.organization = org;
 
