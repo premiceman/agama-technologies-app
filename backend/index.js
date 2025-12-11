@@ -677,8 +677,10 @@ async function createOrgForOnboarding({ user, suiteSelection = {}, orgDraft = {}
         name,
         domains
       });
-      // When WorkOS is configured, we should not create a local-only org
-      throw err;
+      // IMPORTANT:
+      // Do NOT throw here. We still want to create a local organization + membership
+      // so the user can proceed, even if WorkOS is temporarily unhappy.
+      workosOrganizationId = null;
     }
   }
 
