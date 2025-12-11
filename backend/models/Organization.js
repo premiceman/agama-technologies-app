@@ -8,6 +8,7 @@ const OrganizationSchema = new Schema(
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
     workosOrganizationId: { type: String, trim: true, unique: true, sparse: true },
     orgType: { type: String, enum: ['vendor', 'buyer', 'both'], default: 'both' },
+    tier: { type: String, enum: ['personal', 'business'], default: 'personal' },
     productAccess: { type: [String], default: [] },
     domains: { type: [String], default: [] },
     vendorSuiteEnabled: { type: Boolean, default: false },
