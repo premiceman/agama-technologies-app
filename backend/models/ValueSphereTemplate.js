@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const { Schema } = mongoose;
+const { DEFAULT_SANDBOX_ORG_ID } = require('../config/defaultOrg');
 
 const QuestionSchema = new Schema(
   {
@@ -28,7 +29,12 @@ const SectionSchema = new Schema(
 
 const ValueSphereTemplateSchema = new Schema(
   {
-    organization: { type: Schema.Types.ObjectId, ref: 'Organization', required: true },
+    organization: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      required: false,
+      default: DEFAULT_SANDBOX_ORG_ID
+    },
     mode: { type: String, enum: ['seller', 'buyer', 'shared'], required: true },
     name: { type: String, required: true, trim: true },
     description: { type: String, trim: true },
