@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { PUBLIC_ORGANIZATION_PLACEHOLDER_ID } = require('../utils/organizationPlaceholders');
 
 const { Schema } = mongoose;
 
@@ -28,7 +29,12 @@ const SectionSchema = new Schema(
 
 const ValueSphereTemplateSchema = new Schema(
   {
-    organization: { type: Schema.Types.ObjectId, ref: 'Organization', required: true },
+    organization: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      required: true,
+      default: PUBLIC_ORGANIZATION_PLACEHOLDER_ID
+    },
     mode: { type: String, enum: ['seller', 'buyer', 'shared'], required: true },
     name: { type: String, required: true, trim: true },
     description: { type: String, trim: true },
