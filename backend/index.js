@@ -82,6 +82,8 @@ const WORKOS_STATE_COOKIE = 'workos_auth_state';
 const WORKOS_SESSION_COOKIE = 'workos_session';
 const WORKOS_SESSION_TTL_MS = 14 * 24 * 60 * 60 * 1000; // Keep alignment with WorkOS session defaults
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
+const ENABLE_ONBOARDING_ORG_CREATION = process.env.ENABLE_ONBOARDING_ORG_CREATION !== 'false';
+const DEFAULT_ORGANIZATION_ID = process.env.DEFAULT_ORGANIZATION_ID || null;
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
@@ -698,6 +700,31 @@ async function createOrgForOnboarding({ user, suiteSelection = {}, orgDraft = {}
   });
 
   // 🔧 Always route the user into the org they just created
+  user.defaultOrganization = organization._id;
+
+  return { organization, membership };
+}
+
+async function attachUserToDefaultOrganization(user) {
+  if (!DEFAULT_ORGANIZATION_ID) return null;
+
+  const organization = await Organization.findById(DEFAULT_ORGANIZATION_ID);
+  if (!organization) return null;
+
+  let membership = await OrganizationMembership.findOne({ organization: organization._id, user: user._id });
+  if (!membership) {
+    membership = new OrganizationMembership({
+      organization: organization._id,
+      user: user._id,
+      role: 'org_owner',
+      roleOrigin: 'app',
+      status: 'active',
+      vendorSuiteEnabled: Boolean(organization.vendorSuiteEnabled),
+      buyerSuiteEnabled: Boolean(organization.buyerSuiteEnabled)
+    });
+    await membership.save();
+  }
+
   user.defaultOrganization = organization._id;
 
   return { organization, membership };
@@ -3138,25 +3165,38 @@ app.post('/api/onboarding', requireAuth, validateBody(onboardingSchema), async (
     }
 
     let createdOrg = null;
+    let attachedOrg = null;
 
-    if (
-      finalize &&
-      !isOrgManaged &&
-      (suiteSelection.vendorSuite || suiteSelection.buyerSuite) &&
-      payload.organizationDraft &&
-      payload.organizationDraft.name
-    ) {
+    if (ENABLE_ONBOARDING_ORG_CREATION) {
+      if (
+        finalize &&
+        !isOrgManaged &&
+        (suiteSelection.vendorSuite || suiteSelection.buyerSuite) &&
+        payload.organizationDraft &&
+        payload.organizationDraft.name
+      ) {
+        try {
+          const { organization } = await createOrgForOnboarding({
+            user,
+            suiteSelection,
+            orgDraft: payload.organizationDraft,
+            billingDetails: payload.billingDetails
+          });
+          createdOrg = organization;
+          isOrgManaged = true;
+        } catch (err) {
+          console.error('Onboarding org creation failed', err);
+        }
+      }
+    } else {
       try {
-        const { organization } = await createOrgForOnboarding({
-          user,
-          suiteSelection,
-          orgDraft: payload.organizationDraft,
-          billingDetails: payload.billingDetails
-        });
-        createdOrg = organization;
-        isOrgManaged = true;
+        const attachment = await attachUserToDefaultOrganization(user);
+        if (attachment?.organization) {
+          attachedOrg = attachment.organization;
+          isOrgManaged = true;
+        }
       } catch (err) {
-        console.error('Onboarding org creation failed', err);
+        console.error('Default org attachment failed during onboarding', err);
       }
     }
 
@@ -3184,12 +3224,13 @@ app.post('/api/onboarding', requireAuth, validateBody(onboardingSchema), async (
     if (payload.billingDetails) {
       user.billingProfile = { ...(user.billingProfile || {}), ...normalizeBillingDetails(payload.billingDetails) };
     }
+    const onboardingOrg = createdOrg || attachedOrg;
     if (createdOrg && payload.billingDetails) {
       createdOrg.billingProfile = normalizeBillingDetails(payload.billingDetails);
       await createdOrg.save();
     }
-    if (createdOrg) {
-      user.onboardingResponses.organizationId = createdOrg._id.toString();
+    if (onboardingOrg) {
+      user.onboardingResponses.organizationId = onboardingOrg._id.toString();
       user.onboardingResponses.suiteSelection = suiteSelection;
     }
 
