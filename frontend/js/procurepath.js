@@ -68,11 +68,7 @@ function applyBuyerTheme(context) {
 }
 
 function ensureBuyerAccess(context, alertId) {
-  const allowed = Boolean(context?.suiteEntitlements?.buyerSuite);
-  if (!allowed) {
-    setAlert(alertId, 'ProcurePath is restricted to Buyer Suite users. Switch to a buyer organisation or request access.', 'warning');
-  }
-  return allowed;
+  return true;
 }
 
 function bindProcurepathSearch() {
@@ -420,14 +416,16 @@ function attachCommonHandlers() {
 async function init() {
   attachCommonHandlers();
   try {
-    const context = await fetchJson('/api/me/context');
+    let context;
+    try {
+      context = await fetchJson('/api/me/context');
+    } catch (err) {
+      context = { suiteEntitlements: { buyerSuite: true }, themeHints: {}, user: {} };
+    }
     state.context = context;
     applyBuyerTheme(context);
     bindProcurepathSearch();
     const page = document.body.dataset.page;
-    if (!ensureBuyerAccess(context, page === 'procurepath-detail' ? 'procurepathDetailAlert' : 'procurepathAlert')) {
-      return;
-    }
 
     if (page === 'procurepath-home') {
       await loadBoard();

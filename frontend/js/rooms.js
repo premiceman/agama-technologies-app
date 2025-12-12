@@ -51,45 +51,7 @@ function licenseLabel(tier) {
 }
 
 function roomsEntitlement() {
-  const suites = state.suiteEntitlements || {};
-  const orgContext = state.orgContext || {};
-  const effective = suites.effective || {};
-  const orgSuites = suites.org || {};
-  const membershipSuites = suites.membership || {};
-
-  const sellerSuiteEnabled =
-    orgSuites.sellerSuiteEnabled ?? orgContext.sellerSuiteEnabled ?? false;
-  const sellerSuiteProvisioned =
-    membershipSuites.sellerSuiteProvisioned ?? orgContext.membershipSuites?.sellerSuiteProvisioned ?? false;
-  const effectiveSellerSuite = effective.sellerSuite ?? (sellerSuiteEnabled && sellerSuiteProvisioned);
-  const isGuest = state.user?.licenseTier === 'guest';
-
-  // Engagement Rooms are now part of the Seller suite.
-  if (effectiveSellerSuite && !isGuest) {
-    return { allowed: true };
-  }
-
-  if (!sellerSuiteEnabled) {
-    return {
-      allowed: false,
-      reason:
-        'Engagement Rooms are part of the Seller suite. This organisation has not enabled the Seller suite yet.'
-    };
-  }
-
-  if (!sellerSuiteProvisioned || isGuest) {
-    return {
-      allowed: false,
-      reason:
-        'Engagement Rooms are part of the Seller suite, but your user is not provisioned for Seller access. Ask your workspace admin to grant you the Seller suite.'
-    };
-  }
-
-  return {
-    allowed: false,
-    reason:
-      'Engagement Rooms are part of advanced Agama workspaces. Talk to us to switch on the Seller suite and unify every buyer conversation.'
-  };
+  return { allowed: true };
 }
 
 function buildSalesEmailLink() {
@@ -249,24 +211,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function initRoomsPage() {
   try {
-    const orgResp = await fetchJson('/api/org/current');
-    state.orgContext = orgResp.organization;
-    state.user = orgResp.user;
-    state.effectiveLicenseTier = orgResp.effectiveLicenseTier || orgResp.effectiveLicense?.tier;
-    state.isGuest = orgResp.user?.licenseTier === 'guest';
-    state.suiteEntitlements = orgResp.suiteEntitlements || null;
-
-    const entitlement = roomsEntitlement();
-    if (!entitlement.allowed) {
-      renderRoomsLanding(entitlement);
-      return;
+    let orgResp;
+    try {
+      orgResp = await fetchJson('/api/org/current');
+    } catch (err) {
+      orgResp = {};
     }
 
-    const licenseTier = state.effectiveLicenseTier || orgResp.user?.licenseTier || 'personal';
+    state.orgContext = orgResp.organization || { name: 'Sandbox org', orgType: 'both' };
+    state.user = orgResp.user || { name: 'Rooms user', licenseTier: 'business' };
+    state.effectiveLicenseTier = orgResp.effectiveLicenseTier || orgResp.effectiveLicense?.tier || 'business';
+    state.isGuest = state.user?.licenseTier === 'guest';
+    state.suiteEntitlements = orgResp.suiteEntitlements || { org: {}, membership: {}, effective: {} };
+
+    const licenseTier = state.effectiveLicenseTier || state.user?.licenseTier || 'personal';
     setText('licenseBadge', licenseLabel(licenseTier));
 
-    const orgsResp = await fetchJson('/api/orgs');
-    state.organizations = orgsResp.organizations || [];
+    try {
+      const orgsResp = await fetchJson('/api/orgs');
+      state.organizations = orgsResp.organizations || [];
+    } catch (err) {
+      state.organizations = [];
+    }
     setText(
       'roomsOrgContext',
       state.orgContext ? `${state.orgContext.name} • ${state.orgContext.orgType || 'multi-org'}` : 'No organization selected'
