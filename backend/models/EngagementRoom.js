@@ -1,12 +1,23 @@
 const mongoose = require('mongoose');
 
 const { Schema } = mongoose;
+const { DEFAULT_SANDBOX_ORG_ID } = require('../config/defaultOrg');
 
 const EngagementRoomSchema = new Schema(
   {
     title: { type: String, required: true, trim: true },
-    vendorOrg: { type: Schema.Types.ObjectId, ref: 'Organization', required: true },
-    buyerOrg: { type: Schema.Types.ObjectId, ref: 'Organization', required: true },
+    vendorOrg: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      required: false,
+      default: DEFAULT_SANDBOX_ORG_ID
+    },
+    buyerOrg: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      required: false,
+      default: DEFAULT_SANDBOX_ORG_ID
+    },
     revenueAccount: { type: Schema.Types.ObjectId, ref: 'RevenueAccount' },
     procurementVendor: { type: Schema.Types.ObjectId, ref: 'ProcurementVendor' },
     status: { type: String, enum: ['draft', 'active', 'closed', 'archived'], default: 'draft' },
