@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { PUBLIC_ORGANIZATION_PLACEHOLDER_ID } = require('../utils/organizationPlaceholders');
 
 const { Schema } = mongoose;
 
@@ -24,8 +25,18 @@ const RfxResponseSchema = new Schema(
     roomId: { type: Schema.Types.ObjectId, ref: 'EngagementRoom' },
     rfxId: { type: Schema.Types.ObjectId, ref: 'Rfx', required: true, index: true },
     questionId: { type: Schema.Types.ObjectId, ref: 'RfxItem', required: true },
-    vendorOrgId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true },
-    buyerOrgId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true },
+    vendorOrgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      required: true,
+      default: PUBLIC_ORGANIZATION_PLACEHOLDER_ID
+    },
+    buyerOrgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      required: true,
+      default: PUBLIC_ORGANIZATION_PLACEHOLDER_ID
+    },
     answerText: { type: String, trim: true },
     answerNumeric: { type: Number },
     answerOptions: { type: [String], default: [] },
