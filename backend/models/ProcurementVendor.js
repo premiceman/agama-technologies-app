@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { PUBLIC_ORGANIZATION_PLACEHOLDER_ID } = require('../utils/organizationPlaceholders');
 
 const { Schema } = mongoose;
 
@@ -35,7 +36,13 @@ const TouchpointSchema = new Schema(
 
 const ProcurementVendorSchema = new Schema(
   {
-    orgId: { type: Schema.Types.ObjectId, ref: 'Organization', index: true, required: true },
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+      required: true,
+      default: PUBLIC_ORGANIZATION_PLACEHOLDER_ID
+    },
     createdByUserId: { type: Schema.Types.ObjectId, ref: 'User', index: true, required: true },
     name: { type: String, required: true, trim: true },
     domain: { type: String, trim: true },

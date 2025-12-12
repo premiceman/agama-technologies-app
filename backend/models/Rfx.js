@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { PUBLIC_ORGANIZATION_PLACEHOLDER_ID } = require('../utils/organizationPlaceholders');
 
 const { Schema } = mongoose;
 
@@ -14,7 +15,13 @@ const RfxSectionSchema = new Schema(
 
 const RfxSchema = new Schema(
   {
-    orgId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      required: true,
+      index: true,
+      default: PUBLIC_ORGANIZATION_PLACEHOLDER_ID
+    },
     sourcingEventId: { type: Schema.Types.ObjectId, ref: 'SourcingEvent' },
     topicArea: { type: String, required: true, trim: true },
     overallWeight: { type: Number, min: 0 },

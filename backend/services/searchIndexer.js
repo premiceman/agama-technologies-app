@@ -260,26 +260,24 @@ async function indexRfxItems(rfxId) {
   );
 }
 
-async function reindexOrg(orgId) {
-  if (!orgId) return null;
-  const roomVendorQuery = { $or: [{ vendorOrg: orgId }, { buyerOrg: orgId }] };
-  const rooms = await EngagementRoom.find(roomVendorQuery).lean();
+async function reindexOrg() {
+  const rooms = await EngagementRoom.find().lean();
   await Promise.all(rooms.map(room => indexEngagementRoom(room._id)));
 
-  const vendors = await ProcurementVendor.find({ orgId }).lean();
+  const vendors = await ProcurementVendor.find().lean();
   await Promise.all(vendors.map(vendor => indexProcurementVendor(vendor._id)));
 
-  const assessments = await BuyerValueAssessment.find({ organization: orgId }).lean();
+  const assessments = await BuyerValueAssessment.find().lean();
   await Promise.all(assessments.map(assessment => indexBuyerAssessment(assessment._id)));
 
-  const members = await OrganizationMembership.find({ organization: orgId, status: 'active' }).lean();
+  const members = await OrganizationMembership.find({ status: 'active' }).lean();
   const memberUserIds = members.map(m => m.user).filter(Boolean);
   if (memberUserIds.length > 0) {
     const accounts = await RevenueAccount.find({ userId: { $in: memberUserIds } }).lean();
-    await Promise.all(accounts.map(account => indexRevenueAccount(account._id, orgId)));
+    await Promise.all(accounts.map(account => indexRevenueAccount(account._id, null)));
   }
 
-  const rfxList = await Rfx.find({ orgId }).lean();
+  const rfxList = await Rfx.find().lean();
   await Promise.all(rfxList.map(rfx => indexRfxItems(rfx._id)));
 
   return true;
