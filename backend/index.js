@@ -354,6 +354,7 @@ const PLATFORM_DEFINITIONS = [
 ];
 
 const PLATFORM_IDS = new Set(PLATFORM_DEFINITIONS.map(platform => platform.id));
+const ALL_PLATFORMS = Array.from(PLATFORM_IDS);
 const PERSONAL_ALLOWED_PLATFORMS = new Set(['valuesphere']);
 const LICENSE_PLANS = ['free-personal', 'vendor-enterprise', 'procurement-enterprise', 'consulting-enterprise'];
 
@@ -487,6 +488,15 @@ function computeEffectiveLicense(user, organizationContext) {
   return { tier: 'business', homeOrg };
 }
 
+function buildUnlockedUserPayload(user) {
+  const base = user?.public ? user.public() : {};
+  return {
+    ...base,
+    platformAccess: ALL_PLATFORMS,
+    licenseTier: 'business'
+  };
+}
+
 function computeAccessState(user, organizationContext) {
   if (!user) return 'needs_onboarding';
   return 'active';
@@ -499,8 +509,8 @@ function buildSuiteEntitlements(user, orgContext, membership) {
   };
 
   const membershipSuites = {
-    vendorSuiteEnabled: membership ? Boolean(membership.vendorSuiteEnabled ?? true) : true,
-    buyerSuiteEnabled: membership ? Boolean(membership.buyerSuiteEnabled ?? true) : true
+    vendorSuiteEnabled: true,
+    buyerSuiteEnabled: true
   };
 
   const effective = {
@@ -683,10 +693,10 @@ async function createOrgForOnboarding({ user, suiteSelection = {}, orgDraft = {}
       rooms: roomsSeatLimit
     },
     tier: 'business',
-    productAccess: Array.from(PLATFORM_IDS),
+    productAccess: ALL_PLATFORMS,
     orgType: deriveOrgTypeFromSuites(suiteSelection),
-    vendorSuiteEnabled: Boolean(suiteSelection.vendorSuite),
-    buyerSuiteEnabled: Boolean(suiteSelection.buyerSuite),
+    vendorSuiteEnabled: true,
+    buyerSuiteEnabled: true,
     billingProfile: billingDetails ? normalizeBillingDetails(billingDetails) : {},
     createdBy: user._id
   };
@@ -1077,43 +1087,24 @@ function serializeAuditEvent(event) {
 function getPlatformEntitlement(user, organizationContext, platformId) {
   const platform = PLATFORM_DEFINITIONS.find(p => p.id === platformId);
   const effectiveLicense = computeEffectiveLicense(user, organizationContext);
-  const suiteReqs = PLATFORM_SUITE_REQUIREMENTS[platformId];
 
   if (!platform) {
     return { allowed: false, reason: 'unknown_platform', effectiveLicense };
   }
 
-  if (!organizationContext) {
-    return { allowed: false, reason: 'no_organization_context', effectiveLicense };
-  }
-
-  const membership = organizationContext?.membership;
-  if (!membership) {
-    return { allowed: false, reason: 'no_membership', effectiveLicense };
-  }
-
-  const permissions = getEffectivePermissions(user, organizationContext, membership);
-
-  // Check license requirement
-  if (suiteReqs?.requiresBusiness) {
-    const isBusinessLicense = effectiveLicense?.tier === 'business';
-    if (!isBusinessLicense) {
-      return { allowed: false, reason: 'business_license_required', effectiveLicense, permissions };
-    }
-  }
-
-  // Check suite access
-  if (suiteReqs?.suites) {
-    const hasRequiredSuite = suiteReqs.suites.some(suite => {
-      if (suite === 'vendorSuite') return permissions.vendorSuiteAccess;
-      if (suite === 'buyerSuite') return permissions.buyerSuiteAccess;
-      return false;
-    });
-
-    if (!hasRequiredSuite) {
-      return { allowed: false, reason: 'suite_access_denied', effectiveLicense, permissions };
-    }
-  }
+  const permissions = {
+    role: organizationContext?.membership?.role || 'org_owner',
+    entitlements: {
+      org: { vendorSuiteEnabled: true, buyerSuiteEnabled: true },
+      membership: { vendorSuiteEnabled: true, buyerSuiteEnabled: true, role: 'org_owner' },
+      effective: { vendorSuite: true, buyerSuite: true }
+    },
+    isOrgOwner: true,
+    isOrgAdmin: true,
+    canManageOrg: true,
+    vendorSuiteAccess: true,
+    buyerSuiteAccess: true
+  };
 
   return { allowed: true, reason: 'ok', effectiveLicense, permissions };
 }
@@ -1137,13 +1128,15 @@ async function buildOrganizationContext(user, orgId, { includeSeatDetails = fals
     onboardingStatus: organization.onboardingStatus
   };
 
-  context.vendorSuiteEnabled = Boolean(organization.vendorSuiteEnabled);
-  context.buyerSuiteEnabled = Boolean(organization.buyerSuiteEnabled);
+  context.vendorSuiteEnabled = true;
+  context.buyerSuiteEnabled = true;
 
   context.membershipSuites = {
-    vendorSuiteEnabled: Boolean(membership.vendorSuiteEnabled),
-    buyerSuiteEnabled: Boolean(membership.buyerSuiteEnabled)
+    vendorSuiteEnabled: true,
+    buyerSuiteEnabled: true
   };
+
+  context.platformAccess = ALL_PLATFORMS;
 
   if (includeSeatDetails) {
     context.seatLimit = organization.seatLimit;
@@ -1275,8 +1268,9 @@ function requirePlatformAccess(platformId) {
         tier: 'business',
         orgType: 'both',
         role: 'org_owner',
-        productAccess: ['valuesphere', 'revenueforge', 'procurepath'],
-        membershipSuites: { sellerSuiteProvisioned: true, buyerSuiteProvisioned: true }
+        productAccess: ALL_PLATFORMS,
+        membershipSuites: { sellerSuiteProvisioned: true, buyerSuiteProvisioned: true },
+        platformAccess: ALL_PLATFORMS
       };
       req.platformEntitlement = { allowed: true, platformId };
 
@@ -1309,10 +1303,7 @@ async function requireStaff(req, res, next) {
 }
 
 function normaliseProductAccess(requested) {
-  const selections = Array.isArray(requested)
-    ? Array.from(new Set(requested.map(value => String(value))))
-    : [];
-  return selections.filter(id => PLATFORM_IDS.has(id));
+  return ALL_PLATFORMS;
 }
 
 async function ensureWorkOSOrganization({
@@ -2435,7 +2426,7 @@ app.post('/api/auth/signup', validateBody(signupSchema), async (req, res) => {
       uid: user._id.toString(),
       orgId: user.defaultOrganization ? user.defaultOrganization.toString() : null
     });
-    res.json({ ok: true, user: user.public(), token });
+    res.json({ ok: true, user: buildUnlockedUserPayload(user), token });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -2524,10 +2515,10 @@ app.get('/api/auth/workos/callback', async (req, res) => {
           workosOrganizationId: workosOrgId,
           orgType: 'both',
           tier: 'business',
-          productAccess: ['valuesphere'],
-          vendorSuiteEnabled: false,
-          buyerSuiteEnabled: false,
-          seatLimits: { vendorSuite: 0, buyerSuite: 0, bothSuites: 0 }
+          productAccess: ALL_PLATFORMS,
+          vendorSuiteEnabled: true,
+          buyerSuiteEnabled: true,
+          seatLimits: { vendorSuite: 100000, buyerSuite: 100000, bothSuites: 100000 }
         });
         await organization.save();
       }
@@ -2538,20 +2529,20 @@ app.get('/api/auth/workos/callback', async (req, res) => {
           membership = new OrganizationMembership({
             organization: organization._id,
             user: user._id,
-            role: 'vendor_user',
+            role: 'org_owner',
             roleOrigin: 'app',
-            vendorSuiteEnabled: Boolean(organization.vendorSuiteEnabled),
-            buyerSuiteEnabled: Boolean(organization.buyerSuiteEnabled)
+            vendorSuiteEnabled: true,
+            buyerSuiteEnabled: true
           });
           membershipCreated = true;
         }
 
         const previousStatus = membership.status;
         if (membership.vendorSuiteEnabled === undefined) {
-          membership.vendorSuiteEnabled = Boolean(organization.vendorSuiteEnabled);
+          membership.vendorSuiteEnabled = true;
         }
         if (membership.buyerSuiteEnabled === undefined) {
-          membership.buyerSuiteEnabled = Boolean(organization.buyerSuiteEnabled);
+          membership.buyerSuiteEnabled = true;
         }
         const seatsUsed = await OrganizationMembership.countActiveSeats(organization._id);
         if (membership.status !== 'active') {
@@ -2611,9 +2602,9 @@ app.get('/api/auth/workos/callback', async (req, res) => {
           slug,
           orgType: 'both',
           tier: 'business',
-          productAccess: ['valuesphere'],
+          productAccess: ALL_PLATFORMS,
           vendorSuiteEnabled: true,
-          buyerSuiteEnabled: false,
+          buyerSuiteEnabled: true,
           createdBy: user._id
         });
         await organization.save();
@@ -2624,7 +2615,7 @@ app.get('/api/auth/workos/callback', async (req, res) => {
           role: 'org_owner',
           roleOrigin: 'app',
           vendorSuiteEnabled: true,
-          buyerSuiteEnabled: false
+          buyerSuiteEnabled: true
         });
         await membership.save();
       }
@@ -2667,12 +2658,13 @@ app.get('/api/auth/workos/callback', async (req, res) => {
           orgType: organization.orgType || 'both',
           role: membership?.role,
           membership,
-          vendorSuiteEnabled: Boolean(organization.vendorSuiteEnabled),
-          buyerSuiteEnabled: Boolean(organization.buyerSuiteEnabled),
+          vendorSuiteEnabled: true,
+          buyerSuiteEnabled: true,
           membershipSuites: {
-            vendorSuiteEnabled: Boolean(membership?.vendorSuiteEnabled),
-            buyerSuiteEnabled: Boolean(membership?.buyerSuiteEnabled)
+            vendorSuiteEnabled: true,
+            buyerSuiteEnabled: true
           },
+          platformAccess: ALL_PLATFORMS,
           seatLimits: organization.seatLimits || {},
           onboardingStatus: organization.onboardingStatus
         };
@@ -2684,7 +2676,7 @@ app.get('/api/auth/workos/callback', async (req, res) => {
     const finalRedirect = accessState === 'needs_onboarding' ? onboardingRedirect : redirectUrl;
 
     if (wantsJson) {
-      return res.json({ ok: true, user: user.public(), token, redirect: finalRedirect });
+      return res.json({ ok: true, user: buildUnlockedUserPayload(user), token, redirect: finalRedirect });
     }
 
     return res.redirect(finalRedirect);
@@ -2722,7 +2714,7 @@ app.post('/api/auth/login', validateBody(loginSchema), async (req, res) => {
       uid: user._id.toString(),
       orgId: user.defaultOrganization ? user.defaultOrganization.toString() : null
     });
-    res.json({ ok: true, user: user.public(), token });
+    res.json({ ok: true, user: buildUnlockedUserPayload(user), token });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -2966,7 +2958,7 @@ app.get('/api/me/context', requireAuth, async (req, res) => {
 
     return res.json({
       ok: true,
-      user: user.public(),
+      user: buildUnlockedUserPayload(user),
       activeOrg,
       orgRole: membership?.role || null,
       suites,
@@ -3028,7 +3020,7 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
 
     res.json({
       ok: true,
-      user: user.public(),
+      user: buildUnlockedUserPayload(user),
       platforms: PLATFORM_DEFINITIONS,
       organizationContext,
       memberships: membershipsPayload,
@@ -3107,7 +3099,7 @@ app.patch('/api/auth/persona', requireAuth, validateBody(personaUpdateSchema), a
     user.persona = req.validatedBody.persona;
     await user.save();
 
-    return res.json({ ok: true, user: user.public() });
+    return res.json({ ok: true, user: buildUnlockedUserPayload(user) });
   } catch (err) {
     console.error('Persona update error', err);
     return res.status(500).json({ error: 'Unable to update persona' });
@@ -3122,7 +3114,7 @@ app.patch('/api/auth/valuesphere-mode', requireAuth, validateBody(valuesphereMod
     user.valuesphereMode = req.validatedBody.mode;
     await user.save();
 
-    return res.json({ ok: true, user: user.public() });
+    return res.json({ ok: true, user: buildUnlockedUserPayload(user) });
   } catch (err) {
     console.error('ValueSphere mode update error', err);
     return res.status(500).json({ error: 'Unable to update ValueSphere mode' });
@@ -3143,7 +3135,7 @@ app.get('/api/onboarding', requireAuth, async (req, res) => {
 
     return res.json({
       ok: true,
-      user: user.public(),
+      user: buildUnlockedUserPayload(user),
       onboarding: {
         status: user.onboardingStatus || 'pending',
         responses: user.onboardingResponses || {},
@@ -3325,7 +3317,7 @@ app.post('/api/onboarding', requireAuth, validateBody(onboardingSchema), async (
 
     return res.json({
       ok: true,
-      user: user.public(),
+      user: buildUnlockedUserPayload(user),
       onboarding: {
         status: user.onboardingStatus,
         responses: user.onboardingResponses,
@@ -3355,7 +3347,7 @@ app.post('/api/onboarding/restart', requireAuth, async (req, res) => {
 
     return res.json({
       ok: true,
-      user: user.public(),
+      user: buildUnlockedUserPayload(user),
       onboarding: { status: user.onboardingStatus, responses: user.onboardingResponses, recommendation }
     });
   } catch (err) {
@@ -3440,7 +3432,7 @@ app.get(
             }
           }
 
-          const productAccess = Array.isArray(org.productAccess) ? org.productAccess : [];
+          const productAccess = ALL_PLATFORMS;
 
           return {
             id: org._id.toString(),
@@ -3502,7 +3494,7 @@ app.get(
         }
       }
 
-      const productAccess = Array.isArray(organization.productAccess) ? organization.productAccess : [];
+      const productAccess = ALL_PLATFORMS;
 
       res.json({
         ok: true,
@@ -4004,9 +3996,7 @@ app.get('/api/org/current', requireAuth, async (req, res) => {
         : null;
 
       if (organization && membership) {
-        const productAccess = Array.isArray(organization.productAccess)
-          ? [...organization.productAccess]
-          : [];
+        const productAccess = ALL_PLATFORMS;
 
         organizationPayload = {
           id: organization._id.toString(),
@@ -4324,9 +4314,7 @@ app.get('/api/org/admin/overview', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Organization not found' });
     }
 
-    const productAccess = Array.isArray(organization.productAccess)
-      ? [...organization.productAccess]
-      : [];
+    const productAccess = ALL_PLATFORMS;
 
     const seatsUsed = await OrganizationMembership.countActiveSeats(organization._id);
     const members = await OrganizationMembership.find({
@@ -4732,7 +4720,7 @@ app.put('/api/auth/me', requireAuth, validateBody(profileUpdateSchema), async (r
     });
 
     await user.save();
-    res.json({ ok: true, user: user.public(), platforms: PLATFORM_DEFINITIONS });
+    res.json({ ok: true, user: buildUnlockedUserPayload(user), platforms: PLATFORM_DEFINITIONS });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Unable to update profile' });
@@ -6749,9 +6737,7 @@ async function loadBuyerContext(req, res) {
   const effectiveLicense = computeEffectiveLicense(user, orgContext);
   const entitlement = getPlatformEntitlement(user, orgContext, 'valuesphere');
   const canUseBuyerMode = orgContext?.membership?.role !== 'guest' && entitlement.allowed;
-  const productAccess = Array.isArray(organization?.productAccess)
-    ? organization.productAccess
-    : [];
+  const productAccess = ALL_PLATFORMS;
 
   const isBusinessBuyerWithProcurePath =
     effectiveLicense.tier === 'business' &&

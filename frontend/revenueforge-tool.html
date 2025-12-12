@@ -588,10 +588,6 @@
           memberships: json.memberships
         });
         rfState.user = json.user;
-        if (!json.user.platformAccess?.includes('revenueforge') || json.user.licenseTier !== 'business') {
-          renderRevenueForgePreview();
-          return;
-        }
         await loadAccounts();
       } catch (err) {
         console.error(err);
