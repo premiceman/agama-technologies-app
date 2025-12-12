@@ -47,6 +47,8 @@ const AuditEvent = require('./models/AuditEvent');
 const RoomEvent = require('./models/RoomEvent');
 const IntegrationConnection = require('./models/IntegrationConnection');
 const IntegrationState = require('./models/IntegrationState');
+const { DEFAULT_SANDBOX_ORG_ID } = require('./config/defaultOrg');
+const { bootstrapSandboxOrg, ensureSandboxOrganization } = require('./services/sandboxOrg');
 const { getDashboardOverview } = require('./services/dashboard');
 const { requireOrgRole, getEffectivePermissions } = require('./middleware/orgAuth');
 const {
@@ -301,7 +303,10 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/agama_
 mongoose.set('strictQuery', true);
 mongoose
   .connect(MONGODB_URI)
-  .then(() => console.log('✅ MongoDB connected'))
+  .then(async () => {
+    console.log('✅ MongoDB connected');
+    await bootstrapSandboxOrg();
+  })
   .catch(err => {
     console.error('❌ MongoDB connection error', err);
     process.exit(1);
@@ -1592,8 +1597,8 @@ const objectIdPattern = /^[a-fA-F0-9]{24}$/;
 
 const roomCreateSchema = z.object({
   title: z.string().trim().min(1),
-  vendorOrg: z.string().regex(objectIdPattern),
-  buyerOrg: z.string().regex(objectIdPattern),
+  vendorOrg: z.string().regex(objectIdPattern).default(DEFAULT_SANDBOX_ORG_ID),
+  buyerOrg: z.string().regex(objectIdPattern).default(DEFAULT_SANDBOX_ORG_ID),
   revenueAccount: z.string().regex(objectIdPattern).optional(),
   procurementVendor: z.string().regex(objectIdPattern).optional()
 });
@@ -5287,12 +5292,21 @@ app.get('/api/rooms', requireAuth, async (req, res) => {
 app.post('/api/rooms', requireAuth, validateBody(roomCreateSchema), async (req, res) => {
   try {
     const payload = req.validatedBody;
-    if (payload.vendorOrg === payload.buyerOrg) {
+    const vendorOrgId = payload.vendorOrg || DEFAULT_SANDBOX_ORG_ID;
+    const buyerOrgId = payload.buyerOrg || DEFAULT_SANDBOX_ORG_ID;
+
+    if (payload.vendorOrg && payload.buyerOrg && vendorOrgId === buyerOrgId) {
       return res.status(400).json({ error: 'Vendor and buyer organizations must differ.' });
     }
 
-    const vendorOrg = await Organization.findById(payload.vendorOrg);
-    const buyerOrg = await Organization.findById(payload.buyerOrg);
+    const sandboxOrgRequired =
+      vendorOrgId === DEFAULT_SANDBOX_ORG_ID || buyerOrgId === DEFAULT_SANDBOX_ORG_ID;
+    const sandboxOrg = sandboxOrgRequired ? await ensureSandboxOrganization() : null;
+
+    const vendorOrg =
+      vendorOrgId === DEFAULT_SANDBOX_ORG_ID ? sandboxOrg : await Organization.findById(vendorOrgId);
+    const buyerOrg =
+      buyerOrgId === DEFAULT_SANDBOX_ORG_ID ? sandboxOrg : await Organization.findById(buyerOrgId);
     if (!vendorOrg || !buyerOrg) {
       return res.status(404).json({ error: 'Organization not found' });
     }
@@ -5304,8 +5318,14 @@ app.post('/api/rooms', requireAuth, validateBody(roomCreateSchema), async (req, 
       return res.status(400).json({ error: 'Buyer organization must allow buyer engagements.' });
     }
 
-    const vendorMembership = await findActiveOrgMembership(req.auth.uid, vendorOrg._id);
-    const buyerMembership = await findActiveOrgMembership(req.auth.uid, buyerOrg._id);
+    const vendorMembership =
+      vendorOrgId === DEFAULT_SANDBOX_ORG_ID
+        ? { role: 'org_owner' }
+        : await findActiveOrgMembership(req.auth.uid, vendorOrg._id);
+    const buyerMembership =
+      buyerOrgId === DEFAULT_SANDBOX_ORG_ID
+        ? { role: 'org_owner' }
+        : await findActiveOrgMembership(req.auth.uid, buyerOrg._id);
     if (!vendorMembership && !buyerMembership) {
       return res.status(403).json({ error: 'No active membership for either organization.' });
     }
@@ -5315,7 +5335,7 @@ app.post('/api/rooms', requireAuth, validateBody(roomCreateSchema), async (req, 
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const membershipOrg = vendorMembership ? vendorOrg : buyerOrg;
+    const membershipOrg = vendorMembership ? vendorOrg : buyerOrg || vendorOrg;
     const membershipContext = vendorMembership || buyerMembership;
     const orgContext =
       membershipOrg && membershipContext
@@ -5363,27 +5383,27 @@ app.post('/api/rooms', requireAuth, validateBody(roomCreateSchema), async (req, 
       isGuest: isGuestUser
     });
 
-      await logRoomMutation({
-        type: 'room.created',
-        room,
-        membership: creatorMembership,
-        actorUser: req.auth.uid,
-        targetOrganization: membershipOrg._id,
-        metadata: {
-          title: room.title,
-          vendorOrg: vendorOrg._id,
-          buyerOrg: buyerOrg._id
-        }
-      });
+    await logRoomMutation({
+      type: 'room.created',
+      room,
+      membership: creatorMembership,
+      actorUser: req.auth.uid,
+      targetOrganization: membershipOrg._id,
+      metadata: {
+        title: room.title,
+        vendorOrg: vendorOrg._id,
+        buyerOrg: buyerOrg._id
+      }
+    });
 
-      await transitionRoomStatus(room, 'active', req.auth.uid, creatorMembership);
+    await transitionRoomStatus(room, 'active', req.auth.uid, creatorMembership);
 
-      await searchIndexer.indexEngagementRoom(room._id);
+    await searchIndexer.indexEngagementRoom(room._id);
 
-      res.status(201).json({
-        ok: true,
-        room: serializeRoom(room, {
-          role: 'room_admin',
+    res.status(201).json({
+      ok: true,
+      room: serializeRoom(room, {
+        role: 'room_admin',
         organization: membershipOrg,
         isGuest: isGuestUser
       })
