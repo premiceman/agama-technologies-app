@@ -491,8 +491,8 @@ Engagement Rooms are central to Agama’s collaboration design. Domain-wise, we 
 
 - `_id: ObjectId`
 - `vendorOrgId: ObjectId` (always required)  
-- `buyerOrgId?: ObjectId` (present when buyer has a full org)  
-- `vendorAccountId: ObjectId` (AgamaAccount from vendor org)  
+- `buyerOrgId: ObjectId` (required when vendors create rooms; derived from the linked Account)
+- `vendorAccountId: ObjectId` (AgamaAccount from vendor org and source of the buyer org link)
 - `buyerVendorRecordId?: ObjectId` (VendorRecord from buyer org)  
 - `sourcingEventId?: ObjectId` (from buyer org)  
 - `status: 'draft' | 'active' | 'closed' | 'archived'`  
@@ -504,7 +504,8 @@ Engagement Rooms are central to Agama’s collaboration design. Domain-wise, we 
 **Important invariants:**
 
 - `vendorOrgId` always points to the vendor’s Organisation.
-- `buyerOrgId` may be null when working with only guest buyers (no Buyer Suite yet).
+- Vendor-created rooms MUST link to a buyer org connected to the selected Account; anonymous or guest-only rooms are not allowe
+d.
 - Room participants are defined in `RoomParticipant`.
 - Suite access in the room follows membership flags: vendor suite enablement unlocks vendor-side participation, buyer suite enablement unlocks buyer-side participation, and members with both flags can see both surfaces. Guests have limited shared-only access.
 
