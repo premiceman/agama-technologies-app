@@ -3,7 +3,7 @@
 Version: 1.0  
 Owner: Agama Technologies  
 Status: Authoritative Specification for Engagement Rooms  
-Last Updated: (update before commit)
+Last Updated: 2024-06-08
 
 Engagement Rooms are the **shared collaboration layer** in Agama.  
 They connect vendors and buyers in structured, permission-safe workspaces where both sides can collaborate on deals, procurement events, value modelling, documents, timelines, and RFX processes—while maintaining strict privacy boundaries.
@@ -41,8 +41,8 @@ The Room is defined in `domain_model.md` but summarised here for clarity.
 ## 2.1 EngagementRoom Fields
 - `_id: ObjectId`
 - `vendorOrgId: ObjectId`
-- `buyerOrgId?: ObjectId` (nullable — buyer may be guests only)
-- `vendorAccountId: ObjectId` (AgamaAccount from vendor org)
+- `buyerOrgId: ObjectId` (required — derived from the linked Account and created if missing)
+- `vendorAccountId: ObjectId` (AgamaAccount from vendor org; the buyer org link must map to this Account)
 - `buyerVendorRecordId?: ObjectId` (VendorRecord from buyer org)
 - `sourcingEventId?: ObjectId`
 - `status: draft | active | closed | archived`
@@ -52,7 +52,7 @@ The Room is defined in `domain_model.md` but summarised here for clarity.
 - `updatedAt: Date`
 
 ## 2.2 Invariants
-- There is always a **vendor organisation**; a buyer org may or may not exist.  
+- There is always a **vendor organisation**, and vendor-created rooms MUST link to a buyer org that is connected to the selected Account (no anonymous/guest-only rooms).
 - Vendor and buyer roles are derived from **OrganizationMembership + RoomParticipant**.  
 - Room visibility depends on participant roles, not just suite entitlements.
 
@@ -67,7 +67,7 @@ The Room is defined in `domain_model.md` but summarised here for clarity.
 - Room created but not all participants invited  
 - Vendor panels active  
 - Shared panels mostly empty  
-- Buyer-only panels active only if buyer org exists and buyer users have joined
+- Buyer-only panels activate once buyer users have joined (org linkage is enforced at creation)
 
 ## 3.2 active
 - Both sides collaborating  
