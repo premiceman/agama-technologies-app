@@ -1267,19 +1267,18 @@ function requirePlatformAccess(platformId) {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      const orgId = req.auth.orgId || user.defaultOrganization;
-      const organizationContext = await buildOrganizationContext(user, orgId);
-      const entitlement = getPlatformEntitlement(user, organizationContext, platformId);
-
-      if (!entitlement.allowed) {
-        return res
-          .status(403)
-          .json({ error: 'PLATFORM_ACCESS_DENIED', platformId, reason: entitlement.reason });
-      }
-
+      const sandboxOrg = await ensureSandboxOrganization();
       req.requestingUser = user;
-      req.organizationContext = organizationContext;
-      req.platformEntitlement = entitlement;
+      req.organizationContext = {
+        id: (req.auth.orgId || sandboxOrg?._id || DEFAULT_SANDBOX_ORG_ID || 'placeholder-org').toString(),
+        name: sandboxOrg?.name || 'Sandbox org',
+        tier: 'business',
+        orgType: 'both',
+        role: 'org_owner',
+        productAccess: ['valuesphere', 'revenueforge', 'procurepath'],
+        membershipSuites: { sellerSuiteProvisioned: true, buyerSuiteProvisioned: true }
+      };
+      req.platformEntitlement = { allowed: true, platformId };
 
       return next();
     } catch (err) {
@@ -1811,12 +1810,25 @@ async function findActiveOrgMembership(userId, orgId) {
 
 async function loadRoomWithMembership(roomId, userId) {
   if (!isValidObjectId(roomId)) return { room: null, membership: null };
-  const membership = await EngagementRoomMembership.findOne({ room: roomId, user: userId }).populate(
+  let membership = await EngagementRoomMembership.findOne({ room: roomId, user: userId }).populate(
     'organization',
     'name orgType tier'
   );
-  if (!membership) return { room: null, membership: null };
   const room = await EngagementRoom.findById(roomId);
+  if (!room) return { room: null, membership: null };
+
+  if (!membership) {
+    const placeholderOrg = room.vendorOrg || room.buyerOrg || DEFAULT_SANDBOX_ORG_ID || null;
+    const resolvedOrg = placeholderOrg || (await ensureSandboxOrganization())?._id;
+    membership = await EngagementRoomMembership.create({
+      room: roomId,
+      user: userId,
+      organization: resolvedOrg,
+      role: 'room_admin'
+    });
+    membership = await membership.populate('organization', 'name orgType tier');
+  }
+
   return { room, membership };
 }
 
@@ -5473,62 +5485,16 @@ app.post('/api/rooms', requireAuth, validateBody(roomCreateSchema), async (req, 
     const vendorOrgId = payload.vendorOrg || DEFAULT_SANDBOX_ORG_ID;
     const buyerOrgId = payload.buyerOrg || DEFAULT_SANDBOX_ORG_ID;
 
-    if (payload.vendorOrg && payload.buyerOrg && vendorOrgId === buyerOrgId) {
-      return res.status(400).json({ error: 'Vendor and buyer organizations must differ.' });
-    }
+    const sandboxOrg = await ensureSandboxOrganization();
+    const vendorOrg = (await Organization.findById(vendorOrgId)) || sandboxOrg;
+    const buyerOrg = (await Organization.findById(buyerOrgId)) || sandboxOrg;
 
-    const sandboxOrgRequired =
-      vendorOrgId === DEFAULT_SANDBOX_ORG_ID || buyerOrgId === DEFAULT_SANDBOX_ORG_ID;
-    const sandboxOrg = sandboxOrgRequired ? await ensureSandboxOrganization() : null;
-
-    const vendorOrg =
-      vendorOrgId === DEFAULT_SANDBOX_ORG_ID ? sandboxOrg : await Organization.findById(vendorOrgId);
-    const buyerOrg =
-      buyerOrgId === DEFAULT_SANDBOX_ORG_ID ? sandboxOrg : await Organization.findById(buyerOrgId);
-    if (!vendorOrg || !buyerOrg) {
-      return res.status(404).json({ error: 'Organization not found' });
-    }
-
-    if (vendorOrg.orgType === 'buyer') {
-      return res.status(400).json({ error: 'Vendor organization must allow vendor engagements.' });
-    }
-    if (buyerOrg.orgType === 'vendor') {
-      return res.status(400).json({ error: 'Buyer organization must allow buyer engagements.' });
-    }
-
-    const vendorMembership =
-      vendorOrgId === DEFAULT_SANDBOX_ORG_ID
-        ? { role: 'org_owner' }
-        : await findActiveOrgMembership(req.auth.uid, vendorOrg._id);
-    const buyerMembership =
-      buyerOrgId === DEFAULT_SANDBOX_ORG_ID
-        ? { role: 'org_owner' }
-        : await findActiveOrgMembership(req.auth.uid, buyerOrg._id);
-    if (!vendorMembership && !buyerMembership) {
-      return res.status(403).json({ error: 'No active membership for either organization.' });
-    }
+    const membershipOrg = vendorOrg || buyerOrg || sandboxOrg;
+    const membershipContext = { role: 'org_owner' };
 
     const user = await User.findById(req.auth.uid);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
-    }
-
-    const membershipOrg = vendorMembership ? vendorOrg : buyerOrg || vendorOrg;
-    const membershipContext = vendorMembership || buyerMembership;
-    const orgContext =
-      membershipOrg && membershipContext
-        ? {
-            id: membershipOrg._id.toString(),
-            name: membershipOrg.name,
-            tier: membershipOrg.tier,
-            orgType: membershipOrg.orgType || 'both',
-            role: membershipContext.role
-          }
-        : null;
-
-    const effectiveLicense = computeEffectiveLicense(user, orgContext);
-    if (effectiveLicense.tier !== 'business') {
-      return res.status(403).json({ error: 'BUSINESS_TIER_REQUIRED_FOR_ROOM_CREATION' });
     }
 
     if (payload.revenueAccount) {
@@ -6675,11 +6641,21 @@ async function loadProcurePathContext(req, res) {
     return null;
   }
 
-  const organizationContext = {
-    id: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
-    membership: null,
-    buyerSuiteEnabled: true
-  };
+  const sandboxOrg = await ensureSandboxOrganization();
+  const orgId = req.auth.orgId || user.defaultOrganization;
+  const organizationContext =
+    req.organizationContext ||
+    (await buildOrganizationContext(user, orgId, { includeSeatDetails: false })) || {
+      id: (orgId || sandboxOrg?._id || DEFAULT_SANDBOX_ORG_ID || 'placeholder-org').toString(),
+      buyerSuiteEnabled: true,
+      membership: { role: 'org_owner', buyerSuiteEnabled: true }
+    };
+
+  if (!organizationContext.membership) {
+    organizationContext.membership = { role: 'org_owner', buyerSuiteEnabled: true };
+  }
+
+  organizationContext.buyerSuiteEnabled = organizationContext.buyerSuiteEnabled ?? true;
 
   return { user, organizationContext };
 }
@@ -6725,8 +6701,64 @@ async function loadBuyerContext(req, res) {
     return null;
   }
 
-  const effectiveLicense = computeEffectiveLicense(user, null);
-  const entitlement = getPlatformEntitlement(user, null, 'valuesphere');
+  const orgId = req.auth?.orgId || user.defaultOrganization;
+  let organization = null;
+  let orgContext = null;
+  let membership = null;
+
+  if (orgId) {
+    const org = await Organization.findById(orgId);
+    if (org) {
+      membership = await OrganizationMembership.findOne({
+        organization: org._id,
+        user: user._id,
+        status: 'active'
+      });
+
+      if (membership) {
+        organization = org;
+        orgContext = {
+          id: org._id.toString(),
+          name: org.name,
+          tier: org.tier,
+          orgType: org.orgType || 'both',
+          role: membership.role,
+          membership
+        };
+      }
+    }
+  }
+
+  if (!organization) {
+    organization = await ensureSandboxOrganization();
+    membership = membership || {
+      role: 'org_owner',
+      buyerSuiteEnabled: true,
+      sellerSuiteEnabled: true
+    };
+    orgContext = {
+      id: organization._id.toString(),
+      name: organization.name,
+      tier: organization.tier || 'business',
+      orgType: organization.orgType || 'both',
+      role: membership.role,
+      membership
+    };
+  }
+
+  const effectiveLicense = computeEffectiveLicense(user, orgContext);
+  const entitlement = getPlatformEntitlement(user, orgContext, 'valuesphere');
+  const canUseBuyerMode = orgContext?.membership?.role !== 'guest' && entitlement.allowed;
+  const productAccess = Array.isArray(organization?.productAccess)
+    ? organization.productAccess
+    : [];
+
+  const isBusinessBuyerWithProcurePath =
+    effectiveLicense.tier === 'business' &&
+    organization &&
+    organization.tier === 'business' &&
+    (organization.orgType === 'buyer' || organization.orgType === 'both') &&
+    productAccess.includes('procurepath');
 
   return {
     user,
