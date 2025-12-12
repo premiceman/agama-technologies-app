@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Organization = require('../models/Organization');
+const OrganizationMembership = require('../models/OrganizationMembership');
 
 const COOKIE = process.env.JWT_COOKIE_NAME || 'at_session';
 const SESSION_MS =
@@ -46,17 +48,44 @@ async function requireAuth(req, res, next) {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
-    const orgId = decoded.orgId || (user.defaultOrganization ? user.defaultOrganization.toString() : null);
+    const orgIdFromClaims = decoded.orgId || null;
+    const resolvedOrgId =
+      req.params?.orgId ||
+      req.query?.orgId ||
+      orgIdFromClaims ||
+      (user.defaultOrganization ? user.defaultOrganization.toString() : null);
+
+    let organization = null;
+    let membership = null;
+
+    if (resolvedOrgId) {
+      try {
+        organization = await Organization.findById(resolvedOrgId);
+        if (organization) {
+          membership = await OrganizationMembership.findOne({ organization: organization._id, user: user._id });
+        }
+      } catch (err) {
+        console.error('Org context load error', err);
+      }
+    }
+
+    const effectiveOrgId = organization?.id || resolvedOrgId || null;
     const shouldRefresh =
-      !decoded.exp || decoded.exp * 1000 - Date.now() < SESSION_MS / 2 || decoded.orgId !== orgId;
+      !decoded.exp || decoded.exp * 1000 - Date.now() < SESSION_MS / 2 || decoded.orgId !== effectiveOrgId;
     if (shouldRefresh) {
       issueTokenCookie(res, {
         uid: decoded.uid,
-        orgId
+        orgId: effectiveOrgId || undefined
       });
     }
 
-    req.auth = { ...decoded, orgId };
+    req.organization = organization || null;
+    req.orgMembership =
+      membership ||
+      (effectiveOrgId
+        ? { organization: effectiveOrgId, user: decoded.uid, role: decoded.role || 'guest', status: 'inactive', synthetic: true }
+        : null);
+    req.auth = { ...decoded, orgId: effectiveOrgId || null, role: decoded.role || 'user' };
     req.requestingUser = user;
     return next();
   } catch (err) {
