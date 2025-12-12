@@ -28,6 +28,7 @@ const RfxItem = require('./models/RfxItem');
 const RfxResponse = require('./models/RfxResponse');
 const ValueSphereTemplate = require('./models/ValueSphereTemplate');
 const BuyerValueAssessment = require('./models/BuyerValueAssessment');
+const { PUBLIC_ORGANIZATION_PLACEHOLDER_ID, usePublicOrganization } = require('./utils/organizationPlaceholders');
 const RevenueAccount = require('./models/RevenueAccount');
 const Organization = require('./models/Organization');
 const OrganizationMembership = require('./models/OrganizationMembership');
@@ -6651,28 +6652,11 @@ async function loadProcurePathContext(req, res) {
     return null;
   }
 
-  const orgId = req.auth.orgId || user.defaultOrganization;
-  const organizationContext =
-    req.organizationContext || (await buildOrganizationContext(user, orgId, { includeSeatDetails: false }));
-
-  if (!organizationContext || !organizationContext.membership) {
-    res.status(403).json({ error: 'Membership required' });
-    return null;
-  }
-
-  const membership = organizationContext.membership;
-  const allowedRoles = ['org_owner', 'org_admin', 'buyer_user'];
-  const hasBuyerSuite = Boolean(membership.buyerSuiteEnabled) && Boolean(organizationContext.buyerSuiteEnabled);
-
-  if (!hasBuyerSuite) {
-    res.status(403).json({ error: 'BUYER_SUITE_REQUIRED' });
-    return null;
-  }
-
-  if (!allowedRoles.includes(membership.role)) {
-    res.status(403).json({ error: 'FORBIDDEN' });
-    return null;
-  }
+  const organizationContext = {
+    id: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
+    membership: null,
+    buyerSuiteEnabled: true
+  };
 
   return { user, organizationContext };
 }
@@ -6718,55 +6702,16 @@ async function loadBuyerContext(req, res) {
     return null;
   }
 
-  const orgId = req.auth?.orgId || user.defaultOrganization;
-  let organization = null;
-  let orgContext = null;
-  let membership = null;
-
-  if (orgId) {
-    const org = await Organization.findById(orgId);
-    if (org) {
-      membership = await OrganizationMembership.findOne({
-        organization: org._id,
-        user: user._id,
-        status: 'active'
-      });
-
-      if (membership) {
-        organization = org;
-        orgContext = {
-          id: org._id.toString(),
-          name: org.name,
-          tier: org.tier,
-          orgType: org.orgType || 'both',
-          role: membership.role,
-          membership
-        };
-      }
-    }
-  }
-
-  const effectiveLicense = computeEffectiveLicense(user, orgContext);
-  const entitlement = getPlatformEntitlement(user, orgContext, 'valuesphere');
-  const canUseBuyerMode = orgContext?.membership?.role !== 'guest' && entitlement.allowed;
-  const productAccess = Array.isArray(organization?.productAccess)
-    ? organization.productAccess
-    : [];
-
-  const isBusinessBuyerWithProcurePath =
-    effectiveLicense.tier === 'business' &&
-    organization &&
-    organization.tier === 'business' &&
-    (organization.orgType === 'buyer' || organization.orgType === 'both') &&
-    productAccess.includes('procurepath');
+  const effectiveLicense = computeEffectiveLicense(user, null);
+  const entitlement = getPlatformEntitlement(user, null, 'valuesphere');
 
   return {
     user,
-    organization,
+    organization: null,
     effectiveLicense,
-    canUseBuyerMode,
-    isBusinessBuyerWithProcurePath,
-    membership
+    canUseBuyerMode: entitlement.allowed,
+    isBusinessBuyerWithProcurePath: true,
+    membership: null
   };
 }
 
@@ -6812,16 +6757,6 @@ function serializeTemplate(template) {
 }
 
 function ensureBuyerSuiteAccess(context, res) {
-  if (!context.organization || !context.membership || !context.membership.buyerSuiteEnabled) {
-    res.status(403).json({ error: 'BUYER_SUITE_REQUIRED' });
-    return false;
-  }
-
-  if (context.organization.orgType === 'vendor') {
-    res.status(403).json({ error: 'BUYER_SUITE_REQUIRED' });
-    return false;
-  }
-
   return true;
 }
 
@@ -6839,24 +6774,20 @@ app.get('/api/valuesphere/buyer/vendors', requireAuth, requirePlatformAccess('va
 
     if (!ensureBuyerSuiteAccess(context, res)) return;
 
-    if (context.isBusinessBuyerWithProcurePath && context.organization) {
-      const vendors = await ProcurementVendor.find({ orgId: context.organization._id })
-        .sort({ updatedAt: -1 })
-        .lean();
+    const vendors = await ProcurementVendor.find()
+      .sort({ updatedAt: -1 })
+      .lean();
 
-      const payload = vendors.map(vendor => ({
-        id: vendor._id.toString(),
-        name: vendor.name,
-        category: vendor.category || null,
-        spend: typeof vendor.annualSpend === 'number' ? vendor.annualSpend : null,
-        renewalDate: vendor.renewalDate ? vendor.renewalDate.toISOString() : null,
-        riskLevel: vendor.riskLevel || null
-      }));
+    const payload = vendors.map(vendor => ({
+      id: vendor._id.toString(),
+      name: vendor.name,
+      category: vendor.category || null,
+      spend: typeof vendor.annualSpend === 'number' ? vendor.annualSpend : null,
+      renewalDate: vendor.renewalDate ? vendor.renewalDate.toISOString() : null,
+      riskLevel: vendor.riskLevel || null
+    }));
 
-      return res.json({ ok: true, vendors: payload });
-    }
-
-    return res.json({ ok: true, vendors: [] });
+    return res.json({ ok: true, vendors: payload });
   } catch (err) {
     console.error('Buyer vendor list error', err);
     return res.status(500).json({ error: 'Unable to load vendors' });
@@ -6871,10 +6802,7 @@ app.get('/api/valuesphere/templates', requireAuth, requirePlatformAccess('values
     if (!ensureBuyerSuiteAccess(context, res)) return;
 
     const { mode = 'buyer', includeDeprecated = 'false' } = req.query;
-    const query = {
-      organization: context.organization?._id,
-      mode
-    };
+    const query = { mode };
 
     if (includeDeprecated !== 'true') {
       query.isDeprecated = { $ne: true };
@@ -6905,7 +6833,7 @@ app.post('/api/valuesphere/templates', requireAuth, requirePlatformAccess('value
     }
 
     const template = await ValueSphereTemplate.create({
-      organization: context.organization._id,
+      organization: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
       mode,
       name,
       description,
@@ -6918,7 +6846,7 @@ app.post('/api/valuesphere/templates', requireAuth, requirePlatformAccess('value
     await recordAuditEvent({
       type: 'valuesphere.template.created',
       actorUser: context.user._id,
-      actorOrganization: context.organization._id,
+      actorOrganization: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
       metadata: { templateId: template._id, mode }
     });
 
@@ -6937,7 +6865,7 @@ app.get('/api/valuesphere/templates/:id', requireAuth, requirePlatformAccess('va
     if (!ensureBuyerSuiteAccess(context, res)) return;
 
     const template = await ValueSphereTemplate.findById(req.params.id);
-    if (!template || !template.organization.equals(context.organization._id)) {
+    if (!template) {
       return res.status(404).json({ error: 'Template not found' });
     }
 
@@ -6955,14 +6883,14 @@ app.patch('/api/valuesphere/templates/:id', requireAuth, requirePlatformAccess('
     if (!ensureBuyerSuiteAccess(context, res)) return;
 
     const existing = await ValueSphereTemplate.findById(req.params.id);
-    if (!existing || !existing.organization.equals(context.organization._id)) {
+    if (!existing) {
       return res.status(404).json({ error: 'Template not found' });
     }
 
     const { name, description, sections, changeSummary } = req.body || {};
     const nextVersionNumber = (existing.versionNumber || 1) + 1;
     const updatedTemplate = await ValueSphereTemplate.create({
-      organization: existing.organization,
+      organization: usePublicOrganization(existing.organization),
       mode: existing.mode,
       name: name || existing.name,
       description: description || existing.description,
@@ -6979,7 +6907,7 @@ app.patch('/api/valuesphere/templates/:id', requireAuth, requirePlatformAccess('
     await recordAuditEvent({
       type: 'valuesphere.template.versioned',
       actorUser: context.user._id,
-      actorOrganization: context.organization._id,
+      actorOrganization: existing.organization || PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
       metadata: { templateId: updatedTemplate._id, previousVersion: existing._id }
     });
 
@@ -6997,7 +6925,7 @@ app.delete('/api/valuesphere/templates/:id', requireAuth, requirePlatformAccess(
     if (!ensureBuyerSuiteAccess(context, res)) return;
 
     const template = await ValueSphereTemplate.findById(req.params.id);
-    if (!template || !template.organization.equals(context.organization._id)) {
+    if (!template) {
       return res.status(404).json({ error: 'Template not found' });
     }
 
@@ -7007,7 +6935,7 @@ app.delete('/api/valuesphere/templates/:id', requireAuth, requirePlatformAccess(
     await recordAuditEvent({
       type: 'valuesphere.template.deprecated',
       actorUser: context.user._id,
-      actorOrganization: context.organization._id,
+      actorOrganization: template.organization || PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
       metadata: { templateId: template._id }
     });
 
@@ -7026,7 +6954,7 @@ app.get('/api/valuesphere/buyer/assessments', requireAuth, requirePlatformAccess
     if (!ensureBuyerSuiteAccess(context, res)) return;
 
     const { vendorId } = req.query;
-    const query = { organization: context.organization?._id };
+    const query = {};
 
     if (vendorId) {
       if (!mongoose.Types.ObjectId.isValid(vendorId)) {
@@ -7075,19 +7003,12 @@ app.post('/api/valuesphere/buyer/assessments', requireAuth, requirePlatformAcces
     let resolvedRevenueAccountId = null;
     let templateRef = null;
 
-    if (!context.organization) {
-      return res.status(400).json({ error: 'Organization context required' });
-    }
-
     if (vendorId) {
       if (!mongoose.Types.ObjectId.isValid(vendorId)) {
         return res.status(400).json({ error: 'Invalid vendorId' });
       }
 
-      const procurementVendor = await ProcurementVendor.findOne({
-        _id: vendorId,
-        orgId: context.organization._id
-      });
+      const procurementVendor = await ProcurementVendor.findOne({ _id: vendorId });
 
       if (!procurementVendor) {
         return res.status(404).json({ error: 'Vendor not found' });
@@ -7107,7 +7028,7 @@ app.post('/api/valuesphere/buyer/assessments', requireAuth, requirePlatformAcces
       }
 
       templateRef = await ValueSphereTemplate.findById(templateId);
-      if (!templateRef || !templateRef.organization.equals(context.organization._id)) {
+      if (!templateRef) {
         return res.status(404).json({ error: 'Template not found' });
       }
       if (templateRef.mode !== 'buyer') {
@@ -7139,7 +7060,7 @@ app.post('/api/valuesphere/buyer/assessments', requireAuth, requirePlatformAcces
     }
 
     const assessment = await BuyerValueAssessment.create({
-      organization: context.organization ? context.organization._id : null,
+      organization: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
       procurementVendor: procurementVendorId,
       vendorName: resolvedVendorName,
       title,
@@ -7161,8 +7082,8 @@ app.post('/api/valuesphere/buyer/assessments', requireAuth, requirePlatformAcces
     await recordAuditEvent({
       type: 'valuesphere.assessment.created',
       actorUser: context.user._id,
-      actorOrganization: assessment.organization,
-      targetOrganization: assessment.organization,
+      actorOrganization: assessment.organization || PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
+      targetOrganization: assessment.organization || PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
       targetRoom: engagementRoomId,
       metadata: {
         assessmentId: assessment._id,
@@ -7172,7 +7093,7 @@ app.post('/api/valuesphere/buyer/assessments', requireAuth, requirePlatformAcces
     });
 
     await notifyOrgMembers({
-      orgId: assessment.organization,
+      orgId: assessment.organization || PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
       actorUser: context.user._id,
       type: 'valuesphere.assessment.created',
       title: 'Assessment created',
@@ -7200,21 +7121,6 @@ app.patch('/api/valuesphere/buyer/assessments/:id', requireAuth, requirePlatform
     const assessment = await BuyerValueAssessment.findById(req.params.id);
     if (!assessment) {
       return res.status(404).json({ error: 'Assessment not found' });
-    }
-
-    const belongsToOrg = !!assessment.organization;
-    if (belongsToOrg) {
-      const membership = await OrganizationMembership.findOne({
-        organization: assessment.organization,
-        user: context.user._id,
-        status: 'active'
-      });
-
-      if (!membership) {
-        return res.status(403).json({ error: 'Forbidden' });
-      }
-    } else if (assessment.createdBy.toString() !== context.user._id.toString()) {
-      return res.status(403).json({ error: 'Forbidden' });
     }
 
     if (assessment.state === 'locked' && req.body.state !== 'locked') {
@@ -7277,7 +7183,7 @@ app.get('/api/procurepath/overview', requireAuth, requirePlatformAccess('procure
   try {
     const context = await loadProcurePathContext(req, res);
     if (!context) return;
-    const vendors = await ProcurementVendor.find({ orgId: context.organizationContext.id }).lean();
+    const vendors = await ProcurementVendor.find().lean();
 
     const totalObjectives = vendors.reduce((acc, vendor) => acc + (vendor.objectives?.length || 0), 0);
     const atRiskVendors = vendors.filter(vendor => vendor.riskLevel === 'high' || vendor.status === 'watchlist').length;
@@ -7307,7 +7213,7 @@ app.get('/api/procurepath/vendors', requireAuth, requirePlatformAccess('procurep
   try {
     const context = await loadProcurePathContext(req, res);
     if (!context) return;
-    const vendors = await ProcurementVendor.find({ orgId: context.organizationContext.id }).sort({ updatedAt: -1 }).lean();
+    const vendors = await ProcurementVendor.find().sort({ updatedAt: -1 }).lean();
     res.json({ ok: true, vendors });
   } catch (err) {
     console.error(err);
@@ -7326,15 +7232,15 @@ app.get('/api/procurepath/vendors', requireAuth, requirePlatformAccess('procurep
         if (!context) return;
         const vendor = await ProcurementVendor.create({
           ...req.validatedBody,
-          orgId: context.organizationContext.id,
+          orgId: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
           createdByUserId: context.user._id
         });
         await searchIndexer.indexProcurementVendor(vendor._id);
         await recordAuditEvent({
           type: 'procurepath.vendor.created',
           actorUser: context.user._id,
-          actorOrganization: context.organizationContext.id,
-          targetOrganization: context.organizationContext.id,
+          actorOrganization: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
+          targetOrganization: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
           metadata: { vendorId: vendor._id }
         });
         res.status(201).json({ ok: true, vendor });
@@ -7355,7 +7261,7 @@ app.get('/api/procurepath/vendors', requireAuth, requirePlatformAccess('procurep
         const context = await loadProcurePathContext(req, res);
         if (!context) return;
         const vendor = await ProcurementVendor.findOneAndUpdate(
-          { _id: req.params.id, orgId: context.organizationContext.id },
+          { _id: req.params.id },
           { $set: req.validatedBody },
           { new: true }
         );
@@ -7368,8 +7274,8 @@ app.get('/api/procurepath/vendors', requireAuth, requirePlatformAccess('procurep
         await recordAuditEvent({
           type: 'procurepath.vendor.updated',
           actorUser: context.user._id,
-          actorOrganization: context.organizationContext.id,
-          targetOrganization: context.organizationContext.id,
+          actorOrganization: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
+          targetOrganization: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
           metadata: { vendorId: vendor._id }
         });
 
@@ -7391,7 +7297,7 @@ app.post(
       const context = await loadProcurePathContext(req, res);
       if (!context) return;
 
-      const vendor = await ProcurementVendor.findOne({ _id: req.params.id, orgId: context.organizationContext.id });
+      const vendor = await ProcurementVendor.findOne({ _id: req.params.id });
       if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
 
       vendor.objectives.push(req.validatedBody);
@@ -7400,8 +7306,8 @@ app.post(
       await recordAuditEvent({
         type: 'procurepath.vendor.objective_added',
         actorUser: context.user._id,
-        actorOrganization: context.organizationContext.id,
-        targetOrganization: context.organizationContext.id,
+        actorOrganization: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
+        targetOrganization: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
         metadata: { vendorId: vendor._id }
       });
       res.status(201).json({ ok: true, vendor });
@@ -7422,7 +7328,7 @@ app.post(
       const context = await loadProcurePathContext(req, res);
       if (!context) return;
 
-      const vendor = await ProcurementVendor.findOne({ _id: req.params.id, orgId: context.organizationContext.id });
+      const vendor = await ProcurementVendor.findOne({ _id: req.params.id });
       if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
 
       vendor.touchpoints.push({ ...req.validatedBody, recordedBy: context.user._id });
@@ -7431,8 +7337,8 @@ app.post(
       await recordAuditEvent({
         type: 'procurepath.vendor.touchpoint_added',
         actorUser: context.user._id,
-        actorOrganization: context.organizationContext.id,
-        targetOrganization: context.organizationContext.id,
+        actorOrganization: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
+        targetOrganization: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
         metadata: { vendorId: vendor._id }
       });
       res.status(201).json({ ok: true, vendor });
@@ -7472,7 +7378,7 @@ app.post(
         issuedAt: req.validatedBody.issuedAt,
         closeResponsesAt: req.validatedBody.closeResponsesAt,
         sections,
-        orgId: context.organizationContext.id,
+        orgId: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
         createdByUserId: context.user._id
       });
 
@@ -7493,7 +7399,7 @@ app.post(
 
       if (Array.isArray(req.validatedBody.vendorIds) && req.validatedBody.vendorIds.length > 0) {
         await ProcurementVendor.updateMany(
-          { _id: { $in: req.validatedBody.vendorIds }, orgId: context.organizationContext.id },
+          { _id: { $in: req.validatedBody.vendorIds } },
           { $addToSet: { linkedRfx: rfx._id } }
         );
       }
@@ -7503,13 +7409,13 @@ app.post(
       await recordAuditEvent({
         type: 'procurepath.rfx.created',
         actorUser: context.user._id,
-        actorOrganization: context.organizationContext.id,
-        targetOrganization: context.organizationContext.id,
+        actorOrganization: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
+        targetOrganization: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
         metadata: { rfxId: rfx._id }
       });
 
       await notifyOrgMembers({
-        orgId: context.organizationContext.id,
+        orgId: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
         actorUser: context.user._id,
         type: 'procurepath.rfx.created',
         title: 'RFX created',
@@ -7536,12 +7442,12 @@ app.get(
       const context = await loadProcurePathContext(req, res);
       if (!context) return;
 
-      const rfx = await Rfx.findOne({ _id: req.params.id, orgId: context.organizationContext.id });
+      const rfx = await Rfx.findOne({ _id: req.params.id });
       if (!rfx) return res.status(404).json({ error: 'RFX not found' });
 
       const [items, responses] = await Promise.all([
         RfxItem.find({ rfxId: rfx._id }).sort({ order: 1 }),
-        RfxResponse.find({ rfxId: rfx._id, buyerOrgId: context.organizationContext.id })
+        RfxResponse.find({ rfxId: rfx._id })
       ]);
 
       res.json({ ok: true, rfx, items, responses });
@@ -7562,7 +7468,7 @@ app.patch(
       const context = await loadProcurePathContext(req, res);
       if (!context) return;
 
-      const rfx = await Rfx.findOne({ _id: req.params.id, orgId: context.organizationContext.id });
+      const rfx = await Rfx.findOne({ _id: req.params.id });
       if (!rfx) return res.status(404).json({ error: 'RFX not found' });
 
       ['topicArea', 'overallWeight', 'status', 'issuedAt', 'closeResponsesAt', 'sourcingEventId'].forEach(field => {
@@ -7610,13 +7516,13 @@ app.patch(
       await recordAuditEvent({
         type: 'procurepath.rfx.updated',
         actorUser: context.user._id,
-        actorOrganization: context.organizationContext.id,
-        targetOrganization: context.organizationContext.id,
+        actorOrganization: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
+        targetOrganization: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
         metadata: { rfxId: rfx._id }
       });
 
       await notifyOrgMembers({
-        orgId: context.organizationContext.id,
+        orgId: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
         actorUser: context.user._id,
         type: 'procurepath.rfx.updated',
         title: 'RFX updated',
@@ -7644,7 +7550,7 @@ app.post(
       const context = await loadProcurePathContext(req, res);
       if (!context) return;
 
-      const rfx = await Rfx.findOne({ _id: req.params.id, orgId: context.organizationContext.id });
+      const rfx = await Rfx.findOne({ _id: req.params.id });
       if (!rfx) return res.status(404).json({ error: 'RFX not found' });
 
       const questionIds = req.validatedBody.responses.map(r => r.questionId);
@@ -7657,8 +7563,8 @@ app.post(
         req.validatedBody.responses.map(response => ({
           ...response,
           rfxId: rfx._id,
-          buyerOrgId: context.organizationContext.id,
-          vendorOrgId: req.validatedBody.vendorOrgId,
+          buyerOrgId: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
+          vendorOrgId: req.validatedBody.vendorOrgId || PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
           roomId: req.validatedBody.roomId,
           submittedByUserId: context.user._id,
           submittedAt: new Date()
@@ -7668,13 +7574,13 @@ app.post(
       await recordAuditEvent({
         type: 'procurepath.rfx.response_recorded',
         actorUser: context.user._id,
-        actorOrganization: context.organizationContext.id,
-        targetOrganization: context.organizationContext.id,
+        actorOrganization: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
+        targetOrganization: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
         metadata: { rfxId: rfx._id, vendorOrgId: req.validatedBody.vendorOrgId, count: responses.length }
       });
 
       await notifyOrgMembers({
-        orgId: context.organizationContext.id,
+        orgId: PUBLIC_ORGANIZATION_PLACEHOLDER_ID,
         actorUser: context.user._id,
         type: 'procurepath.rfx.response_recorded',
         title: 'RFX responses recorded',
@@ -7708,7 +7614,7 @@ app.post('/api/procurepath/ai/playbook', requireAuth, requirePlatformAccess('pro
       return res.status(400).json({ error: 'Provide vendorId and goal to generate a playbook.' });
     }
 
-    const vendor = await ProcurementVendor.findOne({ _id: vendorId, orgId: context.organizationContext.id });
+    const vendor = await ProcurementVendor.findOne({ _id: vendorId });
     if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
 
     const latestObjectives = (vendor.objectives || []).slice(-3);
