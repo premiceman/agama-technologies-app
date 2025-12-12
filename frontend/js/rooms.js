@@ -4,6 +4,7 @@ const state = {
   effectiveLicenseTier: null,
   isGuest: false,
   organizations: [],
+  revenueAccounts: [],
   roomId: null,
   room: null,
   members: [],
@@ -18,6 +19,8 @@ const state = {
   persona: 'shared',
   eventsInterval: null
 };
+
+const SANDBOX_ORG_ID = '000000000000000000000000';
 
 async function fetchJson(url, options = {}) {
   const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, credentials: 'include', ...options });
@@ -94,6 +97,20 @@ function resolveOrgName(orgId) {
   if (!orgId) return 'Unknown';
   const org = state.organizations.find(o => o.id === orgId || o._id === orgId);
   return org?.name || orgId;
+}
+
+function resolveGuestOrgId() {
+  const guestOrg =
+    state.organizations.find(org => org.orgType === 'buyer') ||
+    state.organizations.find(org => org.orgType === 'both');
+  const fallbackOrg = state.organizations[0];
+  return (
+    guestOrg?._id ||
+    guestOrg?.id ||
+    fallbackOrg?._id ||
+    fallbackOrg?.id ||
+    SANDBOX_ORG_ID
+  );
 }
 
 function derivePersona(membership, room) {
@@ -232,6 +249,13 @@ async function initRoomsPage() {
       state.organizations = orgsResp.organizations || [];
     } catch (err) {
       state.organizations = [];
+    }
+
+    try {
+      const accountsResp = await fetchJson('/api/revenueforge/accounts');
+      state.revenueAccounts = accountsResp.accounts || [];
+    } catch (err) {
+      state.revenueAccounts = [];
     }
     setText(
       'roomsOrgContext',
@@ -419,24 +443,21 @@ function setupCreateRoomHandlers() {
     if (feedback) feedback.textContent = '';
     const title = document.getElementById('createRoomTitle')?.value.trim();
     const vendorOrg = document.getElementById('createRoomVendorOrg')?.value;
-    const buyerOrg = document.getElementById('createRoomBuyerOrg')?.value;
+    const buyerAccount = document.getElementById('createRoomBuyerOrg')?.value;
     if (!title) {
       if (feedback) feedback.textContent = 'Title is required.';
       return;
     }
-    if (!vendorOrg || !buyerOrg) {
-      if (feedback) feedback.textContent = 'Select both vendor and buyer organizations.';
-      return;
-    }
-    if (vendorOrg === buyerOrg) {
-      if (feedback) feedback.textContent = 'Vendor and buyer must be different organizations.';
+    if (!vendorOrg || !buyerAccount) {
+      if (feedback) feedback.textContent = 'Select a vendor and buyer account.';
       return;
     }
 
     try {
+      const buyerOrg = resolveGuestOrgId();
       const res = await fetchJson('/api/rooms', {
         method: 'POST',
-        body: JSON.stringify({ title, vendorOrg, buyerOrg })
+        body: JSON.stringify({ title, vendorOrg, buyerOrg, revenueAccount: buyerAccount })
       });
       const createdId = res.room?.id || res.room?._id;
       if (modal) modal.hide();
@@ -463,25 +484,29 @@ function populateCreateRoomModal() {
     emptyVendor.disabled = true;
     emptyVendor.selected = true;
     vendorSelect.appendChild(emptyVendor);
+  } else {
+    state.organizations.forEach(org => {
+      const vendorOpt = document.createElement('option');
+      vendorOpt.value = org.id || org._id;
+      vendorOpt.textContent = org.name;
+      vendorSelect.appendChild(vendorOpt);
+    });
+  }
 
+  if (!state.revenueAccounts.length) {
     const emptyBuyer = document.createElement('option');
-    emptyBuyer.textContent = 'No organizations available';
+    emptyBuyer.textContent = 'No RevenueForge accounts found';
     emptyBuyer.disabled = true;
     emptyBuyer.selected = true;
     buyerSelect.appendChild(emptyBuyer);
-    return;
+  } else {
+    state.revenueAccounts.forEach(account => {
+      const buyerOpt = document.createElement('option');
+      buyerOpt.value = account._id || account.id;
+      buyerOpt.textContent = account.name || 'Unnamed account';
+      buyerSelect.appendChild(buyerOpt);
+    });
   }
-  state.organizations.forEach(org => {
-    const vendorOpt = document.createElement('option');
-    vendorOpt.value = org.id;
-    vendorOpt.textContent = org.name;
-    vendorSelect.appendChild(vendorOpt);
-
-    const buyerOpt = document.createElement('option');
-    buyerOpt.value = org.id;
-    buyerOpt.textContent = org.name;
-    buyerSelect.appendChild(buyerOpt);
-  });
 }
 
 async function initRoomDetailPage() {
