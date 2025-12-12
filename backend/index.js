@@ -356,6 +356,13 @@ const PLATFORM_IDS = new Set(PLATFORM_DEFINITIONS.map(platform => platform.id));
 const PERSONAL_ALLOWED_PLATFORMS = new Set(['valuesphere']);
 const LICENSE_PLANS = ['free-personal', 'vendor-enterprise', 'procurement-enterprise', 'consulting-enterprise'];
 
+// 🔧 Map platforms to required suites
+const PLATFORM_SUITE_REQUIREMENTS = {
+  'valuesphere': { suites: ['vendorSuite', 'buyerSuite'], requiresBusiness: false },
+  'procurepath': { suites: ['buyerSuite'], requiresBusiness: true },
+  'revenueforge': { suites: ['vendorSuite'], requiresBusiness: true }
+};
+
 function storeWorkOSState(res) {
   const value = crypto.randomBytes(24).toString('hex');
   res.cookie(WORKOS_STATE_COOKIE, value, {
@@ -1069,14 +1076,42 @@ function serializeAuditEvent(event) {
 function getPlatformEntitlement(user, organizationContext, platformId) {
   const platform = PLATFORM_DEFINITIONS.find(p => p.id === platformId);
   const effectiveLicense = computeEffectiveLicense(user, organizationContext);
-
-  const membership = organizationContext?.membership;
-  const permissions = membership
-    ? getEffectivePermissions(user, organizationContext, membership)
-    : { vendorSuiteAccess: true, buyerSuiteAccess: true };
+  const suiteReqs = PLATFORM_SUITE_REQUIREMENTS[platformId];
 
   if (!platform) {
     return { allowed: false, reason: 'unknown_platform', effectiveLicense };
+  }
+
+  if (!organizationContext) {
+    return { allowed: false, reason: 'no_organization_context', effectiveLicense };
+  }
+
+  const membership = organizationContext?.membership;
+  if (!membership) {
+    return { allowed: false, reason: 'no_membership', effectiveLicense };
+  }
+
+  const permissions = getEffectivePermissions(user, organizationContext, membership);
+
+  // Check license requirement
+  if (suiteReqs?.requiresBusiness) {
+    const isBusinessLicense = effectiveLicense?.tier === 'business';
+    if (!isBusinessLicense) {
+      return { allowed: false, reason: 'business_license_required', effectiveLicense, permissions };
+    }
+  }
+
+  // Check suite access
+  if (suiteReqs?.suites) {
+    const hasRequiredSuite = suiteReqs.suites.some(suite => {
+      if (suite === 'vendorSuite') return permissions.vendorSuiteAccess;
+      if (suite === 'buyerSuite') return permissions.buyerSuiteAccess;
+      return false;
+    });
+
+    if (!hasRequiredSuite) {
+      return { allowed: false, reason: 'suite_access_denied', effectiveLicense, permissions };
+    }
   }
 
   return { allowed: true, reason: 'ok', effectiveLicense, permissions };
@@ -1181,6 +1216,41 @@ function projectSeatUsage(currentUsage, previousCategory, nextCategory) {
 }
 
 function findSeatLimitViolation(usage, seatLimits = {}) {
+  if (!seatLimits || typeof seatLimits !== 'object') {
+    return null;
+  }
+
+  const vendorLimit = Number(seatLimits.vendorSuite) || 0;
+  const buyerLimit = Number(seatLimits.buyerSuite) || 0;
+  const bothLimit = Number(seatLimits.bothSuites) || 0;
+
+  if (vendorLimit > 0 && usage.vendorUsed >= vendorLimit) {
+    return {
+      violationType: 'vendor_suite_limit',
+      limit: vendorLimit,
+      used: usage.vendorUsed,
+      message: `Vendor suite seat limit (${vendorLimit}) reached`
+    };
+  }
+
+  if (buyerLimit > 0 && usage.buyerUsed >= buyerLimit) {
+    return {
+      violationType: 'buyer_suite_limit',
+      limit: buyerLimit,
+      used: usage.buyerUsed,
+      message: `Buyer suite seat limit (${buyerLimit}) reached`
+    };
+  }
+
+  if (bothLimit > 0 && usage.bothUsed >= bothLimit) {
+    return {
+      violationType: 'both_suites_limit',
+      limit: bothLimit,
+      used: usage.bothUsed,
+      message: `Both suites seat limit (${bothLimit}) reached`
+    };
+  }
+
   return null;
 }
 
@@ -2480,7 +2550,10 @@ app.get('/api/auth/workos/callback', async (req, res) => {
           workosOrganizationId: workosOrgId,
           orgType: 'both',
           tier: 'business',
-          productAccess: ['valuesphere']
+          productAccess: ['valuesphere'],
+          vendorSuiteEnabled: false,
+          buyerSuiteEnabled: false,
+          seatLimits: { vendorSuite: 0, buyerSuite: 0, bothSuites: 0 }
         });
         await organization.save();
       }
@@ -3119,7 +3192,9 @@ app.post('/api/onboarding', requireAuth, validateBody(onboardingSchema), async (
     const nextResponses = { ...(user.onboardingResponses || {}) };
 
     // 🔧 Normalise suite selection across payload and previous state
-    const canonicalSuiteSelection = { vendorSuite: true, buyerSuite: true };
+    const canonicalSuiteSelection = payload.suiteSelection ||
+      nextResponses.suiteSelection ||
+      { vendorSuite: false, buyerSuite: false };
 
     nextResponses.suiteSelection = canonicalSuiteSelection;
     [
@@ -3197,6 +3272,44 @@ app.post('/api/onboarding', requireAuth, validateBody(onboardingSchema), async (
         }
       } catch (err) {
         console.error('Default org attachment failed during onboarding', err);
+      }
+    }
+
+    // 🔧 If user already has a default org from WorkOS and is completing onboarding,
+    // enable suites on that org based on their selection
+    if (finalize && user.defaultOrganization && !createdOrg) {
+      try {
+        const defaultOrg = await Organization.findById(user.defaultOrganization);
+        if (defaultOrg && !defaultOrg.productAccess?.length) {
+          const hasVendor = Boolean(suiteSelection?.vendorSuite);
+          const hasBuyer = Boolean(suiteSelection?.buyerSuite);
+
+          if (hasVendor || hasBuyer) {
+            defaultOrg.vendorSuiteEnabled = hasVendor;
+            defaultOrg.buyerSuiteEnabled = hasBuyer;
+            defaultOrg.productAccess = [];
+            if (hasVendor) defaultOrg.productAccess.push('valuesphere', 'revenueforge');
+            if (hasBuyer) defaultOrg.productAccess.push('procurepath', 'valuesphere');
+
+            if (!defaultOrg.seatLimits || !defaultOrg.seatLimits.vendorSuite) {
+              defaultOrg.seatLimits = { vendorSuite: 10, buyerSuite: 10, bothSuites: 10 };
+            }
+
+            await defaultOrg.save();
+
+            const userMembership = await OrganizationMembership.findOne({
+              organization: defaultOrg._id,
+              user: user._id
+            });
+            if (userMembership) {
+              userMembership.vendorSuiteEnabled = hasVendor;
+              userMembership.buyerSuiteEnabled = hasBuyer;
+              await userMembership.save();
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to enable suites on default org during onboarding', err);
       }
     }
 

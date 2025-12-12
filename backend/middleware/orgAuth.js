@@ -6,11 +6,11 @@ const ORG_AUTH_MODE = (process.env.ORG_AUTH_MODE || 'strict').toLowerCase();
 const DEFAULT_ORG_MODE_ENABLED = ORG_AUTH_MODE === 'default-org';
 
 function buildEffectiveEntitlements(membership, organization) {
-  const orgVendor = true;
-  const orgBuyer = true;
+  const orgVendor = Boolean(organization?.vendorSuiteEnabled ?? false);
+  const orgBuyer = Boolean(organization?.buyerSuiteEnabled ?? false);
 
-  const memberVendor = Boolean(membership?.vendorSuiteEnabled ?? true);
-  const memberBuyer = Boolean(membership?.buyerSuiteEnabled ?? true);
+  const memberVendor = Boolean(membership?.vendorSuiteEnabled ?? false);
+  const memberBuyer = Boolean(membership?.buyerSuiteEnabled ?? false);
 
   const effectiveVendorSuite = orgVendor && memberVendor;
   const effectiveBuyerSuite = orgBuyer && memberBuyer;
@@ -36,20 +36,26 @@ function getEffectivePermissions(user, organization, membership) {
   const role = membership?.role;
   const entitlements = buildEffectiveEntitlements(membership, organization);
 
+  const isOrgOwner = role === 'org_owner';
+  const isOrgAdmin = role === 'org_owner' || role === 'org_admin';
+  const canManageOrg = isOrgAdmin;
+
   return {
     role,
     entitlements,
-    isOrgOwner: true,
-    isOrgAdmin: true,
-    canManageOrg: true,
-    vendorSuiteAccess: true,
-    buyerSuiteAccess: true,
+    isOrgOwner,
+    isOrgAdmin,
+    canManageOrg,
+    vendorSuiteAccess: entitlements.effective.vendorSuite,
+    buyerSuiteAccess: entitlements.effective.buyerSuite,
   };
 }
 
 function hasOrgRole(membership, minRole) {
   if (!membership) return false;
-  return true;
+  const memberRoleIndex = ORG_ROLE_ORDER.indexOf(membership.role);
+  const minRoleIndex = ORG_ROLE_ORDER.indexOf(minRole);
+  return memberRoleIndex >= minRoleIndex;
 }
 
 async function resolveDefaultOrganization() {
@@ -118,6 +124,10 @@ function requireOrgRole(minRole) {
         return res.status(403).json({ error: 'No active membership for this organization.' });
       }
 
+      if (!hasOrgRole(membership, minRole)) {
+        return res.status(403).json({ error: 'Insufficient role to access this resource.' });
+      }
+
       req.organization = organization;
       req.orgMembership = membership;
 
@@ -129,4 +139,4 @@ function requireOrgRole(minRole) {
   };
 }
 
-module.exports = { requireOrgRole, getEffectivePermissions };
+module.exports = { requireOrgRole, getEffectivePermissions, hasOrgRole };

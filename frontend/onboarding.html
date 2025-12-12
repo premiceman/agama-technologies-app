@@ -9,6 +9,47 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <link rel="stylesheet" href="/css/styles.v2.css">
+  <style>
+    .suite-selector {
+      cursor: pointer;
+      border: 2px solid #e0e0e0;
+      transition: all 0.3s ease;
+    }
+    .suite-selector:hover {
+      border-color: #333;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .suite-selector.selected {
+      border-color: var(--bs-primary);
+      background-color: rgba(0, 123, 255, 0.05);
+    }
+    .step-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 32px;
+    }
+    .step-dot {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #e0e0e0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: #666;
+    }
+    .step-dot.active {
+      background: var(--bs-primary);
+      color: white;
+    }
+    .step-dot.complete {
+      background: #28a745;
+      color: white;
+    }
+  </style>
 </head>
 <body class="bg-body text-fg">
   <div class="liquid-bg" aria-hidden="true">
@@ -20,53 +61,279 @@
   <div class="container py-5">
     <div class="row justify-content-center">
       <div class="col-lg-8">
-        <div class="glass rounded-4 p-4 p-md-5 shadow-lg position-relative overflow-hidden">
-          <span class="badge-soft mb-3">Instant access</span>
-          <h1 class="h3 mb-3">You now get the full Agama platform</h1>
+
+        <!-- Step 1: Suite Selection -->
+        <div id="step1-suite" class="glass rounded-4 p-4 p-md-5 shadow-lg position-relative overflow-hidden">
+          <div class="step-indicator">
+            <div class="step-dot active">1</div>
+            <div class="step-label">Choose your suite</div>
+          </div>
+
+          <h1 class="h3 mb-2">What would you like to focus on?</h1>
+          <p class="text-fg-3 mb-5">
+            Select the suite that best matches your role. You can access additional features later.
+          </p>
+
+          <div class="row g-3 mb-4">
+            <!-- Vendor Suite -->
+            <div class="col-md-6">
+              <div class="suite-selector glass p-4 rounded-3 h-100" data-suite="vendor">
+                <div class="d-flex align-items-start gap-3">
+                  <div class="flex-grow-1">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                      <i class="bi bi-rocket-takeoff text-brand fs-5"></i>
+                      <h5 class="h6 mb-0">Vendor Suite</h5>
+                    </div>
+                    <p class="small text-fg-2 mb-3">Perfect for sales and revenue teams</p>
+                    <ul class="small text-fg-2 list-unstyled">
+                      <li><i class="bi bi-check-lg text-success me-2"></i><strong>ValueSphere</strong> - Value assessments</li>
+                      <li><i class="bi bi-check-lg text-success me-2"></i><strong>RevenueForge</strong> - AI-powered sales</li>
+                      <li><i class="bi bi-check-lg text-success me-2"></i><strong>Engagement Rooms</strong> - Collaboration</li>
+                    </ul>
+                  </div>
+                  <div class="form-check mt-1">
+                    <input class="form-check-input suite-radio" type="radio" name="suite" value="vendor" id="suite-vendor">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Buyer Suite -->
+            <div class="col-md-6">
+              <div class="suite-selector glass p-4 rounded-3 h-100" data-suite="buyer">
+                <div class="d-flex align-items-start gap-3">
+                  <div class="flex-grow-1">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                      <i class="bi bi-diagram-3 text-brand fs-5"></i>
+                      <h5 class="h6 mb-0">Buyer Suite</h5>
+                    </div>
+                    <p class="small text-fg-2 mb-3">Perfect for procurement teams</p>
+                    <ul class="small text-fg-2 list-unstyled">
+                      <li><i class="bi bi-check-lg text-success me-2"></i><strong>ProcurePath</strong> - Vendor control</li>
+                      <li><i class="bi bi-check-lg text-success me-2"></i><strong>Engagement Rooms</strong> - Collaboration</li>
+                      <li><i class="bi bi-check-lg text-success me-2"></i><strong>ValueSphere</strong> - Vendor assessments</li>
+                    </ul>
+                  </div>
+                  <div class="form-check mt-1">
+                    <input class="form-check-input suite-radio" type="radio" name="suite" value="buyer" id="suite-buyer">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-between">
+            <button class="btn btn-outline-secondary" onclick="window.location='/workspace.html'">Skip for now</button>
+            <button id="step1-next" class="btn btn-primary" disabled>Continue</button>
+          </div>
+        </div>
+
+        <!-- Step 2: Organization Creation -->
+        <div id="step2-org" class="glass rounded-4 p-4 p-md-5 shadow-lg position-relative overflow-hidden" style="display:none;">
+          <div class="step-indicator">
+            <div class="step-dot complete"><i class="bi bi-check"></i></div>
+            <div class="step-label">Suite selected</div>
+            <span class="ms-3">•</span>
+            <div class="step-dot active ms-3">2</div>
+            <div class="step-label">Create organization</div>
+          </div>
+
+          <h1 class="h3 mb-2">Set up your organization</h1>
           <p class="text-fg-3 mb-4">
-            We removed licensing and role gates so every user can explore both the Seller (ValueSphere) and Buyer experiences in one place.
+            Create a workspace that will contain your team and all your work.
+          </p>
+
+          <form id="orgForm" class="mb-4">
+            <div class="mb-3">
+              <label for="orgName" class="form-label">Organization name *</label>
+              <input type="text" class="form-control" id="orgName" placeholder="e.g., Acme Corp, Sales Team" required>
+              <div class="form-text">This is the name of your shared workspace</div>
+            </div>
+
+            <div class="mb-3">
+              <label for="orgSlug" class="form-label">Organization URL slug</label>
+              <div class="input-group">
+                <span class="input-group-text">agama.workspace/</span>
+                <input type="text" class="form-control" id="orgSlug" placeholder="acme-corp">
+              </div>
+              <div class="form-text">A unique identifier for your organization (auto-generated if left blank)</div>
+            </div>
+
+            <div class="alert alert-info d-flex align-items-start gap-2">
+              <i class="bi bi-info-circle-fill"></i>
+              <div class="small">
+                You'll be the organization owner and can invite team members after setup.
+              </div>
+            </div>
+          </form>
+
+          <div id="orgErrorMessage" class="alert alert-danger d-none" role="alert"></div>
+
+          <div class="d-flex gap-2">
+            <button id="step2-back" class="btn btn-outline-secondary">Back</button>
+            <button id="step2-next" class="btn btn-primary ms-auto">Create organization</button>
+          </div>
+        </div>
+
+        <!-- Step 3: Welcome -->
+        <div id="step3-welcome" class="glass rounded-4 p-4 p-md-5 shadow-lg position-relative overflow-hidden" style="display:none;">
+          <div class="step-indicator">
+            <div class="step-dot complete"><i class="bi bi-check"></i></div>
+            <div class="step-label">Complete</div>
+          </div>
+
+          <span class="badge-soft mb-3">Welcome aboard!</span>
+          <h1 class="h3 mb-3">Your workspace is ready</h1>
+          <p class="text-fg-3 mb-4">
+            You're all set to start using the Agama platform. Your organization is ready and your features are enabled.
           </p>
 
           <div class="row g-3 mb-4">
             <div class="col-md-6">
               <div class="glass p-3 rounded-3 h-100">
                 <div class="d-flex align-items-center gap-2 mb-2">
-                  <i class="bi bi-rocket-takeoff text-brand"></i>
-                  <h5 class="h6 mb-0">Seller + ValueSphere</h5>
+                  <i class="bi bi-gear text-brand"></i>
+                  <h5 class="h6 mb-0">Organization settings</h5>
                 </div>
-                <p class="small text-fg-2 mb-0">Engagement Rooms, RevenueForge, and ValueSphere are unlocked for everyone.</p>
+                <p class="small text-fg-2 mb-0">Manage members, roles, and billing from settings.</p>
               </div>
             </div>
             <div class="col-md-6">
               <div class="glass p-3 rounded-3 h-100">
                 <div class="d-flex align-items-center gap-2 mb-2">
-                  <i class="bi bi-diagram-3 text-brand"></i>
-                  <h5 class="h6 mb-0">Buyer tools</h5>
+                  <i class="bi bi-people text-brand"></i>
+                  <h5 class="h6 mb-0">Invite your team</h5>
                 </div>
-                <p class="small text-fg-2 mb-0">ProcurePath and buyer governance features are ready to use without limits.</p>
+                <p class="small text-fg-2 mb-0">Add team members and assign roles in settings.</p>
               </div>
             </div>
           </div>
 
-          <div class="alert alert-info d-flex align-items-start gap-2" role="status">
-            <i class="bi bi-check-circle-fill fs-5"></i>
-            <div>
-              <div class="fw-semibold" id="onboardingStatus">Preparing your workspace…</div>
-              <div class="small text-fg-3" id="onboardingDetail">Creating a shared workspace with both suites enabled.</div>
-            </div>
-          </div>
-
-          <div class="d-flex align-items-center gap-3 mt-4">
-            <button id="continueButton" class="btn btn-primary" disabled>
-              Enter the workspace
-            </button>
-            <div class="small text-fg-3" id="progressHint">This will only take a moment.</div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary" onclick="window.location='/workspace.html'">Enter workspace</button>
           </div>
         </div>
+
       </div>
     </div>
   </div>
 
-  <script src="/js/onboarding.js"></script>
+  <script src="/js/main.js"></script>
+  <script>
+    let selectedSuite = null;
+    let createdOrgId = null;
+
+    // Suite selection handlers
+    document.querySelectorAll('.suite-selector').forEach(selector => {
+      selector.addEventListener('click', function() {
+        document.querySelectorAll('.suite-selector').forEach(s => s.classList.remove('selected'));
+        this.classList.add('selected');
+
+        const suite = this.dataset.suite;
+        document.getElementById(`suite-${suite}`).checked = true;
+        selectedSuite = suite;
+
+        document.getElementById('step1-next').disabled = false;
+      });
+    });
+
+    // Step 1: Next button
+    document.getElementById('step1-next').addEventListener('click', async () => {
+      if (!selectedSuite) return;
+
+      try {
+        // Send suite selection to server
+        const response = await fetch('/api/onboarding', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            suiteSelection: {
+              vendorSuite: selectedSuite === 'vendor' || selectedSuite === 'both',
+              buyerSuite: selectedSuite === 'buyer' || selectedSuite === 'both'
+            },
+            status: 'in-progress'
+          })
+        });
+
+        if (!response.ok) throw new Error('Failed to save suite selection');
+
+        // Show org creation form
+        document.getElementById('step1-suite').style.display = 'none';
+        document.getElementById('step2-org').style.display = 'block';
+        window.scrollTo(0, 0);
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
+    });
+
+    // Step 2: Back button
+    document.getElementById('step2-back').addEventListener('click', () => {
+      document.getElementById('step2-org').style.display = 'none';
+      document.getElementById('step1-suite').style.display = 'block';
+      window.scrollTo(0, 0);
+    });
+
+    // Step 2: Create organization
+    document.getElementById('step2-next').addEventListener('click', async () => {
+      const orgName = document.getElementById('orgName').value.trim();
+      if (!orgName) {
+        alert('Please enter an organization name');
+        return;
+      }
+
+      const orgSlug = document.getElementById('orgSlug').value.trim();
+      const errorDiv = document.getElementById('orgErrorMessage');
+      errorDiv.classList.add('d-none');
+
+      try {
+        document.getElementById('step2-next').disabled = true;
+
+        const response = await fetch('/api/onboarding', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            suiteSelection: {
+              vendorSuite: selectedSuite === 'vendor' || selectedSuite === 'both',
+              buyerSuite: selectedSuite === 'buyer' || selectedSuite === 'both'
+            },
+            organizationDraft: {
+              name: orgName,
+              slug: orgSlug || undefined
+            },
+            status: 'completed'
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          errorDiv.textContent = data.error || 'Failed to create organization';
+          errorDiv.classList.remove('d-none');
+          document.getElementById('step2-next').disabled = false;
+          return;
+        }
+
+        // Show welcome screen
+        document.getElementById('step2-org').style.display = 'none';
+        document.getElementById('step3-welcome').style.display = 'block';
+        window.scrollTo(0, 0);
+      } catch (error) {
+        errorDiv.textContent = 'Error: ' + error.message;
+        errorDiv.classList.remove('d-none');
+        document.getElementById('step2-next').disabled = false;
+      }
+    });
+
+    // Auto-generate slug from name
+    document.getElementById('orgName').addEventListener('input', function() {
+      const slug = this.value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+      if (slug) {
+        document.getElementById('orgSlug').value = slug;
+      }
+    });
+  </script>
 </body>
 </html>
